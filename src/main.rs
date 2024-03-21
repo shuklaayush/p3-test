@@ -1,5 +1,6 @@
 mod chip;
 mod keccak_permute;
+mod merkle_tree;
 
 use p3_baby_bear::BabyBear;
 use p3_challenger::{HashChallenger, SerializingChallenger32};
@@ -20,9 +21,8 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Registry};
 
-use keccak_permute::KeccakPermuteChip;
-
 use crate::chip::Chip;
+use keccak_permute::KeccakPermuteChip;
 
 const NUM_HASHES: usize = 680;
 
