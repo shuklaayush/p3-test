@@ -340,15 +340,14 @@ dependencies = [
 [[package]]
 name = "p3-merkle-tree"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#4809fa7bedd9ba8f6f5d3267b1592618e3776c57"
 dependencies = [
  "itertools 0.12.1",
  "p3-commit",
  "p3-field",
  "p3-matrix",
- "p3-maybe-rayon 0.1.0 (git+https://github.com/Plonky3/Plonky3.git)",
+ "p3-maybe-rayon 0.1.0",
  "p3-symmetric",
- "p3-util 0.1.0 (git+https://github.com/Plonky3/Plonky3.git)",
+ "p3-util 0.1.0",
  "serde",
  "tracing",
 ]
