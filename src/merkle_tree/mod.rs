@@ -8,7 +8,7 @@ use p3_matrix::{dense::RowMajorMatrix, MatrixRowSlices};
 use std::iter;
 
 use crate::{
-    chip::{Chip, Interaction},
+    chip::{Chip, Interaction, MachineChip},
     merkle_tree::generation::generate_trace_rows_for_leaf,
 };
 use columns::{MerkleTreeCols, NUM_MERKLE_TREE_COLS, NUM_U64_HASH_ELEMS, U64_LIMBS};
@@ -94,6 +94,11 @@ impl<F: PrimeField64, const HEIGHT: usize> Chip<F> for MerkleTreeChip<HEIGHT> {
     }
 }
 
+impl<F: PrimeField64, AB: AirBuilder, const HEIGHT: usize> MachineChip<F, AB>
+    for MerkleTreeChip<HEIGHT>
+{
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,8 +121,6 @@ mod tests {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
     use tracing_subscriber::{EnvFilter, Registry};
-
-    use crate::chip::Chip;
 
     const HEIGHT: usize = 3;
 

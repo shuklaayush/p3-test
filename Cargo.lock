@@ -394,6 +394,7 @@ dependencies = [
  "p3-uni-stark",
  "p3-util 0.1.0 (git+https://github.com/Plonky3/Plonky3.git)",
  "rand",
+ "serde",
  "tracing",
  "tracing-forest",
  "tracing-subscriber",

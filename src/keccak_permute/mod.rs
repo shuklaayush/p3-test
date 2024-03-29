@@ -12,7 +12,7 @@ use p3_keccak_air::{BITS_PER_LIMB, NUM_ROUNDS, U64_LIMBS};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::MatrixRowSlices;
 
-use crate::chip::{Chip, Interaction};
+use crate::chip::{Chip, Interaction, MachineChip};
 
 /// Assumes the field size is at least 16 bits.
 pub struct KeccakPermuteChip {
@@ -191,6 +191,8 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
     }
 }
 
+impl<F: PrimeField64, AB: AirBuilder> MachineChip<F, AB> for KeccakPermuteChip {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,8 +215,6 @@ mod tests {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
     use tracing_subscriber::{EnvFilter, Registry};
-
-    use crate::chip::Chip;
 
     const NUM_HASHES: usize = 680;
 

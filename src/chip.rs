@@ -1,6 +1,17 @@
-use p3_air::VirtualPairCol;
-use p3_field::Field;
+use p3_air::{Air, PairBuilder, PermutationAirBuilder, VirtualPairCol};
+use p3_air::{AirBuilder, ExtensionBuilder};
+use p3_field::{AbstractField, ExtensionField, Field, Powers};
 use p3_matrix::dense::RowMajorMatrix;
+use p3_matrix::{Matrix, MatrixRowSlices};
+use p3_uni_stark::{StarkGenericConfig, SymbolicAirBuilder, Val};
+
+use crate::util::batch_multiplicative_inverse_allowing_zero;
+
+#[derive(Clone, Debug)]
+pub enum InteractionType {
+    Send,
+    Receive,
+}
 
 pub struct Interaction<F: Field> {
     pub fields: Vec<VirtualPairCol<F>>,
@@ -18,4 +29,228 @@ pub trait Chip<F: Field> {
     fn receives(&self) -> Vec<Interaction<F>> {
         vec![]
     }
+
+    fn all_interactions(&self) -> Vec<(Interaction<F>, InteractionType)> {
+        let mut interactions: Vec<(Interaction<F>, InteractionType)> = vec![];
+        interactions.extend(self.sends().into_iter().map(|i| (i, InteractionType::Send)));
+        interactions.extend(
+            self.receives()
+                .into_iter()
+                .map(|i| (i, InteractionType::Receive)),
+        );
+        interactions
+    }
+}
+
+pub trait MachineChip<F: Field, AB: AirBuilder>: Chip<F> + Air<AB> {}
+
+/// Generate the permutation trace for a chip with the provided machine.
+/// This is called only after `generate_trace` has been called on all chips.
+pub fn generate_permutation_trace<
+    SC: StarkGenericConfig,
+    AB: AirBuilder,
+    C: Chip<Val<SC>> + Air<SymbolicAirBuilder<Val<SC>>>,
+>(
+    chip: &C,
+    main: &RowMajorMatrix<Val<SC>>,
+    random_elements: Vec<SC::Challenge>,
+) -> RowMajorMatrix<SC::Challenge> {
+    let all_interactions = chip.all_interactions();
+    let alphas = generate_rlc_elements::<SC>(chip, &random_elements);
+    let betas = random_elements[2].powers();
+
+    let preprocessed = chip.preprocessed_trace();
+
+    // Compute the reciprocal columns
+    //
+    // Row: | q_1 | q_2 | q_3 | ... | q_n | \phi |
+    // * q_i = \frac{1}{\alpha^i + \sum_j \beta^j * f_{i,j}}
+    // * f_{i,j} is the jth main trace column for the ith interaction
+    // * \phi is the running sum
+    //
+    // Note: We can optimize this by combining several reciprocal columns into one (the
+    // number is subject to a target constraint degree).
+    let perm_width = all_interactions.len() + 1;
+    let mut perm_values = Vec::with_capacity(main.height() * perm_width);
+
+    for (n, main_row) in main.rows().enumerate() {
+        let mut row = vec![SC::Challenge::zero(); perm_width];
+        for (m, (interaction, _)) in all_interactions.iter().enumerate() {
+            let alpha_m = alphas[interaction.argument_index];
+            let preprocessed_row = if preprocessed.is_some() {
+                preprocessed.as_ref().unwrap().row_slice(n)
+            } else {
+                &[]
+            };
+            row[m] = reduce_row(
+                main_row,
+                preprocessed_row,
+                &interaction.fields,
+                alpha_m,
+                betas.clone(),
+            );
+        }
+        perm_values.extend(row);
+    }
+    // TODO: Switch to batch_multiplicative_inverse (not allowing zero)?
+    // Zero should be vanishingly unlikely if properly randomized?
+    let perm_values = batch_multiplicative_inverse_allowing_zero(perm_values);
+    let mut perm = RowMajorMatrix::new(perm_values, perm_width);
+
+    // Compute the running sum column
+    let mut phi = vec![SC::Challenge::zero(); perm.height()];
+    for (n, (main_row, perm_row)) in main.rows().zip(perm.rows()).enumerate() {
+        if n > 0 {
+            phi[n] = phi[n - 1];
+        }
+        let preprocessed_row = if preprocessed.is_some() {
+            preprocessed.as_ref().unwrap().row_slice(n)
+        } else {
+            &[]
+        };
+        for (m, (interaction, interaction_type)) in all_interactions.iter().enumerate() {
+            let mult = interaction
+                .count
+                .apply::<Val<SC>, Val<SC>>(preprocessed_row, main_row);
+            match interaction_type {
+                InteractionType::Send => {
+                    phi[n] += perm_row[m] * mult;
+                }
+                InteractionType::Receive => {
+                    phi[n] -= perm_row[m] * mult;
+                }
+            }
+        }
+    }
+
+    for (n, row) in perm.as_view_mut().rows_mut().enumerate() {
+        *row.last_mut().unwrap() = phi[n];
+    }
+
+    perm
+}
+
+pub fn eval_permutation_constraints<C, SC, AB>(chip: &C, builder: &mut AB, cumulative_sum: AB::EF)
+where
+    C: Chip<Val<SC>> + Air<AB>,
+    SC: StarkGenericConfig,
+    AB: PairBuilder<F = Val<SC>> + PermutationAirBuilder<F = Val<SC>, EF = SC::Challenge>,
+{
+    let rand_elems = builder.permutation_randomness().to_vec();
+
+    let main = builder.main();
+    let main_local: &[AB::Var] = main.row_slice(0);
+    let main_next: &[AB::Var] = main.row_slice(1);
+
+    let preprocessed = builder.preprocessed();
+    let preprocessed_local = preprocessed.row_slice(0);
+    let preprocessed_next = preprocessed.row_slice(1);
+
+    let perm = builder.permutation();
+    let perm_width = perm.width();
+    let perm_local: &[AB::VarEF] = perm.row_slice(0);
+    let perm_next: &[AB::VarEF] = perm.row_slice(1);
+
+    let phi_local = perm_local[perm_width - 1].clone();
+    let phi_next = perm_next[perm_width - 1].clone();
+
+    let all_interactions = chip.all_interactions();
+
+    let alphas = generate_rlc_elements::<SC>(chip, &rand_elems);
+    let betas = rand_elems[2].powers();
+
+    let lhs = phi_next.into() - phi_local.into();
+    let mut rhs = AB::ExprEF::zero();
+    let mut phi_0 = AB::ExprEF::zero();
+    for (m, (interaction, interaction_type)) in all_interactions.iter().enumerate() {
+        // Reciprocal constraints
+        let mut rlc = AB::ExprEF::zero();
+        for (field, beta) in interaction.fields.iter().zip(betas.clone()) {
+            let elem = field.apply::<AB::Expr, AB::Var>(preprocessed_local, main_local);
+            rlc += AB::ExprEF::from_f(beta) * elem;
+        }
+        rlc = rlc + AB::ExprEF::from_f(alphas[interaction.argument_index]);
+        builder.assert_one_ext(rlc * perm_local[m].into());
+
+        let mult_local = interaction
+            .count
+            .apply::<AB::Expr, AB::Var>(preprocessed_local, main_local);
+        let mult_next = interaction
+            .count
+            .apply::<AB::Expr, AB::Var>(preprocessed_next, main_next);
+
+        // Build the RHS of the permutation constraint
+        match interaction_type {
+            InteractionType::Send => {
+                phi_0 += perm_local[m].into() * mult_local;
+                rhs += perm_next[m].into() * mult_next;
+            }
+            InteractionType::Receive => {
+                phi_0 -= perm_local[m].into() * mult_local;
+                rhs -= perm_next[m].into() * mult_next;
+            }
+        }
+    }
+
+    // Running sum constraints
+    builder.when_transition().assert_eq_ext(lhs, rhs);
+    builder
+        .when_first_row()
+        .assert_eq_ext(perm_local.last().unwrap().clone(), phi_0);
+    builder.when_last_row().assert_eq_ext(
+        perm_local.last().unwrap().clone(),
+        AB::ExprEF::from_f(cumulative_sum),
+    );
+}
+
+fn generate_rlc_elements<SC: StarkGenericConfig>(
+    chip: &dyn Chip<Val<SC>>,
+    random_elements: &[SC::Challenge],
+) -> Vec<SC::Challenge> {
+    let alphas = random_elements[0]
+        .powers()
+        .skip(1)
+        .take(
+            chip.sends()
+                .into_iter()
+                .chain(chip.receives())
+                .into_iter()
+                .map(|interaction| interaction.argument_index)
+                .max()
+                .unwrap_or(0)
+                + 1,
+        )
+        .collect::<Vec<_>>();
+
+    alphas
+}
+
+// TODO: Use Var and Expr type bounds in place of concrete fields so that
+// this function can be used in `eval_permutation_constraints`.
+fn reduce_row<F, EF>(
+    main_row: &[F],
+    preprocessed_row: &[F],
+    fields: &[VirtualPairCol<F>],
+    alpha: EF,
+    betas: Powers<EF>,
+) -> EF
+where
+    F: Field,
+    EF: ExtensionField<F>,
+{
+    let mut rlc = EF::zero();
+    for (columns, beta) in fields.iter().zip(betas) {
+        rlc += beta * columns.apply::<F, F>(preprocessed_row, main_row)
+    }
+    rlc += alpha;
+    rlc
+}
+
+/// Check that the combined cumulative sum across all lookup tables is zero.
+pub fn check_cumulative_sums<Challenge: Field>(perms: &[RowMajorMatrix<Challenge>]) {
+    let sum: Challenge = perms
+        .iter()
+        .map(|perm| *perm.row_slice(perm.height() - 1).last().unwrap())
+        .sum();
+    assert_eq!(sum, Challenge::zero());
 }
