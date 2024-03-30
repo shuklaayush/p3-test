@@ -192,9 +192,9 @@ mod tests {
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
 
-        let proof = prove::<MyConfig, _>(&config, &chip, &mut challenger, trace);
+        let proof = prove::<MyConfig, _>(&config, &chip, &mut challenger, trace, &vec![]);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-        verify(&config, &chip, &mut challenger, &proof)
+        verify(&config, &chip, &mut challenger, &proof, &vec![])
     }
 }

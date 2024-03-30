@@ -48,8 +48,7 @@ pub trait MachineChip<F: Field, AB: AirBuilder>: Chip<F> + Air<AB> {}
 /// This is called only after `generate_trace` has been called on all chips.
 pub fn generate_permutation_trace<
     SC: StarkGenericConfig,
-    AB: AirBuilder,
-    C: Chip<Val<SC>> + Air<SymbolicAirBuilder<Val<SC>>>,
+    C: MachineChip<Val<SC>, SymbolicAirBuilder<Val<SC>>>,
 >(
     chip: &C,
     main: &RowMajorMatrix<Val<SC>>,
@@ -151,8 +150,8 @@ where
     let perm_local: &[AB::VarEF] = perm.row_slice(0);
     let perm_next: &[AB::VarEF] = perm.row_slice(1);
 
-    let phi_local = perm_local[perm_width - 1].clone();
-    let phi_next = perm_next[perm_width - 1].clone();
+    let phi_local = perm_local[perm_width - 1];
+    let phi_next = perm_next[perm_width - 1];
 
     let all_interactions = chip.all_interactions();
 
@@ -169,7 +168,7 @@ where
             let elem = field.apply::<AB::Expr, AB::Var>(preprocessed_local, main_local);
             rlc += AB::ExprEF::from_f(beta) * elem;
         }
-        rlc = rlc + AB::ExprEF::from_f(alphas[interaction.argument_index]);
+        rlc += AB::ExprEF::from_f(alphas[interaction.argument_index]);
         builder.assert_one_ext(rlc * perm_local[m].into());
 
         let mult_local = interaction
@@ -196,9 +195,9 @@ where
     builder.when_transition().assert_eq_ext(lhs, rhs);
     builder
         .when_first_row()
-        .assert_eq_ext(perm_local.last().unwrap().clone(), phi_0);
+        .assert_eq_ext(*perm_local.last().unwrap(), phi_0);
     builder.when_last_row().assert_eq_ext(
-        perm_local.last().unwrap().clone(),
+        *perm_local.last().unwrap(),
         AB::ExprEF::from_f(cumulative_sum),
     );
 }
@@ -207,22 +206,19 @@ fn generate_rlc_elements<SC: StarkGenericConfig>(
     chip: &dyn Chip<Val<SC>>,
     random_elements: &[SC::Challenge],
 ) -> Vec<SC::Challenge> {
-    let alphas = random_elements[0]
+    random_elements[0]
         .powers()
         .skip(1)
         .take(
             chip.sends()
                 .into_iter()
                 .chain(chip.receives())
-                .into_iter()
                 .map(|interaction| interaction.argument_index)
                 .max()
                 .unwrap_or(0)
                 + 1,
         )
-        .collect::<Vec<_>>();
-
-    alphas
+        .collect::<Vec<_>>()
 }
 
 // TODO: Use Var and Expr type bounds in place of concrete fields so that

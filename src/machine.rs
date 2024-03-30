@@ -1,10 +1,11 @@
-use p3_air::{Air, AirBuilder};
+
+
 use p3_baby_bear::BabyBear;
 use p3_challenger::{CanObserve, FieldChallenger};
-use p3_commit::Pcs;
-use p3_field::{AbstractField, Field, PrimeField64};
+use p3_commit::{Pcs, PolynomialSpace};
+use p3_field::{AbstractField, PrimeField64};
 use p3_keccak::Keccak256Hash;
-use p3_matrix::{dense::RowMajorMatrix, Dimensions, Matrix, MatrixRowSlices};
+use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_merkle_tree::FieldMerkleTree;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
@@ -13,24 +14,64 @@ use p3_util::log2_strict_usize;
 use rand::random;
 
 use crate::{
-    chip::{check_cumulative_sums, generate_permutation_trace, Chip, MachineChip},
+    chip::{
+        check_cumulative_sums, generate_permutation_trace, Chip, Interaction, InteractionType,
+    },
     keccak_permute::KeccakPermuteChip,
     merkle_tree::MerkleTreeChip,
     proof::{ChipProof, Commitments, MachineProof, OpenedValues},
     quotient::quotient_values,
 };
-pub struct Machine<const HEIGHT: usize> {
-    keccak_permute_chip: KeccakPermuteChip,
-    merkle_tree_chip: MerkleTreeChip<HEIGHT>,
+
+const HEIGHT: usize = 8;
+
+pub enum ChipType {
+    KeccakPermute(KeccakPermuteChip),
+    MerkleTree(MerkleTreeChip<HEIGHT>),
 }
 
-impl<const HEIGHT: usize> Machine<HEIGHT> {
-    pub fn chips<F: PrimeField64, AB: AirBuilder>(&self) -> Vec<&dyn MachineChip<F, AB>> {
+impl<F: PrimeField64> Chip<F> for ChipType {
+    fn generate_trace(&self) -> RowMajorMatrix<F> {
+        match self {
+            ChipType::KeccakPermute(chip) => chip.generate_trace(),
+            ChipType::MerkleTree(chip) => chip.generate_trace(),
+        }
+    }
+
+    fn sends(&self) -> Vec<Interaction<F>> {
+        match self {
+            ChipType::KeccakPermute(chip) => chip.sends(),
+            ChipType::MerkleTree(chip) => chip.sends(),
+        }
+    }
+
+    fn receives(&self) -> Vec<Interaction<F>> {
+        match self {
+            ChipType::KeccakPermute(chip) => chip.receives(),
+            ChipType::MerkleTree(chip) => chip.receives(),
+        }
+    }
+
+    fn all_interactions(&self) -> Vec<(Interaction<F>, InteractionType)> {
+        match self {
+            ChipType::KeccakPermute(chip) => chip.all_interactions(),
+            ChipType::MerkleTree(chip) => chip.all_interactions(),
+        }
+    }
+}
+
+pub struct Machine {
+    keccak_permute_chip: ChipType,
+    merkle_tree_chip: ChipType,
+}
+
+impl Machine {
+    pub fn chips(&self) -> Vec<&ChipType> {
         vec![&self.keccak_permute_chip, &self.merkle_tree_chip]
     }
 }
 
-impl<const HEIGHT: usize> Machine<HEIGHT> {
+impl Machine {
     pub fn new() -> Self {
         type Val = BabyBear;
 
@@ -67,8 +108,8 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
         };
 
         Self {
-            keccak_permute_chip,
-            merkle_tree_chip,
+            keccak_permute_chip: ChipType::KeccakPermute(keccak_permute_chip),
+            merkle_tree_chip: ChipType::MerkleTree(merkle_tree_chip),
         }
     }
 
@@ -76,7 +117,14 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
         &self,
         config: &SC,
         challenger: &mut SC::Challenger,
-    ) -> MachineProof<SC> {
+    ) -> MachineProof<SC>
+    where
+        Val<SC>: PrimeField64,
+        <<SC as StarkGenericConfig>::Pcs as Pcs<
+            <SC as StarkGenericConfig>::Challenge,
+            <SC as StarkGenericConfig>::Challenger,
+        >>::Domain: Send,
+    {
         let pcs = config.pcs();
 
         // 1. Generate and commit to preprocessed traces
@@ -115,33 +163,52 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
             .iter()
             .map(|trace| trace.height())
             .collect::<Vec<_>>();
-        let main_domains = main_degrees.map(|degree| pcs.natural_domain_for_degree(degree));
+        let main_domains = main_degrees
+            .iter()
+            .map(|&degree| pcs.natural_domain_for_degree(degree))
+            .collect::<Vec<_>>();
 
-        let (main_commit, main_data) = tracing::info_span!("commit to main traces")
-            .in_scope(|| pcs.commit(std::iter::zip(main_domains, main_traces).collect::<Vec<_>>()));
+        let (main_commit, main_data) =
+            tracing::info_span!("commit to main traces").in_scope(|| {
+                pcs.commit(
+                    std::iter::zip(main_domains.clone(), main_traces.clone()).collect::<Vec<_>>(),
+                )
+            });
         challenger.observe(main_commit.clone());
 
         // 3. Generate and commit to permutation trace
         let mut perm_challenges = Vec::new();
         for _ in 0..3 {
-            perm_challenges.push(challenger.sample_ext_element());
+            perm_challenges.push(challenger.sample_ext_element::<SC::Challenge>());
         }
 
         let perm_traces = tracing::info_span!("generate permutation traces").in_scope(|| {
             self.chips()
                 .into_par_iter()
                 .enumerate()
-                .map(|(i, chip)| {
-                    generate_permutation_trace(chip, &main_traces[i], perm_challenges.clone())
+                .map(|(i, chip)| match chip {
+                    ChipType::KeccakPermute(chip) => generate_permutation_trace::<SC, _>(
+                        chip,
+                        &main_traces[i],
+                        perm_challenges.clone(),
+                    ),
+                    ChipType::MerkleTree(chip) => generate_permutation_trace::<SC, _>(
+                        chip,
+                        &main_traces[i],
+                        perm_challenges.clone(),
+                    ),
                 })
                 .collect::<Vec<_>>()
         });
         // TODO: Assert equal to main trace degrees?
         let perm_degrees = perm_traces
             .iter()
-            .map(|trace| trace.height())
+            .map(|trace: &RowMajorMatrix<SC::Challenge>| trace.height())
             .collect::<Vec<_>>();
-        let perm_domains = perm_degrees.map(|degree| pcs.natural_domain_for_degree(degree));
+        let perm_domains = perm_degrees
+            .iter()
+            .map(|&degree| pcs.natural_domain_for_degree(degree))
+            .collect::<Vec<_>>();
         let (perm_commit, perm_data) = tracing::info_span!("commit to permutation traces")
             .in_scope(|| {
                 let flattened_perm_traces = perm_traces
@@ -153,7 +220,7 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
         challenger.observe(perm_commit.clone());
         let cumulative_sums = perm_traces
             .iter()
-            .map(|trace| trace.row_slice(trace.height() - 1).last().unwrap().clone())
+            .map(|trace| *trace.row_slice(trace.height() - 1).last().unwrap())
             .collect::<Vec<_>>();
 
         // 4. Verify constraints
@@ -172,11 +239,17 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
         check_cumulative_sums(&perm_traces[..]);
 
         // 5. Generate and commit to quotient traces
-        let log_degrees = main_degrees.map(|d| log2_strict_usize(d));
+        let log_degrees = main_degrees
+            .iter()
+            .map(|&d| log2_strict_usize(d))
+            .collect::<Vec<_>>();
         let log_quotient_degrees = self
             .chips()
             .iter()
-            .map(|chip| get_log_quotient_degree(chip))
+            .map(|chip| match chip {
+                ChipType::KeccakPermute(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
+                ChipType::MerkleTree(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
+            })
             .collect::<Vec<_>>();
         let quotient_degrees = log_quotient_degrees
             .iter()
@@ -186,7 +259,7 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
             .iter()
             .zip(log_degrees.iter())
             .zip(log_quotient_degrees.iter())
-            .map(|(domain, log_degree, log_quotient_degree)| {
+            .map(|((domain, log_degree), log_quotient_degree)| {
                 domain.create_disjoint_domain(1 << (log_degree + log_quotient_degree))
             })
             .collect::<Vec<_>>();
@@ -194,6 +267,7 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
         let alpha: SC::Challenge = challenger.sample_ext_element();
 
         let quotient_values = quotient_domains
+            .clone()
             .into_par_iter()
             .enumerate()
             .map(|(i, quotient_domain)| {
@@ -201,36 +275,60 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
                 //     self.keccak_permute_chip.preprocessed_trace();
                 // let preprocessed_trace_lde = ppt.map(|trace| preprocessed_trace_ldes.remove(0));
                 let main_trace_on_quotient_domains =
-                    pcs.get_evaluations_on_domain(&main_data, i, *quotient_domain);
+                    pcs.get_evaluations_on_domain(&main_data, i, quotient_domain);
                 let permutation_trace_on_quotient_domains =
-                    pcs.get_evaluations_on_domain(&perm_data, i, *quotient_domain);
-                quotient_values(
-                    self.chips()[i],
-                    cumulative_sums[i],
-                    main_domains[i],
-                    *quotient_domain,
-                    main_trace_on_quotient_domains,
-                    permutation_trace_on_quotient_domains,
-                    &perm_challenges,
-                    alpha,
-                )
+                    pcs.get_evaluations_on_domain(&perm_data, i, quotient_domain);
+                match self.chips()[i] {
+                    ChipType::KeccakPermute(chip) => quotient_values::<SC, _, _>(
+                        chip,
+                        cumulative_sums[i],
+                        main_domains[i],
+                        quotient_domain,
+                        main_trace_on_quotient_domains,
+                        permutation_trace_on_quotient_domains,
+                        &perm_challenges,
+                        alpha,
+                    ),
+                    ChipType::MerkleTree(chip) => quotient_values::<SC, _, _>(
+                        chip,
+                        cumulative_sums[i],
+                        main_domains[i],
+                        quotient_domain,
+                        main_trace_on_quotient_domains,
+                        permutation_trace_on_quotient_domains,
+                        &perm_challenges,
+                        alpha,
+                    ),
+                }
             })
             .collect::<Vec<_>>();
-        let qc_domains = quotient_domains.zip(quotient_degrees.iter()).iter().map(
-            |(quotient_domain, quotient_degree)| quotient_domain.split_domains(quotient_degree),
-        );
         let quotient_chunks = quotient_domains
-            .iter()
-            .zip(quotient_degrees.iter())
-            .zip(quotient_values.iter())
-            .map(|(domain, degree, values)| {
+            .clone()
+            .into_iter()
+            .zip(quotient_degrees.clone())
+            .zip(quotient_values)
+            .map(|((domain, degree), values)| {
                 let quotient_flat = RowMajorMatrix::new_col(values).flatten_to_base();
                 domain.split_evals(degree, quotient_flat)
-            });
+            })
+            .collect::<Vec<_>>();
+        let qc_domains = quotient_domains
+            .into_iter()
+            .zip(quotient_degrees)
+            .map(|(quotient_domain, quotient_degree)| {
+                quotient_domain.split_domains(quotient_degree)
+            })
+            .collect::<Vec<_>>();
 
         let (quotient_commit, quotient_data) = tracing::info_span!("commit to quotient chunks")
             .in_scope(|| {
-                pcs.commit(std::iter::zip(qc_domains, quotient_chunks).collect::<Vec<_>>())
+                pcs.commit(
+                    qc_domains
+                        .into_iter()
+                        .flatten()
+                        .zip(quotient_chunks.into_iter().flatten())
+                        .collect::<Vec<_>>(),
+                )
             });
         challenger.observe(quotient_commit.clone());
 
@@ -250,12 +348,12 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
             .map(|&log_deg| vec![zeta.exp_power_of_2(log_deg)])
             .collect::<Vec<_>>();
 
-        let prover_data_and_points = [
-            (&main_data, zeta_and_next.as_slice()),
-            (&perm_data, zeta_and_next.as_slice()),
-            (&quotient_data, zeta_exp_quotient_degree.as_slice()),
+        let prover_data_and_points = vec![
+            (&main_data, zeta_and_next.clone()),
+            (&perm_data, zeta_and_next),
+            (&quotient_data, zeta_exp_quotient_degree),
         ];
-        let (openings, opening_proof) = pcs.open(&prover_data_and_points, challenger);
+        let (openings, opening_proof) = pcs.open(prover_data_and_points, challenger);
         let [main_openings, perm_openings, quotient_openings] = openings
             .try_into()
             .expect("Should have 3 rounds of openings");
@@ -277,11 +375,10 @@ impl<const HEIGHT: usize> Machine<HEIGHT> {
                     permutation_next: perm_next,
                     quotient_chunks,
                 };
-                let cumulative_sum = perm_trace
+                let cumulative_sum = *perm_trace
                     .row_slice(perm_trace.height() - 1)
                     .last()
-                    .unwrap()
-                    .clone();
+                    .unwrap();
                 ChipProof {
                     log_degree: *log_degree,
                     opened_values,
