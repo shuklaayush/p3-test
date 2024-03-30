@@ -1,10 +1,11 @@
+use p3_air::ExtensionBuilder;
 use p3_air::{Air, PairBuilder, PermutationAirBuilder, VirtualPairCol};
-use p3_air::{AirBuilder, ExtensionBuilder};
 use p3_field::{AbstractField, ExtensionField, Field, Powers};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::{Matrix, MatrixRowSlices};
 use p3_uni_stark::{StarkGenericConfig, SymbolicAirBuilder, Val};
 
+use crate::folder::ProverConstraintFolder;
 use crate::util::batch_multiplicative_inverse_allowing_zero;
 
 #[derive(Clone, Debug)]
@@ -42,20 +43,25 @@ pub trait Chip<F: Field> {
     }
 }
 
-pub trait MachineChip<F: Field, AB: AirBuilder>: Chip<F> + Air<AB> {}
+pub trait MachineChip<SC: StarkGenericConfig>: Chip<Val<SC>> + for<'a> Air<ProverConstraintFolder<'a, SC>>
+    // + for<'a> Air<VerifierConstraintFolder<'a, SC>>
+    + for<'a> Air<SymbolicAirBuilder<Val<SC>>>
+    // + for<'a> Air<DebugConstraintBuilder<'a, Val<SC>>>
+{
+    fn trace_width(&self) -> usize {
+        self.width()
+    }
+}
 
 /// Generate the permutation trace for a chip with the provided machine.
 /// This is called only after `generate_trace` has been called on all chips.
-pub fn generate_permutation_trace<
-    SC: StarkGenericConfig,
-    C: MachineChip<Val<SC>, SymbolicAirBuilder<Val<SC>>>,
->(
+pub fn generate_permutation_trace<SC: StarkGenericConfig, C: MachineChip<SC>>(
     chip: &C,
     main: &RowMajorMatrix<Val<SC>>,
     random_elements: Vec<SC::Challenge>,
 ) -> RowMajorMatrix<SC::Challenge> {
     let all_interactions = chip.all_interactions();
-    let alphas = generate_rlc_elements::<SC>(chip, &random_elements);
+    let alphas = generate_rlc_elements(chip, &random_elements);
     let betas = random_elements[2].powers();
 
     let preprocessed = chip.preprocessed_trace();
@@ -131,7 +137,7 @@ pub fn generate_permutation_trace<
 
 pub fn eval_permutation_constraints<C, SC, AB>(chip: &C, builder: &mut AB, cumulative_sum: AB::EF)
 where
-    C: Chip<Val<SC>> + Air<AB>,
+    C: MachineChip<SC>,
     SC: StarkGenericConfig,
     AB: PairBuilder<F = Val<SC>> + PermutationAirBuilder<F = Val<SC>, EF = SC::Challenge>,
 {
@@ -155,7 +161,7 @@ where
 
     let all_interactions = chip.all_interactions();
 
-    let alphas = generate_rlc_elements::<SC>(chip, &rand_elems);
+    let alphas = generate_rlc_elements(chip, &rand_elems);
     let betas = rand_elems[2].powers();
 
     let lhs = phi_next.into() - phi_local.into();
@@ -202,8 +208,8 @@ where
     );
 }
 
-fn generate_rlc_elements<SC: StarkGenericConfig>(
-    chip: &dyn Chip<Val<SC>>,
+fn generate_rlc_elements<SC: StarkGenericConfig, C: MachineChip<SC>>(
+    chip: &C,
     random_elements: &[SC::Challenge],
 ) -> Vec<SC::Challenge> {
     random_elements[0]

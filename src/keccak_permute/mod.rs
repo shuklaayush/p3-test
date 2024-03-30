@@ -2,8 +2,7 @@ use core::borrow::Borrow;
 use p3_keccak_air::generate_trace_rows;
 
 use p3_air::{Air, AirBuilder, BaseAir};
-use p3_field::AbstractField;
-use p3_field::PrimeField64;
+use p3_field::{AbstractField, PrimeField64};
 use p3_keccak_air::logic::{andn_gen, xor3_gen, xor_gen};
 use p3_keccak_air::rc_value_bit;
 use p3_keccak_air::round_flags::eval_round_flags;
@@ -11,6 +10,8 @@ use p3_keccak_air::{KeccakCols, NUM_KECCAK_COLS};
 use p3_keccak_air::{BITS_PER_LIMB, NUM_ROUNDS, U64_LIMBS};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::MatrixRowSlices;
+use p3_uni_stark::StarkGenericConfig;
+use p3_uni_stark::Val;
 
 use crate::chip::{Chip, Interaction, MachineChip};
 
@@ -191,7 +192,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
     }
 }
 
-impl<F: PrimeField64, AB: AirBuilder> MachineChip<F, AB> for KeccakPermuteChip {}
+impl<SC: StarkGenericConfig> MachineChip<SC> for KeccakPermuteChip where Val<SC>: PrimeField64 {}
 
 #[cfg(test)]
 mod tests {
@@ -210,25 +211,11 @@ mod tests {
     use p3_uni_stark::{prove, verify, StarkConfig, VerificationError};
     use p3_util::log2_ceil_usize;
     use rand::random;
-    use tracing_forest::util::LevelFilter;
-    use tracing_forest::ForestLayer;
-    use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::util::SubscriberInitExt;
-    use tracing_subscriber::{EnvFilter, Registry};
 
     const NUM_HASHES: usize = 680;
 
     #[test]
     fn test_keccak_prove() -> Result<(), VerificationError> {
-        let env_filter = EnvFilter::builder()
-            .with_default_directive(LevelFilter::INFO.into())
-            .from_env_lossy();
-
-        Registry::default()
-            .with(env_filter)
-            .with(ForestLayer::default())
-            .init();
-
         type Val = BabyBear;
         type Challenge = BinomialExtensionField<Val, 4>;
 

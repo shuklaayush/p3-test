@@ -1,11 +1,10 @@
-
-
+use p3_air::{Air, AirBuilder, BaseAir};
 use p3_baby_bear::BabyBear;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
-use p3_field::{AbstractField, PrimeField64};
+use p3_field::{AbstractField, Field, PrimeField64};
 use p3_keccak::Keccak256Hash;
-use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
+use p3_matrix::{dense::RowMajorMatrix, Dimensions, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_merkle_tree::FieldMerkleTree;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
@@ -14,9 +13,7 @@ use p3_util::log2_strict_usize;
 use rand::random;
 
 use crate::{
-    chip::{
-        check_cumulative_sums, generate_permutation_trace, Chip, Interaction, InteractionType,
-    },
+    chip::{check_cumulative_sums, generate_permutation_trace, Chip, Interaction, InteractionType},
     keccak_permute::KeccakPermuteChip,
     merkle_tree::MerkleTreeChip,
     proof::{ChipProof, Commitments, MachineProof, OpenedValues},
@@ -28,6 +25,31 @@ const HEIGHT: usize = 8;
 pub enum ChipType {
     KeccakPermute(KeccakPermuteChip),
     MerkleTree(MerkleTreeChip<HEIGHT>),
+}
+
+impl<F: Field> BaseAir<F> for ChipType {
+    fn width(&self) -> usize {
+        match self {
+            ChipType::KeccakPermute(chip) => <KeccakPermuteChip as BaseAir<F>>::width(chip),
+            ChipType::MerkleTree(chip) => <MerkleTreeChip<HEIGHT> as BaseAir<F>>::width(chip),
+        }
+    }
+
+    fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
+        match self {
+            ChipType::KeccakPermute(chip) => chip.preprocessed_trace(),
+            ChipType::MerkleTree(chip) => chip.preprocessed_trace(),
+        }
+    }
+}
+
+impl<AB: AirBuilder> Air<AB> for ChipType {
+    fn eval(&self, builder: &mut AB) {
+        match self {
+            ChipType::KeccakPermute(chip) => chip.eval(builder),
+            ChipType::MerkleTree(chip) => chip.eval(builder),
+        }
+    }
 }
 
 impl<F: PrimeField64> Chip<F> for ChipType {
@@ -399,10 +421,14 @@ impl Machine {
     //     proof: &MachineProof<SC>,
     //     challenger: &mut SC::Challenger,
     // ) -> core::result::Result<(), ()> {
-    //     let log_quotient_degrees: [usize; 2usize] = [
-    //         get_log_quotient_degree(self.keccak_permute_chip()),
-    //         get_log_quotient_degree(self.merkle_tree_chip()),
-    //     ];
+    //     let log_quotient_degrees = self
+    //         .chips()
+    //         .iter()
+    //         .map(|chip| match chip {
+    //             ChipType::KeccakPermute(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
+    //             ChipType::MerkleTree(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
+    //         })
+    //         .collect::<Vec<_>>();
     //     let pcs = config.pcs();
     //     let chips_interactions = self
     //         .chips()
@@ -414,7 +440,10 @@ impl Machine {
     //             .iter()
     //             .zip(proof.chip_proofs.iter())
     //             .map(|(chip, chip_proof)| Dimensions {
-    //                 width: chip.trace_width(),
+    //                 width: match chip {
+    //                     ChipType::KeccakPermute(chip) => chip.trace_width(),
+    //                     ChipType::MerkleTree(chip) => chip.trace_width(),
+    //                 },
     //                 height: 1 << chip_proof.log_degree,
     //             })
     //             .collect::<Vec<_>>(),
@@ -522,4 +551,64 @@ impl Machine {
     //     }
     //     Ok(())
     // }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use p3_baby_bear::BabyBear;
+    use p3_challenger::{HashChallenger, SerializingChallenger32};
+    use p3_commit::ExtensionMmcs;
+    use p3_dft::Radix2DitParallel;
+    use p3_field::extension::BinomialExtensionField;
+    use p3_fri::{FriConfig, TwoAdicFriPcs};
+    use p3_keccak::Keccak256Hash;
+    use p3_merkle_tree::FieldMerkleTreeMmcs;
+    use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
+    use p3_uni_stark::StarkConfig;
+    use p3_util::log2_ceil_usize;
+
+    #[test]
+    fn test_machine_prove() {
+        type Val = BabyBear;
+        type Challenge = BinomialExtensionField<Val, 4>;
+
+        type ByteHash = Keccak256Hash;
+        type FieldHash = SerializingHasher32<ByteHash>;
+        let byte_hash = ByteHash {};
+        let field_hash = FieldHash::new(Keccak256Hash {});
+
+        type MyCompress = CompressionFunctionFromHasher<u8, ByteHash, 2, 32>;
+        let compress = MyCompress::new(byte_hash);
+
+        type ValMmcs = FieldMerkleTreeMmcs<Val, u8, FieldHash, MyCompress, 32>;
+        let val_mmcs = ValMmcs::new(field_hash, compress);
+
+        type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
+        let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
+
+        type Dft = Radix2DitParallel;
+        let dft = Dft {};
+
+        type Challenger = SerializingChallenger32<Val, HashChallenger<u8, ByteHash, 32>>;
+
+        let fri_config = FriConfig {
+            log_blowup: 1,
+            num_queries: 100,
+            proof_of_work_bits: 16,
+            mmcs: challenge_mmcs,
+        };
+        type Pcs = TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
+        let pcs = Pcs::new(log2_ceil_usize(256), dft, val_mmcs, fri_config);
+
+        type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
+        let config = MyConfig::new(pcs);
+
+        let mut challenger = Challenger::from_hasher(vec![], byte_hash);
+
+        let machine = Machine::new();
+
+        machine.prove(&config, &mut challenger);
+    }
 }

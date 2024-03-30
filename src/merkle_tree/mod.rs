@@ -5,6 +5,7 @@ use core::borrow::Borrow;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::{AbstractField, PrimeField64};
 use p3_matrix::{dense::RowMajorMatrix, MatrixRowSlices};
+use p3_uni_stark::{StarkGenericConfig, Val};
 use std::iter;
 
 use crate::{
@@ -94,8 +95,8 @@ impl<F: PrimeField64, const HEIGHT: usize> Chip<F> for MerkleTreeChip<HEIGHT> {
     }
 }
 
-impl<F: PrimeField64, AB: AirBuilder, const HEIGHT: usize> MachineChip<F, AB>
-    for MerkleTreeChip<HEIGHT>
+impl<SC: StarkGenericConfig, const HEIGHT: usize> MachineChip<SC> for MerkleTreeChip<HEIGHT> where
+    Val<SC>: PrimeField64
 {
 }
 
@@ -116,25 +117,11 @@ mod tests {
     use p3_uni_stark::{prove, verify, StarkConfig, VerificationError};
     use p3_util::log2_ceil_usize;
     use rand::random;
-    use tracing_forest::util::LevelFilter;
-    use tracing_forest::ForestLayer;
-    use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::util::SubscriberInitExt;
-    use tracing_subscriber::{EnvFilter, Registry};
 
     const HEIGHT: usize = 3;
 
     #[test]
     fn test_merkle_tree_prove() -> Result<(), VerificationError> {
-        let env_filter = EnvFilter::builder()
-            .with_default_directive(LevelFilter::INFO.into())
-            .from_env_lossy();
-
-        Registry::default()
-            .with(env_filter)
-            .with(ForestLayer::default())
-            .init();
-
         type Val = BabyBear;
         type Challenge = BinomialExtensionField<Val, 4>;
 

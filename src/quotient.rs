@@ -1,4 +1,4 @@
-use p3_air::{Air, TwoRowMatrixView};
+use p3_air::TwoRowMatrixView;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, PackedValue};
 use p3_matrix::MatrixGet;
@@ -7,7 +7,7 @@ use p3_uni_stark::{Domain, PackedChallenge, PackedVal, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
 
 use crate::{
-    chip::{eval_permutation_constraints, Chip},
+    chip::{eval_permutation_constraints, MachineChip},
     folder::ProverConstraintFolder,
 };
 
@@ -23,7 +23,7 @@ pub fn quotient_values<SC, C, Mat>(
 ) -> Vec<SC::Challenge>
 where
     SC: StarkGenericConfig,
-    C: Chip<Val<SC>> + for<'a> Air<ProverConstraintFolder<'a, SC>>,
+    C: MachineChip<SC>,
     Mat: MatrixGet<Val<SC>> + Sync,
 {
     let quotient_size = quotient_domain.size();
