@@ -178,7 +178,6 @@ mod tests {
         let config = MyConfig::new(pcs);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-
         let proof = prove::<MyConfig, _>(&config, &chip, &mut challenger, trace, &vec![]);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);

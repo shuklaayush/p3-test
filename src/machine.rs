@@ -1,19 +1,23 @@
-use p3_air::{Air, AirBuilder, BaseAir};
+use p3_air::{Air, AirBuilder, BaseAir, TwoRowMatrixView};
 use p3_baby_bear::BabyBear;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
-use p3_field::{AbstractField, Field, PrimeField64};
+use p3_field::{AbstractExtensionField, AbstractField, Field, PrimeField64};
 use p3_keccak::Keccak256Hash;
 use p3_matrix::{dense::RowMajorMatrix, Dimensions, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_merkle_tree::FieldMerkleTree;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
-use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val};
+use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val, VerificationError};
 use p3_util::log2_strict_usize;
 use rand::random;
 
 use crate::{
-    chip::{check_cumulative_sums, generate_permutation_trace, Chip, Interaction, InteractionType},
+    chip::{
+        check_cumulative_sums, eval_permutation_constraints, generate_permutation_trace, Chip,
+        Interaction, InteractionType, MachineChip,
+    },
+    folder::VerifierConstraintFolder,
     keccak_permute::KeccakPermuteChip,
     merkle_tree::MerkleTreeChip,
     proof::{ChipProof, Commitments, MachineProof, OpenedValues},
@@ -78,6 +82,22 @@ impl<F: PrimeField64> Chip<F> for ChipType {
         match self {
             ChipType::KeccakPermute(chip) => chip.all_interactions(),
             ChipType::MerkleTree(chip) => chip.all_interactions(),
+        }
+    }
+}
+
+impl<SC: StarkGenericConfig> MachineChip<SC> for ChipType
+where
+    Val<SC>: PrimeField64,
+{
+    fn trace_width(&self) -> usize {
+        match self {
+            ChipType::KeccakPermute(chip) => {
+                <KeccakPermuteChip as MachineChip<SC>>::trace_width(chip)
+            }
+            ChipType::MerkleTree(chip) => {
+                <MerkleTreeChip<HEIGHT> as MachineChip<SC>>::trace_width(chip)
+            }
         }
     }
 }
@@ -240,6 +260,7 @@ impl Machine {
                 pcs.commit(std::iter::zip(perm_domains, flattened_perm_traces).collect::<Vec<_>>())
             });
         challenger.observe(perm_commit.clone());
+        let alpha: SC::Challenge = challenger.sample_ext_element();
         let cumulative_sums = perm_traces
             .iter()
             .map(|trace| *trace.row_slice(trace.height() - 1).last().unwrap())
@@ -285,8 +306,6 @@ impl Machine {
                 domain.create_disjoint_domain(1 << (log_degree + log_quotient_degree))
             })
             .collect::<Vec<_>>();
-
-        let alpha: SC::Challenge = challenger.sample_ext_element();
 
         let quotient_values = quotient_domains
             .clone()
@@ -336,7 +355,7 @@ impl Machine {
             .collect::<Vec<_>>();
         let qc_domains = quotient_domains
             .into_iter()
-            .zip(quotient_degrees)
+            .zip(quotient_degrees.clone())
             .map(|(quotient_domain, quotient_degree)| {
                 quotient_domain.split_domains(quotient_degree)
             })
@@ -365,20 +384,36 @@ impl Machine {
             .iter()
             .map(|domain| vec![zeta, domain.next_point(zeta).unwrap()])
             .collect::<Vec<_>>();
-        let zeta_exp_quotient_degree = log_quotient_degrees
-            .iter()
-            .map(|&log_deg| vec![zeta.exp_power_of_2(log_deg)])
-            .collect::<Vec<_>>();
 
-        let prover_data_and_points = vec![
-            (&main_data, zeta_and_next.clone()),
-            (&perm_data, zeta_and_next),
-            (&quotient_data, zeta_exp_quotient_degree),
-        ];
-        let (openings, opening_proof) = pcs.open(prover_data_and_points, challenger);
-        let [main_openings, perm_openings, quotient_openings] = openings
+        let (opening_values, opening_proof) = pcs.open(
+            vec![
+                (&main_data, zeta_and_next.clone()),
+                (&perm_data, zeta_and_next),
+                (
+                    &quotient_data,
+                    quotient_degrees
+                        .iter()
+                        .map(|&quotient_degree| {
+                            (0..quotient_degree).map(|_| vec![zeta]).collect::<Vec<_>>()
+                        })
+                        .flatten()
+                        .collect::<Vec<_>>(),
+                ),
+            ],
+            challenger,
+        );
+        let [main_openings, perm_openings, quotient_openings] = opening_values
             .try_into()
             .expect("Should have 3 rounds of openings");
+        let quotient_openings = quotient_degrees
+            .iter()
+            .scan(0, |start, &chunk_size| {
+                let end = *start + chunk_size;
+                let res = Some(quotient_openings[*start..end].to_vec());
+                *start = end;
+                res
+            })
+            .collect::<Vec<_>>();
 
         let chip_proofs = log_degrees
             .iter()
@@ -389,7 +424,10 @@ impl Machine {
             .map(|((((log_degree, main), perm), quotient), perm_trace)| {
                 let [main_local, main_next] = main.try_into().expect("Should have 2 openings");
                 let [perm_local, perm_next] = perm.try_into().expect("Should have 2 openings");
-                let [quotient_chunks] = quotient.try_into().expect("Should have 1 opening");
+                let quotient_chunks = quotient
+                    .into_iter()
+                    .map(|mut chunk| chunk.remove(0))
+                    .collect::<Vec<_>>();
                 let opened_values = OpenedValues {
                     trace_local: main_local,
                     trace_next: main_next,
@@ -402,12 +440,13 @@ impl Machine {
                     .last()
                     .unwrap();
                 ChipProof {
-                    log_degree: *log_degree,
+                    degree_bits: *log_degree,
                     opened_values,
                     cumulative_sum,
                 }
             })
             .collect::<Vec<_>>();
+
         MachineProof {
             commitments,
             opening_proof,
@@ -415,142 +454,253 @@ impl Machine {
         }
     }
 
-    // fn verify<SC: StarkGenericConfig>(
-    //     &self,
-    //     config: &SC,
-    //     proof: &MachineProof<SC>,
-    //     challenger: &mut SC::Challenger,
-    // ) -> core::result::Result<(), ()> {
-    //     let log_quotient_degrees = self
-    //         .chips()
-    //         .iter()
-    //         .map(|chip| match chip {
-    //             ChipType::KeccakPermute(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
-    //             ChipType::MerkleTree(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
-    //         })
-    //         .collect::<Vec<_>>();
-    //     let pcs = config.pcs();
-    //     let chips_interactions = self
-    //         .chips()
-    //         .iter()
-    //         .map(|chip| chip.all_interactions())
-    //         .collect::<Vec<_>>();
-    //     let dims = &[
-    //         self.chips()
-    //             .iter()
-    //             .zip(proof.chip_proofs.iter())
-    //             .map(|(chip, chip_proof)| Dimensions {
-    //                 width: match chip {
-    //                     ChipType::KeccakPermute(chip) => chip.trace_width(),
-    //                     ChipType::MerkleTree(chip) => chip.trace_width(),
-    //                 },
-    //                 height: 1 << chip_proof.log_degree,
-    //             })
-    //             .collect::<Vec<_>>(),
-    //         chips_interactions
-    //             .iter()
-    //             .zip(proof.chip_proofs.iter())
-    //             .map(|(interactions, chip_proof)| Dimensions {
-    //                 width: (interactions.len() + 1) * SC::Challenge::D,
-    //                 height: 1 << chip_proof.log_degree,
-    //             })
-    //             .collect::<Vec<_>>(),
-    //         proof
-    //             .chip_proofs
-    //             .iter()
-    //             .zip(log_quotient_degrees)
-    //             .map(|(chip_proof, log_quotient_deg)| Dimensions {
-    //                 width: log_quotient_deg << SC::Challenge::D,
-    //                 height: 1 << chip_proof.log_degree,
-    //             })
-    //             .collect::<Vec<_>>(),
-    //     ];
-    //     let g_subgroups: [Val<SC>; 2usize] = proof
-    //         .chip_proofs
-    //         .iter()
-    //         .map(|chip_proof| Val::<SC>::two_adic_generator(chip_proof.log_degree))
-    //         .collect::<Vec<_>>()
-    //         .try_into()
-    //         .unwrap();
-    //     let mut main_values = vec![];
-    //     let mut perm_values = vec![];
-    //     let mut quotient_values = vec![];
-    //     for chip_proof in proof.chip_proofs.iter() {
-    //         let OpenedValues {
-    //             trace_local,
-    //             trace_next,
-    //             permutation_local,
-    //             permutation_next,
-    //             quotient_chunks,
-    //         } = &chip_proof.opened_values;
-    //         main_values.push(vec![trace_local.clone(), trace_next.clone()]);
-    //         perm_values.push(vec![permutation_local.clone(), permutation_next.clone()]);
-    //         quotient_values.push(vec![quotient_chunks.clone()]);
-    //     }
-    //     let chips_opening_values = vec![main_values, perm_values, quotient_values];
-    //     let Commitments {
-    //         main_trace,
-    //         perm_trace,
-    //         quotient_chunks,
-    //     } = &proof.commitments;
-    //     challenger.observe(main_trace.clone());
-    //     let mut perm_challenges = Vec::new();
-    //     for _ in 0..3 {
-    //         perm_challenges.push(challenger.sample_ext_element::<SC::Challenge>());
-    //     }
-    //     challenger.observe(perm_trace.clone());
-    //     let alpha = challenger.sample_ext_element::<SC::Challenge>();
-    //     challenger.observe(quotient_chunks.clone());
-    //     let zeta: SC::Challenge = challenger.sample_ext_element();
-    //     let zeta_and_next: [Vec<SC::Challenge>; 2usize] = g_subgroups.map(|g| vec![zeta, zeta * g]);
-    //     let zeta_exp_quotient_degree: [Vec<SC::Challenge>; 2usize] =
-    //         log_quotient_degrees.map(|log_deg| vec![zeta.exp_power_of_2(log_deg)]);
-    //     pcs.verify(
-    //         &[
-    //             (main_trace.clone(), zeta_and_next.as_slice()),
-    //             (perm_trace.clone(), zeta_and_next.as_slice()),
-    //             (quotient_chunks.clone(), zeta_exp_quotient_degree.as_slice()),
-    //         ],
-    //         dims,
-    //         chips_opening_values,
-    //         &proof.opening_proof,
-    //         &mut challenger,
-    //     )
-    //     .map_err(|_| ())?;
-    //     verify_constraints::<Self, _, SC>(
-    //         self,
-    //         self.keccak_permute_chip(),
-    //         &proof.chip_proofs[11usize].opened_values,
-    //         proof.chip_proofs[11usize].cumulative_sum,
-    //         proof.chip_proofs[11usize].log_degree,
-    //         g_subgroups[11usize],
-    //         zeta,
-    //         alpha,
-    //         &perm_challenges,
-    //     )
-    //     .expect(format!("Failed to verify constraints on chip {}", 0usize));
-    //     verify_constraints::<Self, _, SC>(
-    //         self,
-    //         self.merkle_tree_chip(),
-    //         &proof.chip_proofs[12usize].opened_values,
-    //         proof.chip_proofs[12usize].cumulative_sum,
-    //         proof.chip_proofs[12usize].log_degree,
-    //         g_subgroups[12usize],
-    //         zeta,
-    //         alpha,
-    //         &perm_challenges,
-    //     )
-    //     .expect(format!("Failed to verify constraints on chip {}", 1usize));
-    //     let sum: SC::Challenge = proof
-    //         .chip_proofs
-    //         .iter()
-    //         .map(|chip_proof| chip_proof.cumulative_sum)
-    //         .sum();
-    //     if sum != SC::Challenge::zero() {
-    //         return Err(());
-    //     }
-    //     Ok(())
-    // }
+    fn verify<SC: StarkGenericConfig>(
+        &self,
+        config: &SC,
+        proof: &MachineProof<SC>,
+        challenger: &mut SC::Challenger,
+    ) -> Result<(), VerificationError>
+    where
+        Val<SC>: PrimeField64,
+    {
+        let MachineProof {
+            commitments,
+            opening_proof,
+            chip_proofs,
+        } = proof;
+        let log_degrees = chip_proofs
+            .iter()
+            .map(|chip_proof| chip_proof.degree_bits)
+            .collect::<Vec<_>>();
+
+        let degrees = log_degrees
+            .iter()
+            .map(|degree_bits| 1 << degree_bits)
+            .collect::<Vec<_>>();
+        let log_quotient_degrees = self
+            .chips()
+            .iter()
+            .map(|chip| match chip {
+                ChipType::KeccakPermute(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
+                ChipType::MerkleTree(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
+            })
+            .collect::<Vec<_>>();
+        let quotient_degrees = log_quotient_degrees
+            .iter()
+            .map(|&log_degree| 1 << log_degree)
+            .collect::<Vec<_>>();
+
+        let pcs = config.pcs();
+        let main_domains = degrees
+            .iter()
+            .map(|&degree| pcs.natural_domain_for_degree(degree))
+            .collect::<Vec<_>>();
+        let quotient_domains = main_domains
+            .iter()
+            .zip(log_degrees.iter())
+            .zip(log_quotient_degrees.iter())
+            .map(|((domain, log_degree), log_quotient_degree)| {
+                domain.create_disjoint_domain(1 << (log_degree + log_quotient_degree))
+            })
+            .collect::<Vec<_>>();
+        let quotient_chunks_domains = quotient_domains
+            .into_iter()
+            .zip(quotient_degrees.clone())
+            .map(|(quotient_domain, quotient_degree)| {
+                quotient_domain.split_domains(quotient_degree)
+            })
+            .collect::<Vec<_>>();
+
+        let air_widths = self
+            .chips()
+            .iter()
+            .map(|chip| <ChipType as BaseAir<Val<SC>>>::width(chip))
+            .collect::<Vec<_>>();
+
+        let valid_shape =
+            chip_proofs
+                .iter()
+                .zip(air_widths.iter())
+                .zip(quotient_degrees.iter())
+                .all(|((chip_proof, &air_width), &quotient_degree)| {
+                    chip_proof.opened_values.trace_local.len() == air_width
+                        && chip_proof.opened_values.trace_next.len() == air_width
+                        && chip_proof.opened_values.quotient_chunks.len() == quotient_degree
+                        && chip_proof.opened_values.quotient_chunks.iter().all(|qc| {
+                            qc.len() == <SC::Challenge as AbstractExtensionField<Val<SC>>>::D
+                        })
+                });
+        if !valid_shape {
+            return Err(VerificationError::InvalidProofShape);
+        }
+
+        // let preprocessed_traces: Vec<RowMajorMatrix<Val<SC>>> =
+        //     tracing::info_span!("generate preprocessed traces").in_scope(|| {
+        //         self.chips()
+        //             .par_iter()
+        //             .flat_map(|chip| chip.preprocessed_trace())
+        //             .collect::<Vec<_>>()
+        //     });
+        // let preprocessed_degrees = preprocessed_traces
+        //     .iter()
+        //     .map(|trace| trace.height())
+        //     .collect::<Vec<_>>();
+        // let preprocessed_domains = preprocessed_degrees
+        //     .iter()
+        //     .map(|&degree| pcs.natural_domain_for_degree(degree))
+        //     .collect();
+        // let (preprocessed_commit, preprocessed_data) =
+        //     tracing::info_span!("commit to preprocessed traces").in_scope(|| {
+        //         pcs.commit(
+        //             std::iter::zip(preprocessed_domains, preprocessed_traces).collect::<Vec<_>>(),
+        //         )
+        //     });
+        // challenger.observe(preprocessed_commit.clone());
+
+        challenger.observe(commitments.main_trace.clone());
+        let mut perm_challenges = Vec::new();
+        for _ in 0..3 {
+            perm_challenges.push(challenger.sample_ext_element::<SC::Challenge>());
+        }
+        challenger.observe(commitments.perm_trace.clone());
+        let alpha = challenger.sample_ext_element::<SC::Challenge>();
+        challenger.observe(commitments.quotient_chunks.clone());
+
+        let zeta: SC::Challenge = challenger.sample_ext_element();
+        let zeta_nexts = main_domains
+            .iter()
+            .map(|domain| domain.next_point(zeta).unwrap())
+            .collect::<Vec<_>>();
+
+        pcs.verify(
+            vec![
+                (
+                    commitments.main_trace.clone(),
+                    main_domains
+                        .iter()
+                        .zip(chip_proofs.iter())
+                        .zip(zeta_nexts.iter())
+                        .map(|((&domain, proof), &zeta_next)| {
+                            (
+                                domain,
+                                vec![
+                                    (zeta, proof.opened_values.trace_local.clone()),
+                                    (zeta_next, proof.opened_values.trace_next.clone()),
+                                ],
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+                (
+                    commitments.perm_trace.clone(),
+                    main_domains
+                        .iter()
+                        .zip(chip_proofs.iter())
+                        .zip(zeta_nexts.iter())
+                        .map(|((&domain, proof), &zeta_next)| {
+                            (
+                                domain,
+                                vec![
+                                    (zeta, proof.opened_values.permutation_local.clone()),
+                                    (zeta_next, proof.opened_values.permutation_next.clone()),
+                                ],
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+                (
+                    commitments.quotient_chunks.clone(),
+                    quotient_chunks_domains
+                        .iter()
+                        .flatten()
+                        .zip(
+                            chip_proofs
+                                .iter()
+                                .map(|proof| &proof.opened_values.quotient_chunks)
+                                .flatten(),
+                        )
+                        .map(|(&domain, opened_values)| {
+                            (domain, vec![(zeta, opened_values.clone())])
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+            ],
+            opening_proof,
+            challenger,
+        )
+        .map_err(|_| VerificationError::InvalidOpeningArgument)?;
+
+        for (((qc_domains, chip_proof), main_domain), &chip) in quotient_chunks_domains
+            .iter()
+            .zip(chip_proofs.iter())
+            .zip(main_domains.iter())
+            .zip(self.chips().iter())
+        {
+            let zps = qc_domains
+                .iter()
+                .enumerate()
+                .map(|(i, domain)| {
+                    qc_domains
+                        .iter()
+                        .enumerate()
+                        .filter(|(j, _)| *j != i)
+                        .map(|(_, other_domain)| {
+                            other_domain.zp_at_point(zeta)
+                                * other_domain.zp_at_point(domain.first_point()).inverse()
+                        })
+                        .product::<SC::Challenge>()
+                })
+                .collect::<Vec<_>>();
+
+            let quotient = chip_proof
+                .opened_values
+                .quotient_chunks
+                .iter()
+                .enumerate()
+                .map(|(ch_i, ch)| {
+                    ch.iter()
+                        .enumerate()
+                        .map(|(e_i, &c)| zps[ch_i] * SC::Challenge::monomial(e_i) * c)
+                        .sum::<SC::Challenge>()
+                })
+                .sum::<SC::Challenge>();
+
+            let sels = main_domain.selectors_at_point(zeta);
+
+            let mut folder: VerifierConstraintFolder<'_, SC> = VerifierConstraintFolder {
+                preprocessed: TwoRowMatrixView {
+                    local: &[],
+                    next: &[],
+                },
+                main: TwoRowMatrixView {
+                    local: &chip_proof.opened_values.trace_local,
+                    next: &chip_proof.opened_values.trace_next,
+                },
+                perm: TwoRowMatrixView {
+                    local: &chip_proof.opened_values.permutation_local,
+                    next: &chip_proof.opened_values.permutation_next,
+                },
+                perm_challenges: &perm_challenges,
+                public_values: &vec![],
+                is_first_row: sels.is_first_row,
+                is_last_row: sels.is_last_row,
+                is_transition: sels.is_transition,
+                alpha,
+                accumulator: SC::Challenge::zero(),
+            };
+            chip.eval(&mut folder);
+            eval_permutation_constraints::<_, SC, _>(chip, &mut folder, chip_proof.cumulative_sum);
+            let folded_constraints = folder.accumulator;
+
+            // Finally, check that
+            //     folded_constraints(zeta) / Z_H(zeta) = quotient(zeta)
+            if folded_constraints * sels.inv_zeroifier != quotient {
+                return Err(VerificationError::OodEvaluationMismatch);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -570,7 +720,7 @@ mod tests {
     use p3_util::log2_ceil_usize;
 
     #[test]
-    fn test_machine_prove() {
+    fn test_machine_prove() -> Result<(), VerificationError> {
         type Val = BabyBear;
         type Challenge = BinomialExtensionField<Val, 4>;
 
@@ -605,10 +755,12 @@ mod tests {
         type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
         let config = MyConfig::new(pcs);
 
-        let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-
         let machine = Machine::new();
 
-        machine.prove(&config, &mut challenger);
+        let mut challenger = Challenger::from_hasher(vec![], byte_hash);
+        let proof = machine.prove(&config, &mut challenger);
+
+        let mut challenger = Challenger::from_hasher(vec![], byte_hash);
+        machine.verify(&config, &proof, &mut challenger)
     }
 }

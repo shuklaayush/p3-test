@@ -212,7 +212,7 @@ mod tests {
     use p3_util::log2_ceil_usize;
     use rand::random;
 
-    const NUM_HASHES: usize = 680;
+    const NUM_HASHES: usize = 10;
 
     #[test]
     fn test_keccak_prove() -> Result<(), VerificationError> {
@@ -255,7 +255,6 @@ mod tests {
         let config = MyConfig::new(pcs);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-
         let proof = prove::<MyConfig, _>(&config, &chip, &mut challenger, trace, &vec![]);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);

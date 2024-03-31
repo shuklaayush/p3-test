@@ -19,7 +19,7 @@ pub struct Commitments<Com> {
 
 #[derive(Serialize, Deserialize)]
 pub struct ChipProof<Challenge> {
-    pub log_degree: usize,
+    pub degree_bits: usize,
     pub opened_values: OpenedValues<Challenge>,
     pub cumulative_sum: Challenge,
 }
@@ -30,5 +30,5 @@ pub struct OpenedValues<Challenge> {
     pub trace_next: Vec<Challenge>,
     pub permutation_local: Vec<Challenge>,
     pub permutation_next: Vec<Challenge>,
-    pub quotient_chunks: Vec<Challenge>,
+    pub quotient_chunks: Vec<Vec<Challenge>>,
 }

@@ -97,6 +97,7 @@ where
                     local: &local,
                     next: &next,
                 },
+                public_values: &vec![],
                 perm: TwoRowMatrixView {
                     local: &perm_local,
                     next: &perm_next,
