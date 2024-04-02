@@ -1,10 +1,12 @@
-use p3_air::ExtensionBuilder;
 use p3_air::{Air, PairBuilder, PermutationAirBuilder, VirtualPairCol};
+use p3_air::{ExtensionBuilder, TwoRowMatrixView};
 use p3_field::{AbstractField, ExtensionField, Field, Powers};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::{Matrix, MatrixRowSlices};
+use p3_maybe_rayon::prelude::IntoParallelIterator;
 use p3_uni_stark::{StarkGenericConfig, SymbolicAirBuilder, Val};
 
+use crate::debug_builder::DebugConstraintBuilder;
 use crate::folder::ProverConstraintFolder;
 use crate::util::batch_multiplicative_inverse_allowing_zero;
 
@@ -47,7 +49,7 @@ pub trait Chip<F: Field> {
 pub trait MachineChip<SC: StarkGenericConfig>: Chip<Val<SC>> + for<'a> Air<ProverConstraintFolder<'a, SC>>
     // + for<'a> Air<VerifierConstraintFolder<'a, SC>>
     + for<'a> Air<SymbolicAirBuilder<Val<SC>>>
-    // + for<'a> Air<DebugConstraintBuilder<'a, Val<SC>>>
+    + for<'a> Air<DebugConstraintBuilder<'a, SC>>
 {
     fn trace_width(&self) -> usize {
         self.width()
@@ -247,6 +249,79 @@ where
     }
     rlc += alpha;
     rlc
+}
+
+/// Check that all constraints vanish on the subgroup.
+pub fn check_constraints<C, SC>(
+    chip: &C,
+    main: &RowMajorMatrix<Val<SC>>,
+    perm: &RowMajorMatrix<SC::Challenge>,
+    perm_challenges: &[SC::Challenge],
+    public_values: &Vec<Val<SC>>,
+) where
+    C: MachineChip<SC>,
+    SC: StarkGenericConfig,
+{
+    assert_eq!(main.height(), perm.height());
+    let height = main.height();
+    if height == 0 {
+        return;
+    }
+
+    let preprocessed = chip.preprocessed_trace();
+
+    let cumulative_sum = *perm.row_slice(perm.height() - 1).last().unwrap();
+
+    // Check that constraints are satisfied.
+    (0..height).into_par_iter().for_each(|i| {
+        let i_next = (i + 1) % height;
+
+        let main_local = main.row_slice(i);
+        let main_next = main.row_slice(i_next);
+        let preprocessed_local = if preprocessed.is_some() {
+            preprocessed.as_ref().unwrap().row_slice(i)
+        } else {
+            &[]
+        };
+        let preprocessed_next = if preprocessed.is_some() {
+            preprocessed.as_ref().unwrap().row_slice(i_next)
+        } else {
+            &[]
+        };
+        let perm_local = perm.row_slice(i);
+        let perm_next = perm.row_slice(i_next);
+
+        let mut builder = DebugConstraintBuilder {
+            row_index: i,
+            main: TwoRowMatrixView {
+                local: &main_local,
+                next: &main_next,
+            },
+            preprocessed: TwoRowMatrixView {
+                local: &preprocessed_local,
+                next: &preprocessed_next,
+            },
+            perm: TwoRowMatrixView {
+                local: &perm_local,
+                next: &perm_next,
+            },
+            perm_challenges,
+            public_values,
+            is_first_row: Val::<SC>::zero(),
+            is_last_row: Val::<SC>::zero(),
+            is_transition: Val::<SC>::one(),
+        };
+        if i == 0 {
+            builder.is_first_row = Val::<SC>::one();
+        }
+        if i == height - 1 {
+            builder.is_last_row = Val::<SC>::one();
+            builder.is_transition = Val::<SC>::zero();
+        }
+
+        chip.eval(&mut builder);
+        eval_permutation_constraints(chip, &mut builder, cumulative_sum);
+    });
 }
 
 /// Check that the combined cumulative sum across all lookup tables is zero.

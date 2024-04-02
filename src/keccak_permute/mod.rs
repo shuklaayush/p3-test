@@ -276,8 +276,8 @@ mod tests {
         let trace = chip.generate_trace();
 
         let fri_config = FriConfig {
-            log_blowup: 1,
-            num_queries: 100,
+            log_blowup: 2,
+            num_queries: 42,
             proof_of_work_bits: 16,
             mmcs: challenge_mmcs,
         };

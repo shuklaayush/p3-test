@@ -1,4 +1,5 @@
 mod chip;
+mod debug_builder;
 mod folder;
 mod keccak_permute;
 mod machine;

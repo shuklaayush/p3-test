@@ -9,8 +9,8 @@ use p3_util::log2_strict_usize;
 
 use crate::{
     chip::{
-        check_cumulative_sums, eval_permutation_constraints, generate_permutation_trace, Chip,
-        Interaction, InteractionType, MachineChip,
+        check_constraints, check_cumulative_sums, eval_permutation_constraints,
+        generate_permutation_trace, Chip, Interaction, InteractionType, MachineChip,
     },
     folder::VerifierConstraintFolder,
     keccak_permute::KeccakPermuteChip,
@@ -262,17 +262,14 @@ impl Machine {
             .collect::<Vec<_>>();
 
         // 4. Verify constraints
-        // TODO: Add check_constraints that checks permutation constraints
-        // #[cfg(debug_assertions)]
-        // check_constraints::<Self, _, SC>(
-        //     self,
-        //     chip,
-        //     &main_traces[0usize],
-        //     &perm_traces[0usize],
-        //     &perm_challenges,
-        // );
         #[cfg(debug_assertions)]
-        // check_constraints(self.keccak_permute_chip, &main_traces[0usize]);
+        self.chips()
+            .iter()
+            .zip(main_traces.iter())
+            .zip(perm_traces.iter())
+            .for_each(|((&chip, main_trace), perm_trace)| {
+                check_constraints::<_, SC>(chip, main_trace, perm_trace, &perm_challenges, &vec![]);
+            });
         #[cfg(debug_assertions)]
         check_cumulative_sums(&perm_traces[..]);
 
