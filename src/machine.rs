@@ -4,7 +4,6 @@ use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, Field, PrimeField64};
 use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
-use p3_merkle_tree::FieldMerkleTree;
 use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val, VerificationError};
 use p3_util::log2_strict_usize;
 
@@ -107,12 +106,13 @@ impl Machine {
 
 impl Machine {
     pub fn new(digests: Vec<Vec<[u8; 32]>>, leaf_index: usize) -> Self {
-        let height = digests.len();
         let leaf = digests[0][leaf_index];
-        let siblings = (0..height - 1)
+
+        let height = digests.len() - 1;
+        let siblings = (0..height)
             .map(|i| digests[i][(leaf_index >> i) ^ 1])
             .collect::<Vec<[u8; 32]>>();
-        let keccak_inputs = (0..height - 1)
+        let keccak_inputs = (0..height)
             .map(|i| {
                 let index = leaf_index >> i;
                 let parity = index & 1;
@@ -692,6 +692,7 @@ mod tests {
     use p3_field::extension::BinomialExtensionField;
     use p3_fri::{FriConfig, TwoAdicFriPcs};
     use p3_keccak::{Keccak256Hash, KeccakF};
+    use p3_merkle_tree::FieldMerkleTree;
     use p3_merkle_tree::FieldMerkleTreeMmcs;
     use p3_symmetric::{
         CompressionFunctionFromHasher, PseudoCompressionFunction, SerializingHasher32,
@@ -746,8 +747,8 @@ mod tests {
         type Challenger = SerializingChallenger32<Val, HashChallenger<u8, ByteHash, 32>>;
 
         let fri_config = FriConfig {
-            log_blowup: 1,
-            num_queries: 100,
+            log_blowup: 2,
+            num_queries: 42,
             proof_of_work_bits: 16,
             mmcs: challenge_mmcs,
         };
@@ -757,7 +758,7 @@ mod tests {
         type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
         let config = MyConfig::new(pcs);
 
-        const HEIGHT: usize = 1;
+        const HEIGHT: usize = 3;
         let leaf_hashes = (0..2u64.pow(HEIGHT as u32))
             .map(|_| [0; 32])
             // .map(|_| random())
@@ -765,11 +766,12 @@ mod tests {
         // let merkle_tree = FieldMerkleTree::new::<Val, u8, FieldHash, MyCompress>(
         //     &field_hash,
         //     &compress,
-        //     vec![RowMajorMatrix::new(raw_leaves, 1)],
+        //     vec![RowMajorMatrix::new(leaf_hashes, 1)],
         // );
         let digests = generate_digests(leaf_hashes);
 
         let leaf_index = 0;
+        // let machine = Machine::new(merkle_tree.digest_layers, leaf_index);
         let machine = Machine::new(digests, leaf_index);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);

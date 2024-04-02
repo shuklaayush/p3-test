@@ -34,6 +34,10 @@ impl<AB: AirBuilder> Air<AB> for MerkleTreeChip {
         let local: &MerkleTreeCols<AB::Var> = main.row_slice(0).borrow();
         let next: &MerkleTreeCols<AB::Var> = main.row_slice(1).borrow();
 
+        builder.assert_bool(local.is_real);
+
+        let mut builder = builder.when(local.is_real);
+
         // Left and right nodes are selected correctly.
         for i in 0..NUM_U64_HASH_ELEMS {
             for j in 0..U64_LIMBS {
@@ -60,8 +64,8 @@ impl<AB: AirBuilder> Air<AB> for MerkleTreeChip {
 
 impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
     fn generate_trace(&self) -> RowMajorMatrix<F> {
-        let height_minus_one = self.siblings[0].len();
-        let num_rows = (self.leaves.len() * height_minus_one).next_power_of_two();
+        let height: usize = self.siblings.iter().map(|s| s.len()).sum();
+        let num_rows = height.next_power_of_two();
         let mut trace = RowMajorMatrix::new(
             vec![F::zero(); num_rows * NUM_MERKLE_TREE_COLS],
             NUM_MERKLE_TREE_COLS,
@@ -72,7 +76,7 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
         assert_eq!(rows.len(), num_rows);
 
         // TODO:
-        for (leaf_rows, ((&leaf, &leaf_index), siblings)) in rows.chunks_mut(height_minus_one).zip(
+        for (leaf_rows, ((&leaf, &leaf_index), siblings)) in rows.chunks_mut(height).zip(
             self.leaves
                 .iter()
                 .zip(&self.leaf_indices)
@@ -81,8 +85,12 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
             generate_trace_rows_for_leaf(leaf_rows, leaf, leaf_index, siblings);
         }
 
-        // println!("Merkle: {:?} {:?}", rows[0].left_node, rows[0].right_node);
-        println!("Merkle: {:?}", rows[0].output);
+        let index = 1;
+        println!(
+            "Merkle: {:?} {:?}",
+            rows[index].left_node, rows[index].right_node
+        );
+        println!("Merkle: {:?}", rows[index].output);
         trace
     }
 
@@ -98,29 +106,30 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
         // let send = Interaction {
         //     fields,
         //     count: is_real,
-        //     argument_index: 1,
+        //     argument_index: 0,
         // };
-        // println!("merkle send {:?}", send);
+        // // println!("merkle send {:?}", send);
         // vec![send]
         vec![]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
-        // let fields = MERKLE_TREE_COL_MAP
-        //     .output
-        //     .into_iter()
-        //     .flatten()
-        //     .map(VirtualPairCol::single_main)
-        //     .collect();
-        // let is_real = VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real);
-        // let receive = Interaction {
-        //     fields,
-        //     count: is_real,
-        //     argument_index: 1,
-        // };
+        let fields = MERKLE_TREE_COL_MAP
+            .output
+            .into_iter()
+            // .take(1)
+            .flatten()
+            // .take(1)
+            .map(VirtualPairCol::single_main)
+            .collect();
+        let is_real = VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real);
+        let receive = Interaction {
+            fields,
+            count: is_real,
+            argument_index: 0,
+        };
         // println!("merkle receive {:?}", receive);
-        // vec![receive]
-        vec![]
+        vec![receive]
     }
 }
 
@@ -136,15 +145,36 @@ mod tests {
     use p3_dft::Radix2DitParallel;
     use p3_field::extension::BinomialExtensionField;
     use p3_fri::{FriConfig, TwoAdicFriPcs};
-    use p3_keccak::Keccak256Hash;
+    use p3_keccak::{Keccak256Hash, KeccakF};
     use p3_matrix::Matrix;
     use p3_merkle_tree::{FieldMerkleTree, FieldMerkleTreeMmcs};
-    use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
+    use p3_symmetric::{
+        CompressionFunctionFromHasher, PseudoCompressionFunction, SerializingHasher32,
+        TruncatedPermutation,
+    };
     use p3_uni_stark::{prove, verify, StarkConfig, VerificationError};
     use p3_util::log2_ceil_usize;
     use rand::random;
 
-    const HEIGHT: usize = 3;
+    fn generate_digests(leaf_hashes: Vec<[u8; 32]>) -> Vec<Vec<[u8; 32]>> {
+        let keccak = TruncatedPermutation::new(KeccakF {});
+        let mut digests = vec![leaf_hashes];
+
+        while let Some(last_level) = digests.last().cloned() {
+            if last_level.len() == 1 {
+                break;
+            }
+
+            let next_level = last_level
+                .chunks_exact(2)
+                .map(|chunk| keccak.compress([chunk[0], chunk[1]]))
+                .collect();
+
+            digests.push(next_level);
+        }
+
+        digests
+    }
 
     #[test]
     fn test_merkle_tree_prove() -> Result<(), VerificationError> {
@@ -170,24 +200,24 @@ mod tests {
 
         type Challenger = SerializingChallenger32<Val, HashChallenger<u8, ByteHash, 32>>;
 
-        let raw_leaves = (0..2u64.pow(HEIGHT as u32))
+        const HEIGHT: usize = 3;
+        let leaf_hashes = (0..2u64.pow(HEIGHT as u32))
             .map(|_| random())
             .collect::<Vec<_>>();
-        let merkle_tree = FieldMerkleTree::new::<Val, u8, FieldHash, MyCompress>(
-            &field_hash,
-            &compress,
-            vec![RowMajorMatrix::new(raw_leaves, 1)],
-        );
-        let leaf_index = 0;
+        let digests = generate_digests(leaf_hashes);
 
-        let leaf = merkle_tree.digest_layers[0][leaf_index];
-        let siblings = (0..HEIGHT)
-            .map(|i| merkle_tree.digest_layers[i][(leaf_index >> i) ^ 1])
+        let leaf_index = 0;
+        let leaf = digests[0][leaf_index];
+
+        let height = digests.len() - 1;
+        let siblings = (0..height)
+            .map(|i| digests[i][(leaf_index >> i) ^ 1])
             .collect::<Vec<[u8; 32]>>();
+
         let chip = MerkleTreeChip {
             leaves: vec![leaf],
             leaf_indices: vec![leaf_index],
-            siblings: vec![siblings.try_into().unwrap()],
+            siblings: vec![siblings],
         };
         let trace = chip.generate_trace();
 
@@ -204,7 +234,7 @@ mod tests {
         let config = MyConfig::new(pcs);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-        let proof = prove::<MyConfig, _>(&config, &chip, &mut challenger, trace, &vec![]);
+        let proof = prove(&config, &chip, &mut challenger, trace, &vec![]);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
         verify(&config, &chip, &mut challenger, &proof, &vec![])

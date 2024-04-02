@@ -1,18 +1,22 @@
+mod columns;
+mod generation;
+mod round_flags;
+
 use core::borrow::Borrow;
-use p3_keccak_air::{generate_trace_rows, KECCAK_COL_MAP};
 
 use p3_air::{Air, AirBuilder, BaseAir, VirtualPairCol};
 use p3_field::{AbstractField, PrimeField64};
 use p3_keccak_air::logic::{andn_gen, xor3_gen, xor_gen};
 use p3_keccak_air::rc_value_bit;
-use p3_keccak_air::round_flags::eval_round_flags;
-use p3_keccak_air::{KeccakCols, NUM_KECCAK_COLS};
 use p3_keccak_air::{BITS_PER_LIMB, NUM_ROUNDS, U64_LIMBS};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::MatrixRowSlices;
 use p3_uni_stark::StarkGenericConfig;
 use p3_uni_stark::Val;
 
+use self::columns::{KeccakCols, KECCAK_COL_MAP, NUM_KECCAK_COLS};
+use self::generation::generate_trace_rows;
+use self::round_flags::eval_round_flags;
 use crate::chip::{Chip, Interaction, MachineChip};
 
 /// Assumes the field size is at least 16 bits.
@@ -34,15 +38,11 @@ impl<AB: AirBuilder> Air<AB> for KeccakPermuteChip {
         let local: &KeccakCols<AB::Var> = main.row_slice(0).borrow();
         let next: &KeccakCols<AB::Var> = main.row_slice(1).borrow();
 
-        // The export flag must be 0 or 1.
-        builder.assert_bool(local.export);
+        let mut builder = builder.when(local.is_real);
 
         // If this is not the final step, the export flag must be off.
         let final_step = local.step_flags[NUM_ROUNDS - 1];
         let not_final_step = AB::Expr::one() - final_step;
-        builder
-            .when(not_final_step.clone())
-            .assert_zero(local.export);
 
         // If this is not the final step, the local and next preimages must match.
         for y in 0..5 {
@@ -184,21 +184,24 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
-        // let fields = [KECCAK_COL_MAP.a_prime_prime_prime_0_0_limbs]
-        //     .into_iter()
-        //     .chain(KECCAK_COL_MAP.a_prime_prime.into_iter().flatten().skip(1))
-        //     .flatten()
-        //     .map(VirtualPairCol::single_main)
-        //     .collect();
-        // let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.step_flags[NUM_ROUNDS - 1]);
-        // let send = Interaction {
-        //     fields,
-        //     count: is_real,
-        //     argument_index: 0,
-        // };
-        // println!("keccak send {:?}", send);
-        // vec![send]
-        vec![]
+        let fields = (0..4)
+            // let fields = (0..1)
+            .flat_map(|i| {
+                (0..U64_LIMBS)
+                    // (0..1)
+                    .map(|limb| KECCAK_COL_MAP.a_prime_prime_prime(i % 5, i / 5, limb))
+                    .collect::<Vec<_>>()
+            })
+            .map(VirtualPairCol::single_main)
+            .collect();
+        let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.step_flags[NUM_ROUNDS - 1]);
+        let send = Interaction {
+            fields,
+            count: is_real,
+            argument_index: 0,
+        };
+        vec![send]
+        // vec![]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
@@ -216,7 +219,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
         //     count: is_real,
         //     argument_index: 0,
         // };
-        // println!("keccak receive {:?}", receive);
+        // // println!("keccak receive {:?}", receive);
         // vec![receive]
         vec![]
     }
@@ -285,7 +288,7 @@ mod tests {
         let config = MyConfig::new(pcs);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-        let proof = prove::<MyConfig, _>(&config, &chip, &mut challenger, trace, &vec![]);
+        let proof = prove(&config, &chip, &mut challenger, trace, &vec![]);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
         verify(&config, &chip, &mut challenger, &proof, &vec![])

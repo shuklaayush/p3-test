@@ -65,7 +65,6 @@ pub fn generate_trace_row_for_round<F: PrimeField64>(
 
     let keccak = TruncatedPermutation::new(KeccakF {});
     let output = keccak.compress([left_node, right_node]);
-    // println!("{:?}", output);
 
     row.parity_selector = F::from_canonical_usize(parity_bit);
     for x in 0..NUM_U64_HASH_ELEMS {
