@@ -1,16 +1,12 @@
 use p3_air::{Air, AirBuilder, BaseAir, TwoRowMatrixView};
-use p3_baby_bear::BabyBear;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, Field, PrimeField64};
-use p3_keccak::Keccak256Hash;
-use p3_matrix::{dense::RowMajorMatrix, Dimensions, Matrix, MatrixRowSlices};
+use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_merkle_tree::FieldMerkleTree;
-use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
 use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val, VerificationError};
 use p3_util::log2_strict_usize;
-use rand::random;
 
 use crate::{
     chip::{
@@ -24,18 +20,16 @@ use crate::{
     quotient::quotient_values,
 };
 
-const HEIGHT: usize = 8;
-
 pub enum ChipType {
     KeccakPermute(KeccakPermuteChip),
-    MerkleTree(MerkleTreeChip<HEIGHT>),
+    MerkleTree(MerkleTreeChip),
 }
 
 impl<F: Field> BaseAir<F> for ChipType {
     fn width(&self) -> usize {
         match self {
             ChipType::KeccakPermute(chip) => <KeccakPermuteChip as BaseAir<F>>::width(chip),
-            ChipType::MerkleTree(chip) => <MerkleTreeChip<HEIGHT> as BaseAir<F>>::width(chip),
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as BaseAir<F>>::width(chip),
         }
     }
 
@@ -95,9 +89,7 @@ where
             ChipType::KeccakPermute(chip) => {
                 <KeccakPermuteChip as MachineChip<SC>>::trace_width(chip)
             }
-            ChipType::MerkleTree(chip) => {
-                <MerkleTreeChip<HEIGHT> as MachineChip<SC>>::trace_width(chip)
-            }
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as MachineChip<SC>>::trace_width(chip),
         }
     }
 }
@@ -114,36 +106,44 @@ impl Machine {
 }
 
 impl Machine {
-    pub fn new() -> Self {
-        type Val = BabyBear;
-
-        type ByteHash = Keccak256Hash;
-        type FieldHash = SerializingHasher32<ByteHash>;
-        let byte_hash = ByteHash {};
-        let field_hash = FieldHash::new(Keccak256Hash {});
-
-        type MyCompress = CompressionFunctionFromHasher<u8, ByteHash, 2, 32>;
-        let compress = MyCompress::new(byte_hash);
-
-        const NUM_HASHES: usize = 2;
-        let inputs = (0..NUM_HASHES).map(|_| random()).collect::<Vec<_>>();
-        let keccak_permute_chip = KeccakPermuteChip { inputs };
-
-        let raw_leaves = (0..2u64.pow(HEIGHT as u32))
-            .map(|_| random())
-            .collect::<Vec<_>>();
-        let merkle_tree = FieldMerkleTree::new::<Val, u8, FieldHash, MyCompress>(
-            &field_hash,
-            &compress,
-            vec![RowMajorMatrix::new(raw_leaves, 1)],
-        );
-        let leaf_index = 0;
-
-        let leaf = merkle_tree.digest_layers[0][leaf_index];
-        let siblings = (0..HEIGHT)
-            .map(|i| merkle_tree.digest_layers[i][(leaf_index >> i) ^ 1])
+    pub fn new(digests: Vec<Vec<[u8; 32]>>, leaf_index: usize) -> Self {
+        let height = digests.len();
+        let leaf = digests[0][leaf_index];
+        let siblings = (0..height - 1)
+            .map(|i| digests[i][(leaf_index >> i) ^ 1])
             .collect::<Vec<[u8; 32]>>();
-        let merkle_tree_chip = MerkleTreeChip::<HEIGHT> {
+        let keccak_inputs = (0..height - 1)
+            .map(|i| {
+                let index = leaf_index >> i;
+                let parity = index & 1;
+                let (left, right) = if parity == 0 {
+                    (digests[i][index], digests[i][index ^ 1])
+                } else {
+                    (digests[i][index ^ 1], digests[i][index])
+                };
+                let mut input = [0; 25];
+                input[0..4].copy_from_slice(
+                    left.chunks_exact(8)
+                        .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                );
+                input[4..8].copy_from_slice(
+                    right
+                        .chunks_exact(8)
+                        .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                );
+                input
+            })
+            .collect::<Vec<_>>();
+
+        let keccak_permute_chip = KeccakPermuteChip {
+            inputs: keccak_inputs,
+        };
+
+        let merkle_tree_chip = MerkleTreeChip {
             leaves: vec![leaf],
             leaf_indices: vec![leaf_index],
             siblings: vec![siblings.try_into().unwrap()],
@@ -228,17 +228,12 @@ impl Machine {
             self.chips()
                 .into_par_iter()
                 .enumerate()
-                .map(|(i, chip)| match chip {
-                    ChipType::KeccakPermute(chip) => generate_permutation_trace::<SC, _>(
+                .map(|(i, chip)| {
+                    generate_permutation_trace::<SC, _>(
                         chip,
                         &main_traces[i],
                         perm_challenges.clone(),
-                    ),
-                    ChipType::MerkleTree(chip) => generate_permutation_trace::<SC, _>(
-                        chip,
-                        &main_traces[i],
-                        perm_challenges.clone(),
-                    ),
+                    )
                 })
                 .collect::<Vec<_>>()
         });
@@ -289,10 +284,7 @@ impl Machine {
         let log_quotient_degrees = self
             .chips()
             .iter()
-            .map(|chip| match chip {
-                ChipType::KeccakPermute(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
-                ChipType::MerkleTree(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
-            })
+            .map(|&chip| get_log_quotient_degree::<Val<SC>, _>(chip, 0))
             .collect::<Vec<_>>();
         let quotient_degrees = log_quotient_degrees
             .iter()
@@ -310,8 +302,9 @@ impl Machine {
         let quotient_values = quotient_domains
             .clone()
             .into_par_iter()
+            .zip(self.chips().par_iter())
             .enumerate()
-            .map(|(i, quotient_domain)| {
+            .map(|(i, (quotient_domain, &chip))| {
                 // let ppt: Option<RowMajorMatrix<Val<SC>>> =
                 //     self.keccak_permute_chip.preprocessed_trace();
                 // let preprocessed_trace_lde = ppt.map(|trace| preprocessed_trace_ldes.remove(0));
@@ -319,28 +312,16 @@ impl Machine {
                     pcs.get_evaluations_on_domain(&main_data, i, quotient_domain);
                 let permutation_trace_on_quotient_domains =
                     pcs.get_evaluations_on_domain(&perm_data, i, quotient_domain);
-                match self.chips()[i] {
-                    ChipType::KeccakPermute(chip) => quotient_values::<SC, _, _>(
-                        chip,
-                        cumulative_sums[i],
-                        main_domains[i],
-                        quotient_domain,
-                        main_trace_on_quotient_domains,
-                        permutation_trace_on_quotient_domains,
-                        &perm_challenges,
-                        alpha,
-                    ),
-                    ChipType::MerkleTree(chip) => quotient_values::<SC, _, _>(
-                        chip,
-                        cumulative_sums[i],
-                        main_domains[i],
-                        quotient_domain,
-                        main_trace_on_quotient_domains,
-                        permutation_trace_on_quotient_domains,
-                        &perm_challenges,
-                        alpha,
-                    ),
-                }
+                quotient_values::<SC, _, _>(
+                    chip,
+                    cumulative_sums[i],
+                    main_domains[i],
+                    quotient_domain,
+                    main_trace_on_quotient_domains,
+                    permutation_trace_on_quotient_domains,
+                    &perm_challenges,
+                    alpha,
+                )
             })
             .collect::<Vec<_>>();
         let quotient_chunks = quotient_domains
@@ -480,10 +461,7 @@ impl Machine {
         let log_quotient_degrees = self
             .chips()
             .iter()
-            .map(|chip| match chip {
-                ChipType::KeccakPermute(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
-                ChipType::MerkleTree(chip) => get_log_quotient_degree::<Val<SC>, _>(chip, 0),
-            })
+            .map(|&chip| get_log_quotient_degree::<Val<SC>, _>(chip, 0))
             .collect::<Vec<_>>();
         let quotient_degrees = log_quotient_degrees
             .iter()
@@ -713,11 +691,35 @@ mod tests {
     use p3_dft::Radix2DitParallel;
     use p3_field::extension::BinomialExtensionField;
     use p3_fri::{FriConfig, TwoAdicFriPcs};
-    use p3_keccak::Keccak256Hash;
+    use p3_keccak::{Keccak256Hash, KeccakF};
     use p3_merkle_tree::FieldMerkleTreeMmcs;
-    use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
+    use p3_symmetric::{
+        CompressionFunctionFromHasher, PseudoCompressionFunction, SerializingHasher32,
+        TruncatedPermutation,
+    };
     use p3_uni_stark::StarkConfig;
     use p3_util::log2_ceil_usize;
+    use rand::random;
+
+    fn generate_digests(leaf_hashes: Vec<[u8; 32]>) -> Vec<Vec<[u8; 32]>> {
+        let keccak = TruncatedPermutation::new(KeccakF {});
+        let mut digests = vec![leaf_hashes];
+
+        while let Some(last_level) = digests.last().cloned() {
+            if last_level.len() == 1 {
+                break;
+            }
+
+            let next_level = last_level
+                .chunks_exact(2)
+                .map(|chunk| keccak.compress([chunk[0], chunk[1]]))
+                .collect();
+
+            digests.push(next_level);
+        }
+
+        digests
+    }
 
     #[test]
     fn test_machine_prove() -> Result<(), VerificationError> {
@@ -733,7 +735,7 @@ mod tests {
         let compress = MyCompress::new(byte_hash);
 
         type ValMmcs = FieldMerkleTreeMmcs<Val, u8, FieldHash, MyCompress, 32>;
-        let val_mmcs = ValMmcs::new(field_hash, compress);
+        let val_mmcs = ValMmcs::new(field_hash, compress.clone());
 
         type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
         let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
@@ -755,7 +757,20 @@ mod tests {
         type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
         let config = MyConfig::new(pcs);
 
-        let machine = Machine::new();
+        const HEIGHT: usize = 1;
+        let leaf_hashes = (0..2u64.pow(HEIGHT as u32))
+            .map(|_| [0; 32])
+            // .map(|_| random())
+            .collect::<Vec<_>>();
+        // let merkle_tree = FieldMerkleTree::new::<Val, u8, FieldHash, MyCompress>(
+        //     &field_hash,
+        //     &compress,
+        //     vec![RowMajorMatrix::new(raw_leaves, 1)],
+        // );
+        let digests = generate_digests(leaf_hashes);
+
+        let leaf_index = 0;
+        let machine = Machine::new(digests, leaf_index);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
         let proof = machine.prove(&config, &mut challenger);

@@ -296,7 +296,6 @@ dependencies = [
 [[package]]
 name = "p3-keccak"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#683ca1a9e083729c015b981c035af7428a0d85c6"
 dependencies = [
  "p3-symmetric",
  "tiny-keccak",

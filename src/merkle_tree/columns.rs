@@ -9,6 +9,8 @@ pub(crate) const NUM_U64_HASH_ELEMS: usize = 4;
 #[repr(C)]
 #[derive(Debug)]
 pub struct MerkleTreeCols<T> {
+    pub is_real: T,
+
     pub is_final_step: T,
 
     pub node: [[T; U64_LIMBS]; NUM_U64_HASH_ELEMS],

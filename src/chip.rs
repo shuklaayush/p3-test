@@ -14,6 +14,7 @@ pub enum InteractionType {
     Receive,
 }
 
+#[derive(Clone, Debug)]
 pub struct Interaction<F: Field> {
     pub fields: Vec<VirtualPairCol<F>>,
     pub count: VirtualPairCol<F>,

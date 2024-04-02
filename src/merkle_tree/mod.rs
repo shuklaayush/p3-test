@@ -2,7 +2,7 @@ mod columns;
 mod generation;
 
 use core::borrow::Borrow;
-use p3_air::{Air, AirBuilder, BaseAir};
+use p3_air::{Air, AirBuilder, BaseAir, VirtualPairCol};
 use p3_field::{AbstractField, PrimeField64};
 use p3_matrix::{dense::RowMajorMatrix, MatrixRowSlices};
 use p3_uni_stark::{StarkGenericConfig, Val};
@@ -10,25 +10,25 @@ use std::iter;
 
 use crate::{
     chip::{Chip, Interaction, MachineChip},
-    merkle_tree::generation::generate_trace_rows_for_leaf,
+    merkle_tree::{columns::MERKLE_TREE_COL_MAP, generation::generate_trace_rows_for_leaf},
 };
 use columns::{MerkleTreeCols, NUM_MERKLE_TREE_COLS, NUM_U64_HASH_ELEMS, U64_LIMBS};
 
 pub(crate) const NUM_U8_HASH_ELEMS: usize = 32;
 
-pub struct MerkleTreeChip<const HEIGHT: usize> {
+pub struct MerkleTreeChip {
     pub leaves: Vec<[u8; NUM_U8_HASH_ELEMS]>,
     pub leaf_indices: Vec<usize>,
-    pub siblings: Vec<[[u8; NUM_U8_HASH_ELEMS]; HEIGHT]>,
+    pub siblings: Vec<Vec<[u8; NUM_U8_HASH_ELEMS]>>,
 }
 
-impl<F, const HEIGHT: usize> BaseAir<F> for MerkleTreeChip<HEIGHT> {
+impl<F> BaseAir<F> for MerkleTreeChip {
     fn width(&self) -> usize {
         NUM_MERKLE_TREE_COLS
     }
 }
 
-impl<AB: AirBuilder, const HEIGHT: usize> Air<AB> for MerkleTreeChip<HEIGHT> {
+impl<AB: AirBuilder> Air<AB> for MerkleTreeChip {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
         let local: &MerkleTreeCols<AB::Var> = main.row_slice(0).borrow();
@@ -58,9 +58,10 @@ impl<AB: AirBuilder, const HEIGHT: usize> Air<AB> for MerkleTreeChip<HEIGHT> {
     }
 }
 
-impl<F: PrimeField64, const HEIGHT: usize> Chip<F> for MerkleTreeChip<HEIGHT> {
+impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
     fn generate_trace(&self) -> RowMajorMatrix<F> {
-        let num_rows = (self.leaves.len() * HEIGHT).next_power_of_two();
+        let height_minus_one = self.siblings[0].len();
+        let num_rows = (self.leaves.len() * height_minus_one).next_power_of_two();
         let mut trace = RowMajorMatrix::new(
             vec![F::zero(); num_rows * NUM_MERKLE_TREE_COLS],
             NUM_MERKLE_TREE_COLS,
@@ -70,35 +71,60 @@ impl<F: PrimeField64, const HEIGHT: usize> Chip<F> for MerkleTreeChip<HEIGHT> {
         assert!(suffix.is_empty(), "Alignment should match");
         assert_eq!(rows.len(), num_rows);
 
-        for (leaf_rows, ((&leaf, &leaf_index), siblings)) in rows.chunks_mut(HEIGHT).zip(
+        // TODO:
+        for (leaf_rows, ((&leaf, &leaf_index), siblings)) in rows.chunks_mut(height_minus_one).zip(
             self.leaves
                 .iter()
                 .zip(&self.leaf_indices)
-                .zip(&self.siblings)
-                .chain(iter::repeat((
-                    (&[0; NUM_U8_HASH_ELEMS], &0),
-                    &[[0; NUM_U8_HASH_ELEMS]; HEIGHT],
-                ))),
+                .zip(&self.siblings),
         ) {
             generate_trace_rows_for_leaf(leaf_rows, leaf, leaf_index, siblings);
         }
 
+        // println!("Merkle: {:?} {:?}", rows[0].left_node, rows[0].right_node);
+        println!("Merkle: {:?}", rows[0].output);
         trace
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
+        // let fields = MERKLE_TREE_COL_MAP
+        //     .left_node
+        //     .into_iter()
+        //     .chain(MERKLE_TREE_COL_MAP.right_node.into_iter())
+        //     .flatten()
+        //     .map(VirtualPairCol::single_main)
+        //     .collect();
+        // let is_real = VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real);
+        // let send = Interaction {
+        //     fields,
+        //     count: is_real,
+        //     argument_index: 1,
+        // };
+        // println!("merkle send {:?}", send);
+        // vec![send]
         vec![]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
+        // let fields = MERKLE_TREE_COL_MAP
+        //     .output
+        //     .into_iter()
+        //     .flatten()
+        //     .map(VirtualPairCol::single_main)
+        //     .collect();
+        // let is_real = VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real);
+        // let receive = Interaction {
+        //     fields,
+        //     count: is_real,
+        //     argument_index: 1,
+        // };
+        // println!("merkle receive {:?}", receive);
+        // vec![receive]
         vec![]
     }
 }
 
-impl<SC: StarkGenericConfig, const HEIGHT: usize> MachineChip<SC> for MerkleTreeChip<HEIGHT> where
-    Val<SC>: PrimeField64
-{
-}
+impl<SC: StarkGenericConfig> MachineChip<SC> for MerkleTreeChip where Val<SC>: PrimeField64 {}
 
 #[cfg(test)]
 mod tests {
@@ -158,7 +184,7 @@ mod tests {
         let siblings = (0..HEIGHT)
             .map(|i| merkle_tree.digest_layers[i][(leaf_index >> i) ^ 1])
             .collect::<Vec<[u8; 32]>>();
-        let chip = MerkleTreeChip::<HEIGHT> {
+        let chip = MerkleTreeChip {
             leaves: vec![leaf],
             leaf_indices: vec![leaf_index],
             siblings: vec![siblings.try_into().unwrap()],

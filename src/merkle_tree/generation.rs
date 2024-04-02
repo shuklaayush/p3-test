@@ -1,6 +1,8 @@
 use p3_field::PrimeField64;
-use p3_keccak::Keccak256Hash;
-use p3_symmetric::{CompressionFunctionFromHasher, PseudoCompressionFunction};
+use p3_keccak::{Keccak256Hash, KeccakF};
+use p3_symmetric::{
+    CompressionFunctionFromHasher, PseudoCompressionFunction, TruncatedPermutation,
+};
 
 use super::{
     columns::{MerkleTreeCols, NUM_U64_HASH_ELEMS, U64_LIMBS},
@@ -25,8 +27,7 @@ pub fn generate_trace_rows_for_leaf<F: PrimeField64>(
         }
     }
 
-    let mut node =
-        generate_trace_row_for_round(&mut rows[0], (leaf_index ^ 1) != 0, leaf, siblings[0]);
+    let mut node = generate_trace_row_for_round(&mut rows[0], leaf_index & 1, leaf, siblings[0]);
 
     for round in 1..rows.len() {
         // Copy previous row's output to next row's input.
@@ -38,7 +39,7 @@ pub fn generate_trace_rows_for_leaf<F: PrimeField64>(
 
         node = generate_trace_row_for_round(
             &mut rows[round],
-            ((leaf_index >> round) ^ 1) != 0,
+            (leaf_index >> round) & 1,
             node,
             siblings[round],
         );
@@ -50,20 +51,23 @@ pub fn generate_trace_rows_for_leaf<F: PrimeField64>(
 
 pub fn generate_trace_row_for_round<F: PrimeField64>(
     row: &mut MerkleTreeCols<F>,
-    parity: bool,
+    parity_bit: usize,
     node: [u8; NUM_U8_HASH_ELEMS],
     sibling: [u8; NUM_U8_HASH_ELEMS],
 ) -> [u8; NUM_U8_HASH_ELEMS] {
-    let (left_node, right_node) = if parity {
-        (sibling, node)
-    } else {
+    row.is_real = F::one();
+
+    let (left_node, right_node) = if parity_bit == 0 {
         (node, sibling)
+    } else {
+        (sibling, node)
     };
 
-    let compress = CompressionFunctionFromHasher::<u8, Keccak256Hash, 2, 32>::new(Keccak256Hash {});
-    let output = compress.compress([left_node, right_node]);
+    let keccak = TruncatedPermutation::new(KeccakF {});
+    let output = keccak.compress([left_node, right_node]);
+    // println!("{:?}", output);
 
-    row.parity_selector = F::from_bool(parity);
+    row.parity_selector = F::from_canonical_usize(parity_bit);
     for x in 0..NUM_U64_HASH_ELEMS {
         let offset = x * NUM_U8_HASH_ELEMS / NUM_U64_HASH_ELEMS;
         for limb in 0..U64_LIMBS {

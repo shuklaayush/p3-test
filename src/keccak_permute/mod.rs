@@ -1,7 +1,7 @@
 use core::borrow::Borrow;
-use p3_keccak_air::generate_trace_rows;
+use p3_keccak_air::{generate_trace_rows, KECCAK_COL_MAP};
 
-use p3_air::{Air, AirBuilder, BaseAir};
+use p3_air::{Air, AirBuilder, BaseAir, VirtualPairCol};
 use p3_field::{AbstractField, PrimeField64};
 use p3_keccak_air::logic::{andn_gen, xor3_gen, xor_gen};
 use p3_keccak_air::rc_value_bit;
@@ -184,10 +184,40 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
+        // let fields = [KECCAK_COL_MAP.a_prime_prime_prime_0_0_limbs]
+        //     .into_iter()
+        //     .chain(KECCAK_COL_MAP.a_prime_prime.into_iter().flatten().skip(1))
+        //     .flatten()
+        //     .map(VirtualPairCol::single_main)
+        //     .collect();
+        // let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.step_flags[NUM_ROUNDS - 1]);
+        // let send = Interaction {
+        //     fields,
+        //     count: is_real,
+        //     argument_index: 0,
+        // };
+        // println!("keccak send {:?}", send);
+        // vec![send]
         vec![]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
+        // let fields = KECCAK_COL_MAP
+        //     .preimage
+        //     .into_iter()
+        //     .flatten()
+        //     .take(8)
+        //     .flatten()
+        //     .map(VirtualPairCol::single_main)
+        //     .collect();
+        // let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.step_flags[0]);
+        // let receive = Interaction {
+        //     fields,
+        //     count: is_real,
+        //     argument_index: 0,
+        // };
+        // println!("keccak receive {:?}", receive);
+        // vec![receive]
         vec![]
     }
 }
