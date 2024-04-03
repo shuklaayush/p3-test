@@ -1,7 +1,7 @@
 use p3_field::PrimeField64;
-use p3_keccak::{Keccak256Hash, KeccakF};
+use p3_keccak::{KeccakF};
 use p3_symmetric::{
-    CompressionFunctionFromHasher, PseudoCompressionFunction, TruncatedPermutation,
+    PseudoCompressionFunction, TruncatedPermutation,
 };
 
 use super::{

@@ -370,12 +370,12 @@ impl Machine {
                 (&perm_data, zeta_and_next),
                 (
                     &quotient_data,
+                    // open every chunk at zeta
                     quotient_degrees
                         .iter()
-                        .map(|&quotient_degree| {
+                        .flat_map(|&quotient_degree| {
                             (0..quotient_degree).map(|_| vec![zeta]).collect::<Vec<_>>()
                         })
-                        .flatten()
                         .collect::<Vec<_>>(),
                 ),
             ],
@@ -592,8 +592,7 @@ impl Machine {
                         .zip(
                             chip_proofs
                                 .iter()
-                                .map(|proof| &proof.opened_values.quotient_chunks)
-                                .flatten(),
+                                .flat_map(|proof| &proof.opened_values.quotient_chunks),
                         )
                         .map(|(&domain, opened_values)| {
                             (domain, vec![(zeta, opened_values.clone())])
@@ -643,6 +642,18 @@ impl Machine {
 
             let sels = main_domain.selectors_at_point(zeta);
 
+            let unflatten = |v: &[SC::Challenge]| {
+                v.chunks_exact(SC::Challenge::D)
+                    .map(|chunk| {
+                        chunk
+                            .iter()
+                            .enumerate()
+                            .map(|(e_i, &c)| SC::Challenge::monomial(e_i) * c)
+                            .sum()
+                    })
+                    .collect::<Vec<SC::Challenge>>()
+            };
+
             let mut folder: VerifierConstraintFolder<'_, SC> = VerifierConstraintFolder {
                 preprocessed: TwoRowMatrixView {
                     local: &[],
@@ -653,8 +664,8 @@ impl Machine {
                     next: &chip_proof.opened_values.trace_next,
                 },
                 perm: TwoRowMatrixView {
-                    local: &chip_proof.opened_values.permutation_local,
-                    next: &chip_proof.opened_values.permutation_next,
+                    local: &unflatten(&chip_proof.opened_values.permutation_local),
+                    next: &unflatten(&chip_proof.opened_values.permutation_next),
                 },
                 perm_challenges: &perm_challenges,
                 public_values: &vec![],
@@ -699,7 +710,7 @@ mod tests {
     use p3_field::extension::BinomialExtensionField;
     use p3_fri::{FriConfig, TwoAdicFriPcs};
     use p3_keccak::{Keccak256Hash, KeccakF};
-    use p3_merkle_tree::FieldMerkleTree;
+    
     use p3_merkle_tree::FieldMerkleTreeMmcs;
     use p3_symmetric::{
         CompressionFunctionFromHasher, PseudoCompressionFunction, SerializingHasher32,
@@ -707,7 +718,7 @@ mod tests {
     };
     use p3_uni_stark::StarkConfig;
     use p3_util::log2_ceil_usize;
-    use rand::random;
+    
 
     fn generate_digests(leaf_hashes: Vec<[u8; 32]>) -> Vec<Vec<[u8; 32]>> {
         let keccak = TruncatedPermutation::new(KeccakF {});

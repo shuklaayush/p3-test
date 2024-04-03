@@ -185,10 +185,8 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
 
     fn sends(&self) -> Vec<Interaction<F>> {
         let fields = (0..4)
-            // let fields = (0..1)
             .flat_map(|i| {
                 (0..U64_LIMBS)
-                    // (0..1)
                     .map(|limb| KECCAK_COL_MAP.a_prime_prime_prime(i % 5, i / 5, limb))
                     .collect::<Vec<_>>()
             })
@@ -201,27 +199,24 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
             argument_index: 0,
         };
         vec![send]
-        // vec![]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
-        // let fields = KECCAK_COL_MAP
-        //     .preimage
-        //     .into_iter()
-        //     .flatten()
-        //     .take(8)
-        //     .flatten()
-        //     .map(VirtualPairCol::single_main)
-        //     .collect();
-        // let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.step_flags[0]);
-        // let receive = Interaction {
-        //     fields,
-        //     count: is_real,
-        //     argument_index: 0,
-        // };
-        // // println!("keccak receive {:?}", receive);
-        // vec![receive]
-        vec![]
+        let fields = KECCAK_COL_MAP
+            .preimage
+            .into_iter()
+            .flatten()
+            .take(8)
+            .flatten()
+            .map(VirtualPairCol::single_main)
+            .collect();
+        let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.step_flags[0]);
+        let receive = Interaction {
+            fields,
+            count: is_real,
+            argument_index: 1,
+        };
+        vec![receive]
     }
 }
 

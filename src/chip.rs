@@ -178,7 +178,6 @@ where
             rlc += AB::ExprEF::from_f(beta) * elem;
         }
         rlc += AB::ExprEF::from_f(alphas[interaction.argument_index]);
-        println!("rlc {:?}", rlc.clone() * perm_local[m].into());
         builder.assert_one_ext(rlc * perm_local[m].into());
 
         let mult_local = interaction
@@ -295,16 +294,16 @@ pub fn check_constraints<C, SC>(
         let mut builder = DebugConstraintBuilder {
             row_index: i,
             main: TwoRowMatrixView {
-                local: &main_local,
-                next: &main_next,
+                local: main_local,
+                next: main_next,
             },
             preprocessed: TwoRowMatrixView {
-                local: &preprocessed_local,
-                next: &preprocessed_next,
+                local: preprocessed_local,
+                next: preprocessed_next,
             },
             perm: TwoRowMatrixView {
-                local: &perm_local,
-                next: &perm_next,
+                local: perm_local,
+                next: perm_next,
             },
             perm_challenges,
             public_values,

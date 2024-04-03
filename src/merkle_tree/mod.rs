@@ -6,7 +6,6 @@ use p3_air::{Air, AirBuilder, BaseAir, VirtualPairCol};
 use p3_field::{AbstractField, PrimeField64};
 use p3_matrix::{dense::RowMajorMatrix, MatrixRowSlices};
 use p3_uni_stark::{StarkGenericConfig, Val};
-use std::iter;
 
 use crate::{
     chip::{Chip, Interaction, MachineChip},
@@ -89,31 +88,27 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
-        // let fields = MERKLE_TREE_COL_MAP
-        //     .left_node
-        //     .into_iter()
-        //     .chain(MERKLE_TREE_COL_MAP.right_node.into_iter())
-        //     .flatten()
-        //     .map(VirtualPairCol::single_main)
-        //     .collect();
-        // let is_real = VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real);
-        // let send = Interaction {
-        //     fields,
-        //     count: is_real,
-        //     argument_index: 0,
-        // };
-        // // println!("merkle send {:?}", send);
-        // vec![send]
-        vec![]
+        let fields = MERKLE_TREE_COL_MAP
+            .left_node
+            .into_iter()
+            .chain(MERKLE_TREE_COL_MAP.right_node)
+            .flatten()
+            .map(VirtualPairCol::single_main)
+            .collect();
+        let is_real = VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real);
+        let send = Interaction {
+            fields,
+            count: is_real,
+            argument_index: 1,
+        };
+        vec![send]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
         let fields = MERKLE_TREE_COL_MAP
             .output
             .into_iter()
-            // .take(1)
             .flatten()
-            // .take(1)
             .map(VirtualPairCol::single_main)
             .collect();
         let is_real = VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real);
@@ -122,9 +117,7 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
             count: is_real,
             argument_index: 0,
         };
-        // println!("merkle receive {:?}", receive);
         vec![receive]
-        // vec![]
     }
 }
 
@@ -142,7 +135,7 @@ mod tests {
     use p3_fri::{FriConfig, TwoAdicFriPcs};
     use p3_keccak::{Keccak256Hash, KeccakF};
     use p3_matrix::Matrix;
-    use p3_merkle_tree::{FieldMerkleTree, FieldMerkleTreeMmcs};
+    use p3_merkle_tree::FieldMerkleTreeMmcs;
     use p3_symmetric::{
         CompressionFunctionFromHasher, PseudoCompressionFunction, SerializingHasher32,
         TruncatedPermutation,
