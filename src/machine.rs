@@ -710,7 +710,7 @@ mod tests {
     use p3_field::extension::BinomialExtensionField;
     use p3_fri::{FriConfig, TwoAdicFriPcs};
     use p3_keccak::{Keccak256Hash, KeccakF};
-    
+
     use p3_merkle_tree::FieldMerkleTreeMmcs;
     use p3_symmetric::{
         CompressionFunctionFromHasher, PseudoCompressionFunction, SerializingHasher32,
@@ -718,7 +718,7 @@ mod tests {
     };
     use p3_uni_stark::StarkConfig;
     use p3_util::log2_ceil_usize;
-    
+    use rand::random;
 
     fn generate_digests(leaf_hashes: Vec<[u8; 32]>) -> Vec<Vec<[u8; 32]>> {
         let keccak = TruncatedPermutation::new(KeccakF {});
@@ -779,13 +779,8 @@ mod tests {
         const HEIGHT: usize = 3;
         let leaf_hashes = (0..2u64.pow(HEIGHT as u32))
             .map(|_| [0; 32])
-            // .map(|_| random())
+            .map(|_| random())
             .collect::<Vec<_>>();
-        // let merkle_tree = FieldMerkleTree::new::<Val, u8, FieldHash, MyCompress>(
-        //     &field_hash,
-        //     &compress,
-        //     vec![RowMajorMatrix::new(leaf_hashes, 1)],
-        // );
         let digests = generate_digests(leaf_hashes);
 
         let leaf_index = 0;

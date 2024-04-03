@@ -74,7 +74,7 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
         assert!(suffix.is_empty(), "Alignment should match");
         assert_eq!(rows.len(), num_rows);
 
-        // TODO:
+        // TODO: Padding
         for (leaf_rows, ((&leaf, &leaf_index), siblings)) in rows.chunks_mut(height).zip(
             self.leaves
                 .iter()
