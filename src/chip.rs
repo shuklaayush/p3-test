@@ -65,7 +65,7 @@ pub fn generate_permutation_trace<SC: StarkGenericConfig, C: MachineChip<SC>>(
 ) -> RowMajorMatrix<SC::Challenge> {
     let all_interactions = chip.all_interactions();
     let alphas = generate_rlc_elements(chip, &random_elements);
-    let betas = random_elements[2].powers();
+    let betas = random_elements[1].powers();
 
     let preprocessed = chip.preprocessed_trace();
 
@@ -165,7 +165,7 @@ where
     let all_interactions = chip.all_interactions();
 
     let alphas = generate_rlc_elements(chip, &rand_elems);
-    let betas = rand_elems[2].powers();
+    let betas = rand_elems[1].powers();
 
     let lhs = phi_next.into() - phi_local.into();
     let mut rhs = AB::ExprEF::zero();
@@ -178,6 +178,7 @@ where
             rlc += AB::ExprEF::from_f(beta) * elem;
         }
         rlc += AB::ExprEF::from_f(alphas[interaction.argument_index]);
+        println!("rlc {:?}", rlc.clone() * perm_local[m].into());
         builder.assert_one_ext(rlc * perm_local[m].into());
 
         let mult_local = interaction

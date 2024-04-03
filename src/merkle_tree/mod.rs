@@ -85,12 +85,6 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
             generate_trace_rows_for_leaf(leaf_rows, leaf, leaf_index, siblings);
         }
 
-        let index = 1;
-        println!(
-            "Merkle: {:?} {:?}",
-            rows[index].left_node, rows[index].right_node
-        );
-        println!("Merkle: {:?}", rows[index].output);
         trace
     }
 
@@ -130,6 +124,7 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
         };
         // println!("merkle receive {:?}", receive);
         vec![receive]
+        // vec![]
     }
 }
 

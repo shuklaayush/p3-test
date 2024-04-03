@@ -20,23 +20,6 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<[u64; 25]>) -> RowMajorM
         generate_trace_rows_for_perm(row, input);
     }
 
-    let index = 1;
-    println!("Keccak: {:?}", rows[NUM_ROUNDS * index].preimage);
-    println!(
-        "Keccak: {:?}",
-        (0..4)
-            .map(|i| (0..U64_LIMBS)
-                .map(
-                    |limb| rows[(index + 1) * NUM_ROUNDS - 1].a_prime_prime_prime(
-                        i % 5,
-                        i / 5,
-                        limb
-                    )
-                )
-                .collect::<Vec<_>>())
-            .collect::<Vec<_>>()
-    );
-
     trace
 }
 

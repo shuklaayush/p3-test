@@ -8,3 +8,4 @@ mod proof;
 mod quotient;
 mod util;
 // mod verify;
+mod error;

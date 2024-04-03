@@ -97,7 +97,11 @@ where
         );
     }
 
-    fn assert_eq_ext<I1: Into<Self::ExprEF>, I2: Into<Self::ExprEF>>(&mut self, x: I1, y: I2) {
+    fn assert_eq_ext<I1, I2>(&mut self, x: I1, y: I2)
+    where
+        I1: Into<Self::ExprEF>,
+        I2: Into<Self::ExprEF>,
+    {
         let x = x.into();
         let y = y.into();
         assert_eq!(

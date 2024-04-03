@@ -97,12 +97,12 @@ where
                     local: &local,
                     next: &next,
                 },
-                public_values: &vec![],
                 perm: TwoRowMatrixView {
                     local: &perm_local,
                     next: &perm_next,
                 },
                 perm_challenges,
+                public_values: &vec![],
                 cumulative_sum,
                 is_first_row,
                 is_last_row,

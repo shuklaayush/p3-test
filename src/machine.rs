@@ -4,7 +4,7 @@ use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, Field, PrimeField64};
 use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
-use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val, VerificationError};
+use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
 
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
         check_constraints, check_cumulative_sums, eval_permutation_constraints,
         generate_permutation_trace, Chip, Interaction, InteractionType, MachineChip,
     },
+    error::VerificationError,
     folder::VerifierConstraintFolder,
     keccak_permute::KeccakPermuteChip,
     merkle_tree::MerkleTreeChip,
@@ -220,7 +221,7 @@ impl Machine {
 
         // 3. Generate and commit to permutation trace
         let mut perm_challenges = Vec::new();
-        for _ in 0..3 {
+        for _ in 0..2 {
             perm_challenges.push(challenger.sample_ext_element::<SC::Challenge>());
         }
 
@@ -534,7 +535,7 @@ impl Machine {
 
         challenger.observe(commitments.main_trace.clone());
         let mut perm_challenges = Vec::new();
-        for _ in 0..3 {
+        for _ in 0..2 {
             perm_challenges.push(challenger.sample_ext_element::<SC::Challenge>());
         }
         challenger.observe(commitments.perm_trace.clone());
@@ -665,13 +666,22 @@ impl Machine {
             };
             chip.eval(&mut folder);
             eval_permutation_constraints::<_, SC, _>(chip, &mut folder, chip_proof.cumulative_sum);
-            let folded_constraints = folder.accumulator;
 
+            let folded_constraints = folder.accumulator;
             // Finally, check that
             //     folded_constraints(zeta) / Z_H(zeta) = quotient(zeta)
             if folded_constraints * sels.inv_zeroifier != quotient {
                 return Err(VerificationError::OodEvaluationMismatch);
             }
+        }
+
+        let sum: SC::Challenge = proof
+            .chip_proofs
+            .iter()
+            .map(|chip_proof| chip_proof.cumulative_sum)
+            .sum();
+        if sum != SC::Challenge::zero() {
+            return Err(VerificationError::NonZeroCumulativeSum);
         }
 
         Ok(())
