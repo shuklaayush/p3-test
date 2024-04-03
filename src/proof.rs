@@ -26,6 +26,8 @@ pub struct ChipProof<Challenge> {
 
 #[derive(Serialize, Deserialize)]
 pub struct OpenedValues<Challenge> {
+    pub preprocessed_local: Vec<Challenge>,
+    pub preprocessed_next: Vec<Challenge>,
     pub trace_local: Vec<Challenge>,
     pub trace_next: Vec<Challenge>,
     pub permutation_local: Vec<Challenge>,

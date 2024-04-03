@@ -178,14 +178,13 @@ impl Machine {
         //             .flat_map(|chip| chip.preprocessed_trace())
         //             .collect::<Vec<_>>()
         //     });
-        // let preprocessed_degrees: [usize; 2usize] = preprocessed_traces
+        // let preprocessed_degrees = preprocessed_traces
         //     .iter()
         //     .map(|trace| trace.height())
-        //     .collect::<Vec<_>>()
-        //     .try_into()
-        //     .unwrap();
-        // let preprocessed_domains =
-        //     preprocessed_degrees.map(|degree| pcs.natural_domain_for_degree(degree));
+        //     .collect::<Vec<_>>();
+        // let preprocessed_domains = preprocessed_degrees
+        //     .iter()
+        //     .map(|&degree| pcs.natural_domain_for_degree(degree));
         // let (preprocessed_commit, preprocessed_data) =
         //     tracing::info_span!("commit to preprocessed traces").in_scope(|| {
         //         pcs.commit(
@@ -193,7 +192,6 @@ impl Machine {
         //         )
         //     });
         // challenger.observe(preprocessed_commit.clone());
-        // let mut preprocessed_trace_ldes = pcs.get_ldes(&preprocessed_data);
 
         // 2. Generate and commit to main trace
         let main_traces = tracing::info_span!("generate main traces").in_scope(|| {
@@ -303,9 +301,8 @@ impl Machine {
             .zip(self.chips().par_iter())
             .enumerate()
             .map(|(i, (quotient_domain, &chip))| {
-                // let ppt: Option<RowMajorMatrix<Val<SC>>> =
-                //     self.keccak_permute_chip.preprocessed_trace();
-                // let preprocessed_trace_lde = ppt.map(|trace| preprocessed_trace_ldes.remove(0));
+                // let preprocessed_trace_on_quotient_domains =
+                //     pcs.get_evaluations_on_domain(&preprocessed_data, i, quotient_domain);
                 let main_trace_on_quotient_domains =
                     pcs.get_evaluations_on_domain(&main_data, i, quotient_domain);
                 let permutation_trace_on_quotient_domains =
@@ -315,6 +312,7 @@ impl Machine {
                     cumulative_sums[i],
                     main_domains[i],
                     quotient_domain,
+                    // preprocessed_trace_on_quotient_domains,
                     main_trace_on_quotient_domains,
                     permutation_trace_on_quotient_domains,
                     &perm_challenges,
@@ -401,6 +399,7 @@ impl Machine {
             .zip(quotient_openings)
             .zip(perm_traces)
             .map(|((((log_degree, main), perm), quotient), perm_trace)| {
+                let [preprocessed_local, preprocessed_next] = [vec![], vec![]];
                 let [main_local, main_next] = main.try_into().expect("Should have 2 openings");
                 let [perm_local, perm_next] = perm.try_into().expect("Should have 2 openings");
                 let quotient_chunks = quotient
@@ -408,6 +407,8 @@ impl Machine {
                     .map(|mut chunk| chunk.remove(0))
                     .collect::<Vec<_>>();
                 let opened_values = OpenedValues {
+                    preprocessed_local,
+                    preprocessed_next,
                     trace_local: main_local,
                     trace_next: main_next,
                     permutation_local: perm_local,
@@ -524,7 +525,7 @@ impl Machine {
         // let preprocessed_domains = preprocessed_degrees
         //     .iter()
         //     .map(|&degree| pcs.natural_domain_for_degree(degree))
-        //     .collect();
+        //     .collect::<Vec<_>>();
         // let (preprocessed_commit, preprocessed_data) =
         //     tracing::info_span!("commit to preprocessed traces").in_scope(|| {
         //         pcs.commit(
@@ -656,8 +657,8 @@ impl Machine {
 
             let mut folder: VerifierConstraintFolder<'_, SC> = VerifierConstraintFolder {
                 preprocessed: TwoRowMatrixView {
-                    local: &[],
-                    next: &[],
+                    local: &chip_proof.opened_values.preprocessed_local,
+                    next: &chip_proof.opened_values.preprocessed_next,
                 },
                 main: TwoRowMatrixView {
                     local: &chip_proof.opened_values.trace_local,
