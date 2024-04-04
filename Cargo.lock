@@ -168,7 +168,7 @@ dependencies = [
 [[package]]
 name = "p3-baby-bear"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#75c3b5ed4a74e95781725dc3db6b399394052c05"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
  "num-bigint",
  "p3-field",
@@ -245,7 +245,7 @@ dependencies = [
 [[package]]
 name = "p3-goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#75c3b5ed4a74e95781725dc3db6b399394052c05"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
  "num-bigint",
  "p3-dft",
@@ -306,12 +306,12 @@ version = "0.1.0"
 [[package]]
 name = "p3-maybe-rayon"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#75c3b5ed4a74e95781725dc3db6b399394052c05"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 
 [[package]]
 name = "p3-mds"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#75c3b5ed4a74e95781725dc3db6b399394052c05"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
  "itertools 0.11.0",
  "p3-dft",
@@ -340,7 +340,7 @@ dependencies = [
 [[package]]
 name = "p3-poseidon2"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#75c3b5ed4a74e95781725dc3db6b399394052c05"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
  "p3-field",
  "p3-symmetric",
@@ -412,7 +412,7 @@ dependencies = [
 [[package]]
 name = "p3-util"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#75c3b5ed4a74e95781725dc3db6b399394052c05"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
  "serde",
 ]
@@ -558,9 +558,9 @@ checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
 name = "syn"
-version = "2.0.57"
+version = "2.0.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11a6ae1e52eb25aab8f3fb9fca13be982a373b8f1157ca14b897a825ba4a2d35"
+checksum = "44cfb93f38070beee36b3fef7d4f5a16f27751d94b187b666a5cc5e9b0d30687"
 dependencies = [
  "proc-macro2",
  "quote",

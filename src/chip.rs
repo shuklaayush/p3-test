@@ -1,7 +1,7 @@
 use p3_air::Air;
 use p3_field::Field;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_uni_stark::{StarkGenericConfig, SymbolicAirBuilder, Val};
+use p3_uni_stark::{StarkGenericConfig, Val};
 
 use crate::debug_builder::DebugConstraintBuilder;
 use crate::folder::{ProverConstraintFolder, VerifierConstraintFolder};
@@ -34,7 +34,6 @@ pub trait MachineChip<SC: StarkGenericConfig>:
     Chip<Val<SC>>
     + for<'a> Air<ProverConstraintFolder<'a, SC>>
     + for<'a> Air<VerifierConstraintFolder<'a, SC>>
-    + for<'a> Air<SymbolicAirBuilder<Val<SC>>>
     + for<'a> Air<DebugConstraintBuilder<'a, SC>>
 {
     fn trace_width(&self) -> usize {
