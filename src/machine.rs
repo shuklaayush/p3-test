@@ -6,6 +6,7 @@ use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
+use tracing::instrument;
 
 use crate::{
     check_constraints::{check_constraints, check_cumulative_sums},
@@ -157,6 +158,8 @@ impl Machine {
         }
     }
 
+    // TODO: Move main trace generation outside
+    #[instrument(skip_all)]
     fn prove<SC: StarkGenericConfig>(
         &self,
         config: &SC,
@@ -435,6 +438,7 @@ impl Machine {
         }
     }
 
+    #[instrument(skip_all)]
     fn verify<SC: StarkGenericConfig>(
         &self,
         config: &SC,
@@ -649,7 +653,6 @@ mod tests {
     use p3_field::extension::BinomialExtensionField;
     use p3_fri::{FriConfig, TwoAdicFriPcs};
     use p3_keccak::{Keccak256Hash, KeccakF};
-
     use p3_merkle_tree::FieldMerkleTreeMmcs;
     use p3_symmetric::{
         CompressionFunctionFromHasher, PseudoCompressionFunction, SerializingHasher32,
@@ -658,6 +661,8 @@ mod tests {
     use p3_uni_stark::StarkConfig;
     use p3_util::log2_ceil_usize;
     use rand::random;
+    use tracing_forest::{util::LevelFilter, ForestLayer};
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
     fn generate_digests(leaf_hashes: Vec<[u8; 32]>) -> Vec<Vec<[u8; 32]>> {
         let keccak = TruncatedPermutation::new(KeccakF {});
@@ -681,6 +686,15 @@ mod tests {
 
     #[test]
     fn test_machine_prove() -> Result<(), VerificationError> {
+        let env_filter = EnvFilter::builder()
+            .with_default_directive(LevelFilter::INFO.into())
+            .from_env_lossy();
+
+        Registry::default()
+            .with(env_filter)
+            .with(ForestLayer::default())
+            .init();
+
         type Val = BabyBear;
         type Challenge = BinomialExtensionField<Val, 4>;
 

@@ -1,5 +1,4 @@
 use core::borrow::Borrow;
-
 use p3_air::AirBuilder;
 use p3_keccak_air::NUM_ROUNDS;
 use p3_matrix::MatrixRowSlices;

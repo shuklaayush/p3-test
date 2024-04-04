@@ -1,6 +1,5 @@
 use core::borrow::{Borrow, BorrowMut};
 use core::mem::{size_of, transmute};
-
 use p3_util::indices_arr;
 
 pub(crate) const U64_LIMBS: usize = 4;

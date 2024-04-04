@@ -1,8 +1,6 @@
 use p3_field::PrimeField64;
-use p3_keccak::{KeccakF};
-use p3_symmetric::{
-    PseudoCompressionFunction, TruncatedPermutation,
-};
+use p3_keccak::KeccakF;
+use p3_symmetric::{PseudoCompressionFunction, TruncatedPermutation};
 
 use super::{
     columns::{MerkleTreeCols, NUM_U64_HASH_ELEMS, U64_LIMBS},

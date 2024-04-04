@@ -75,7 +75,7 @@ pub fn verify_constraints<SC: StarkGenericConfig, C: MachineChip<SC>>(
             local: &unflatten(&opened_values.permutation_local),
             next: &unflatten(&opened_values.permutation_next),
         },
-        perm_challenges: &permutation_challenges,
+        perm_challenges: permutation_challenges,
         public_values: &vec![],
         is_first_row: sels.is_first_row,
         is_last_row: sels.is_last_row,
