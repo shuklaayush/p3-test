@@ -1,11 +1,14 @@
+mod check_constraints;
 mod chip;
 mod debug_builder;
+mod error;
 mod folder;
+mod interaction;
 mod keccak_permute;
 mod machine;
 mod merkle_tree;
+mod permutation;
 mod proof;
 mod quotient;
 mod util;
 // mod verify;
-mod error;

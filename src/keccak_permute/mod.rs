@@ -17,7 +17,8 @@ use p3_uni_stark::Val;
 use self::columns::{KeccakCols, KECCAK_COL_MAP, NUM_KECCAK_COLS};
 use self::generation::generate_trace_rows;
 use self::round_flags::eval_round_flags;
-use crate::chip::{Chip, Interaction, MachineChip};
+use crate::chip::{Chip, MachineChip};
+use crate::interaction::Interaction;
 
 /// Assumes the field size is at least 16 bits.
 pub struct KeccakPermuteChip {

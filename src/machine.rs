@@ -8,14 +8,14 @@ use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
 
 use crate::{
-    chip::{
-        check_constraints, check_cumulative_sums, eval_permutation_constraints,
-        generate_permutation_trace, Chip, Interaction, InteractionType, MachineChip,
-    },
+    check_constraints::{check_constraints, check_cumulative_sums},
+    chip::{Chip, MachineChip},
     error::VerificationError,
     folder::VerifierConstraintFolder,
+    interaction::{Interaction, InteractionType},
     keccak_permute::KeccakPermuteChip,
     merkle_tree::MerkleTreeChip,
+    permutation::{eval_permutation_constraints, generate_permutation_trace},
     proof::{ChipProof, Commitments, MachineProof, OpenedValues},
     quotient::quotient_values,
 };

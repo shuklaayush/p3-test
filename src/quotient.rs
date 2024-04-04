@@ -7,8 +7,7 @@ use p3_uni_stark::{Domain, PackedChallenge, PackedVal, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
 
 use crate::{
-    chip::{eval_permutation_constraints, MachineChip},
-    folder::ProverConstraintFolder,
+    chip::MachineChip, folder::ProverConstraintFolder, permutation::eval_permutation_constraints,
 };
 
 pub fn quotient_values<SC, C, Mat>(

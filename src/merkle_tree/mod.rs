@@ -8,7 +8,8 @@ use p3_matrix::{dense::RowMajorMatrix, MatrixRowSlices};
 use p3_uni_stark::{StarkGenericConfig, Val};
 
 use crate::{
-    chip::{Chip, Interaction, MachineChip},
+    chip::{Chip, MachineChip},
+    interaction::Interaction,
     merkle_tree::{columns::MERKLE_TREE_COL_MAP, generation::generate_trace_rows_for_leaf},
 };
 use columns::{MerkleTreeCols, NUM_MERKLE_TREE_COLS, NUM_U64_HASH_ELEMS, U64_LIMBS};
