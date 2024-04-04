@@ -157,6 +157,7 @@ where
     builder
         .when_first_row()
         .assert_eq_ext(*perm_local.last().unwrap(), phi_0);
+    // TODO: Do I need this?
     builder.when_last_row().assert_eq_ext(
         *perm_local.last().unwrap(),
         AB::ExprEF::from_f(cumulative_sum),

@@ -4,7 +4,7 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{StarkGenericConfig, SymbolicAirBuilder, Val};
 
 use crate::debug_builder::DebugConstraintBuilder;
-use crate::folder::ProverConstraintFolder;
+use crate::folder::{ProverConstraintFolder, VerifierConstraintFolder};
 use crate::interaction::{Interaction, InteractionType};
 
 pub trait Chip<F: Field> {
@@ -30,8 +30,10 @@ pub trait Chip<F: Field> {
     }
 }
 
-pub trait MachineChip<SC: StarkGenericConfig>: Chip<Val<SC>> + for<'a> Air<ProverConstraintFolder<'a, SC>>
-    // + for<'a> Air<VerifierConstraintFolder<'a, SC>>
+pub trait MachineChip<SC: StarkGenericConfig>:
+    Chip<Val<SC>>
+    + for<'a> Air<ProverConstraintFolder<'a, SC>>
+    + for<'a> Air<VerifierConstraintFolder<'a, SC>>
     + for<'a> Air<SymbolicAirBuilder<Val<SC>>>
     + for<'a> Air<DebugConstraintBuilder<'a, SC>>
 {

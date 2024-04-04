@@ -1,4 +1,4 @@
-use p3_air::{Air, AirBuilder, BaseAir, TwoRowMatrixView};
+use p3_air::{Air, AirBuilder, BaseAir};
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, Field, PrimeField64};
@@ -11,13 +11,13 @@ use crate::{
     check_constraints::{check_constraints, check_cumulative_sums},
     chip::{Chip, MachineChip},
     error::VerificationError,
-    folder::VerifierConstraintFolder,
     interaction::{Interaction, InteractionType},
     keccak_permute::KeccakPermuteChip,
     merkle_tree::MerkleTreeChip,
-    permutation::{eval_permutation_constraints, generate_permutation_trace},
+    permutation::generate_permutation_trace,
     proof::{ChipProof, Commitments, MachineProof, OpenedValues},
     quotient::quotient_values,
+    verify::verify_constraints,
 };
 
 pub enum ChipType {
@@ -25,6 +25,7 @@ pub enum ChipType {
     MerkleTree(MerkleTreeChip),
 }
 
+// TODO: Write a proc_macro for enum dispatch
 impl<F: Field> BaseAir<F> for ChipType {
     fn width(&self) -> usize {
         match self {
@@ -606,85 +607,22 @@ impl Machine {
         )
         .map_err(|_| VerificationError::InvalidOpeningArgument)?;
 
-        for (((qc_domains, chip_proof), main_domain), &chip) in quotient_chunks_domains
+        for (((qc_domains, chip_proof), &main_domain), &chip) in quotient_chunks_domains
             .iter()
             .zip(chip_proofs.iter())
             .zip(main_domains.iter())
             .zip(self.chips().iter())
         {
-            let zps = qc_domains
-                .iter()
-                .enumerate()
-                .map(|(i, domain)| {
-                    qc_domains
-                        .iter()
-                        .enumerate()
-                        .filter(|(j, _)| *j != i)
-                        .map(|(_, other_domain)| {
-                            other_domain.zp_at_point(zeta)
-                                * other_domain.zp_at_point(domain.first_point()).inverse()
-                        })
-                        .product::<SC::Challenge>()
-                })
-                .collect::<Vec<_>>();
-
-            let quotient = chip_proof
-                .opened_values
-                .quotient_chunks
-                .iter()
-                .enumerate()
-                .map(|(ch_i, ch)| {
-                    ch.iter()
-                        .enumerate()
-                        .map(|(e_i, &c)| zps[ch_i] * SC::Challenge::monomial(e_i) * c)
-                        .sum::<SC::Challenge>()
-                })
-                .sum::<SC::Challenge>();
-
-            let sels = main_domain.selectors_at_point(zeta);
-
-            let unflatten = |v: &[SC::Challenge]| {
-                v.chunks_exact(SC::Challenge::D)
-                    .map(|chunk| {
-                        chunk
-                            .iter()
-                            .enumerate()
-                            .map(|(e_i, &c)| SC::Challenge::monomial(e_i) * c)
-                            .sum()
-                    })
-                    .collect::<Vec<SC::Challenge>>()
-            };
-
-            let mut folder: VerifierConstraintFolder<'_, SC> = VerifierConstraintFolder {
-                preprocessed: TwoRowMatrixView {
-                    local: &chip_proof.opened_values.preprocessed_local,
-                    next: &chip_proof.opened_values.preprocessed_next,
-                },
-                main: TwoRowMatrixView {
-                    local: &chip_proof.opened_values.trace_local,
-                    next: &chip_proof.opened_values.trace_next,
-                },
-                perm: TwoRowMatrixView {
-                    local: &unflatten(&chip_proof.opened_values.permutation_local),
-                    next: &unflatten(&chip_proof.opened_values.permutation_next),
-                },
-                perm_challenges: &perm_challenges,
-                public_values: &vec![],
-                is_first_row: sels.is_first_row,
-                is_last_row: sels.is_last_row,
-                is_transition: sels.is_transition,
+            verify_constraints::<SC, _>(
+                chip,
+                &chip_proof.opened_values,
+                chip_proof.cumulative_sum,
+                main_domain,
+                qc_domains,
+                zeta,
                 alpha,
-                accumulator: SC::Challenge::zero(),
-            };
-            chip.eval(&mut folder);
-            eval_permutation_constraints::<_, SC, _>(chip, &mut folder, chip_proof.cumulative_sum);
-
-            let folded_constraints = folder.accumulator;
-            // Finally, check that
-            //     folded_constraints(zeta) / Z_H(zeta) = quotient(zeta)
-            if folded_constraints * sels.inv_zeroifier != quotient {
-                return Err(VerificationError::OodEvaluationMismatch);
-            }
+                perm_challenges.as_slice(),
+            )?;
         }
 
         let sum: SC::Challenge = proof
