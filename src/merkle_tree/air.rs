@@ -1,12 +1,14 @@
 use core::borrow::Borrow;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::AbstractField;
+use p3_keccak_air::U64_LIMBS;
 use p3_matrix::MatrixRowSlices;
 
 use super::{
-    columns::{MerkleTreeCols, NUM_MERKLE_TREE_COLS, NUM_U64_HASH_ELEMS, U64_LIMBS},
+    columns::{MerkleTreeCols, NUM_MERKLE_TREE_COLS},
     MerkleTreeChip,
 };
+use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 
 impl<F> BaseAir<F> for MerkleTreeChip {
     fn width(&self) -> usize {

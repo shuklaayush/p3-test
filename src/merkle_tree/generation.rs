@@ -1,11 +1,10 @@
 use p3_field::PrimeField64;
 use p3_keccak::KeccakF;
+use p3_keccak_air::U64_LIMBS;
 use p3_symmetric::{PseudoCompressionFunction, TruncatedPermutation};
 
-use super::{
-    columns::{MerkleTreeCols, NUM_U64_HASH_ELEMS, U64_LIMBS},
-    NUM_U8_HASH_ELEMS,
-};
+use super::{columns::MerkleTreeCols, NUM_U8_HASH_ELEMS};
+use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 
 pub fn generate_trace_rows_for_leaf<F: PrimeField64>(
     rows: &mut [MerkleTreeCols<F>],

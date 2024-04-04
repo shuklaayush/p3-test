@@ -10,6 +10,8 @@ use p3_uni_stark::Val;
 
 use crate::chip::MachineChip;
 
+pub const NUM_U64_HASH_ELEMS: usize = 4;
+
 /// Assumes the field size is at least 16 bits.
 pub struct KeccakPermuteChip {
     pub inputs: Vec<[u64; 25]>,

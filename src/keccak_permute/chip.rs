@@ -8,6 +8,7 @@ use super::generation::generate_trace_rows;
 use super::KeccakPermuteChip;
 use crate::chip::Chip;
 use crate::interaction::Interaction;
+use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 
 impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
     fn generate_trace(&self) -> RowMajorMatrix<F> {
@@ -15,7 +16,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
-        let fields = (0..4)
+        let fields = (0..NUM_U64_HASH_ELEMS)
             .flat_map(|i| {
                 (0..U64_LIMBS)
                     .map(|limb| KECCAK_COL_MAP.a_prime_prime_prime(i % 5, i / 5, limb))
@@ -37,7 +38,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
             .preimage
             .into_iter()
             .flatten()
-            .take(8)
+            .take(2 * NUM_U64_HASH_ELEMS)
             .flatten()
             .map(VirtualPairCol::single_main)
             .collect();

@@ -1,9 +1,9 @@
 use core::borrow::{Borrow, BorrowMut};
 use core::mem::{size_of, transmute};
+use p3_keccak_air::U64_LIMBS;
 use p3_util::indices_arr;
 
-pub(crate) const U64_LIMBS: usize = 4;
-pub(crate) const NUM_U64_HASH_ELEMS: usize = 4;
+use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 
 #[repr(C)]
 #[derive(Debug)]
