@@ -32,6 +32,8 @@ serde = { version = "1.0", default-features = false, features = [
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
 tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }
+tiny-keccak = "2.0.2"
+itertools = "0.12.1"
 
 [patch."https://github.com/Plonky3/Plonky3"]
 p3-air = { path = "../Plonky3/air" }
