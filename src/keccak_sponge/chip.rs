@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use p3_air::VirtualPairCol;
 use p3_field::PrimeField64;
 use p3_matrix::dense::RowMajorMatrix;
@@ -33,17 +34,68 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
 
         generate_range_checks(rows);
 
-        println!("Trace: {:?}", trace);
+        // println!("Trace: {:?}", trace);
 
         trace
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
-        vec![]
+        let fields = KECCAK_SPONGE_COL_MAP
+            .xored_rate_u16s
+            .into_iter()
+            .chain(KECCAK_SPONGE_COL_MAP.original_capacity_u16s)
+            .map(VirtualPairCol::single_main)
+            .collect();
+        let is_real = VirtualPairCol::sum_main(
+            vec![KECCAK_SPONGE_COL_MAP.is_full_input_block]
+                .into_iter()
+                .chain(KECCAK_SPONGE_COL_MAP.is_final_input_len.into_iter())
+                .collect_vec(),
+        );
+        let send = Interaction {
+            fields,
+            count: is_real,
+            argument_index: 1,
+        };
+        vec![send]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
-        vec![]
+        // We recover the 16-bit digest limbs from their corresponding bytes,
+        // and then append them to the rest of the updated state limbs.
+        let mut fields = KECCAK_SPONGE_COL_MAP
+            .updated_digest_state_bytes
+            .chunks(2)
+            .into_iter()
+            .map(|cols| {
+                let column_weights = cols
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &c)| (c, F::from_canonical_usize(1 << (8 * i))))
+                    .collect_vec();
+                VirtualPairCol::new_main(column_weights, F::zero())
+            })
+            .collect_vec();
+
+        fields.extend(
+            KECCAK_SPONGE_COL_MAP
+                .partial_updated_state_u16s
+                .into_iter()
+                .map(|c| VirtualPairCol::single_main(c)),
+        );
+
+        let is_real = VirtualPairCol::sum_main(
+            vec![KECCAK_SPONGE_COL_MAP.is_full_input_block]
+                .into_iter()
+                .chain(KECCAK_SPONGE_COL_MAP.is_final_input_len.into_iter())
+                .collect_vec(),
+        );
+        let receive = Interaction {
+            fields,
+            count: is_real,
+            argument_index: 1,
+        };
+        vec![receive]
     }
 }
 
@@ -81,48 +133,6 @@ pub(crate) fn ctl_looked_data<F: Field>() -> Vec<Column<F>> {
     res.push(len_col);
     res.push(Column::single(cols.timestamp));
     res.extend(outputs);
-
-    res
-}
-
-/// Creates the vector of `Columns` corresponding to the inputs of the Keccak
-/// sponge. This is used to check that the inputs of the sponge correspond to
-/// the inputs given by `KeccakStark`.
-pub(crate) fn ctl_looking_keccak_inputs<F: Field>() -> Vec<Column<F>> {
-    let cols = KECCAK_SPONGE_COL_MAP;
-    let mut res: Vec<_> = Column::singles(
-        [
-            cols.xored_rate_u32s.as_slice(),
-            &cols.original_capacity_u32s,
-        ]
-        .concat(),
-    )
-    .collect();
-    res.push(Column::single(cols.timestamp));
-
-    res
-}
-
-/// Creates the vector of `Columns` corresponding to the outputs of the Keccak
-/// sponge. This is used to check that the outputs of the sponge correspond to
-/// the outputs given by `KeccakStark`.
-pub(crate) fn ctl_looking_keccak_outputs<F: Field>() -> Vec<Column<F>> {
-    let cols = KECCAK_SPONGE_COL_MAP;
-
-    // We recover the 32-bit digest limbs from their corresponding bytes,
-    // and then append them to the rest of the updated state limbs.
-    let digest_u32s = cols.updated_digest_state_bytes.chunks_exact(4).map(|c| {
-        Column::linear_combination(
-            c.iter()
-                .enumerate()
-                .map(|(i, &b)| (b, F::from_canonical_usize(1 << (8 * i)))),
-        )
-    });
-
-    let mut res: Vec<_> = digest_u32s.collect();
-
-    res.extend(Column::singles(&cols.partial_updated_state_u32s));
-    res.push(Column::single(cols.timestamp));
 
     res
 }
@@ -232,14 +242,6 @@ pub(crate) fn ctl_looking_memory_filter<F: Field>(i: usize) -> Filter<F> {
 
 /// CTL filter for looking at XORs in the logic table.
 pub(crate) fn ctl_looking_logic_filter<F: Field>() -> Filter<F> {
-    let cols = KECCAK_SPONGE_COL_MAP;
-    Filter::new_simple(Column::sum(
-        once(&cols.is_full_input_block).chain(&cols.is_final_input_len),
-    ))
-}
-
-/// CTL filter for looking at the input and output in the Keccak table.
-pub(crate) fn ctl_looking_keccak_filter<F: Field>() -> Filter<F> {
     let cols = KECCAK_SPONGE_COL_MAP;
     Filter::new_simple(Column::sum(
         once(&cols.is_full_input_block).chain(&cols.is_final_input_len),

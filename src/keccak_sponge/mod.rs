@@ -13,7 +13,7 @@ use crate::chip::MachineChip;
 const BYTE_RANGE_MAX: usize = 1usize << 8;
 
 pub struct KeccakSpongeChip {
-    inputs: Vec<Vec<u8>>,
+    pub inputs: Vec<Vec<u8>>,
 }
 
 impl<SC: StarkGenericConfig> MachineChip<SC> for KeccakSpongeChip where Val<SC>: PrimeField64 {}

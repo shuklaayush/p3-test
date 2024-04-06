@@ -15,6 +15,7 @@ use crate::{
     error::VerificationError,
     interaction::{Interaction, InteractionType},
     keccak_permute::KeccakPermuteChip,
+    keccak_sponge::KeccakSpongeChip,
     merkle_tree::MerkleTreeChip,
     permutation::generate_permutation_trace,
     proof::{ChipProof, Commitments, MachineProof, OpenedValues},
@@ -24,6 +25,7 @@ use crate::{
 
 pub enum ChipType {
     KeccakPermute(KeccakPermuteChip),
+    KeccakSponge(KeccakSpongeChip),
     MerkleTree(MerkleTreeChip),
 }
 
@@ -33,6 +35,7 @@ impl<F: Field> BaseAir<F> for ChipType {
         match self {
             ChipType::KeccakPermute(chip) => <KeccakPermuteChip as BaseAir<F>>::width(chip),
             ChipType::MerkleTree(chip) => <MerkleTreeChip as BaseAir<F>>::width(chip),
+            ChipType::KeccakSponge(chip) => <KeccakSpongeChip as BaseAir<F>>::width(chip),
         }
     }
 
@@ -40,6 +43,7 @@ impl<F: Field> BaseAir<F> for ChipType {
         match self {
             ChipType::KeccakPermute(chip) => chip.preprocessed_trace(),
             ChipType::MerkleTree(chip) => chip.preprocessed_trace(),
+            ChipType::KeccakSponge(chip) => chip.preprocessed_trace(),
         }
     }
 }
@@ -49,6 +53,7 @@ impl<AB: AirBuilder> Air<AB> for ChipType {
         match self {
             ChipType::KeccakPermute(chip) => chip.eval(builder),
             ChipType::MerkleTree(chip) => chip.eval(builder),
+            ChipType::KeccakSponge(chip) => chip.eval(builder),
         }
     }
 }
@@ -58,6 +63,7 @@ impl<F: PrimeField64> Chip<F> for ChipType {
         match self {
             ChipType::KeccakPermute(chip) => chip.generate_trace(),
             ChipType::MerkleTree(chip) => chip.generate_trace(),
+            ChipType::KeccakSponge(chip) => chip.generate_trace(),
         }
     }
 
@@ -65,6 +71,7 @@ impl<F: PrimeField64> Chip<F> for ChipType {
         match self {
             ChipType::KeccakPermute(chip) => chip.sends(),
             ChipType::MerkleTree(chip) => chip.sends(),
+            ChipType::KeccakSponge(chip) => chip.sends(),
         }
     }
 
@@ -72,6 +79,7 @@ impl<F: PrimeField64> Chip<F> for ChipType {
         match self {
             ChipType::KeccakPermute(chip) => chip.receives(),
             ChipType::MerkleTree(chip) => chip.receives(),
+            ChipType::KeccakSponge(chip) => chip.receives(),
         }
     }
 
@@ -79,6 +87,7 @@ impl<F: PrimeField64> Chip<F> for ChipType {
         match self {
             ChipType::KeccakPermute(chip) => chip.all_interactions(),
             ChipType::MerkleTree(chip) => chip.all_interactions(),
+            ChipType::KeccakSponge(chip) => chip.all_interactions(),
         }
     }
 }
@@ -93,18 +102,26 @@ where
                 <KeccakPermuteChip as MachineChip<SC>>::trace_width(chip)
             }
             ChipType::MerkleTree(chip) => <MerkleTreeChip as MachineChip<SC>>::trace_width(chip),
+            ChipType::KeccakSponge(chip) => {
+                <KeccakSpongeChip as MachineChip<SC>>::trace_width(chip)
+            }
         }
     }
 }
 
 pub struct Machine {
     keccak_permute_chip: ChipType,
+    keccak_sponge_chip: ChipType,
     merkle_tree_chip: ChipType,
 }
 
 impl Machine {
     pub fn chips(&self) -> Vec<&ChipType> {
-        vec![&self.keccak_permute_chip, &self.merkle_tree_chip]
+        vec![
+            &self.keccak_permute_chip,
+            &self.keccak_sponge_chip,
+            &self.merkle_tree_chip,
+        ]
     }
 }
 
@@ -153,8 +170,11 @@ impl Machine {
             siblings: vec![siblings.try_into().unwrap()],
         };
 
+        let keccak_sponge_chip = KeccakSpongeChip { inputs: vec![] };
+
         Self {
             keccak_permute_chip: ChipType::KeccakPermute(keccak_permute_chip),
+            keccak_sponge_chip: ChipType::KeccakSponge(keccak_sponge_chip),
             merkle_tree_chip: ChipType::MerkleTree(merkle_tree_chip),
         }
     }
@@ -206,6 +226,13 @@ impl Machine {
                 .collect_vec()
         });
         let main_degrees = main_traces.iter().map(|trace| trace.height()).collect_vec();
+        // TODO: Handle empty traces
+        // let (main_traces, main_degrees): (Vec<_>, Vec<_>) = main_traces
+        //     .into_iter()
+        //     .zip(main_degrees.iter())
+        //     .filter(|(_, &degree)| degree > 0)
+        //     .unzip();
+
         let main_domains = main_degrees
             .iter()
             .map(|&degree| pcs.natural_domain_for_degree(degree))
