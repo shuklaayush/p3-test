@@ -45,16 +45,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11157ac094ffbdde99aa67b23417ebdd801842852b500e395a45a9c0aac03e4a"
 
 [[package]]
-name = "gcd"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d758ba1b47b00caf47f24925c0074ecb20d6dfcffe7f6d53395c0465674841a"
-
-[[package]]
 name = "getrandom"
-version = "0.2.13"
+version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a06fddc2749e0528d2813f95e050e87e52c8cbbae56223b9babf73b3e53b0cc6"
+checksum = "190092ea657667030ac6a35e305e62fc4dd69fd98ac98631e5d3a2b1575a12b5"
 dependencies = [
  "cfg-if",
  "libc",
@@ -174,7 +168,7 @@ dependencies = [
 [[package]]
 name = "p3-baby-bear"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#54c3e4c1a67c96b9717a1289d3cc108225bfca15"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
  "num-bigint",
  "p3-field",
@@ -251,7 +245,7 @@ dependencies = [
 [[package]]
 name = "p3-goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#54c3e4c1a67c96b9717a1289d3cc108225bfca15"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
  "num-bigint",
  "p3-dft",
@@ -312,12 +306,12 @@ version = "0.1.0"
 [[package]]
 name = "p3-maybe-rayon"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#54c3e4c1a67c96b9717a1289d3cc108225bfca15"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 
 [[package]]
 name = "p3-mds"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#54c3e4c1a67c96b9717a1289d3cc108225bfca15"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
  "itertools 0.11.0",
  "p3-dft",
@@ -346,11 +340,9 @@ dependencies = [
 [[package]]
 name = "p3-poseidon2"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#54c3e4c1a67c96b9717a1289d3cc108225bfca15"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
- "gcd",
  "p3-field",
- "p3-mds",
  "p3-symmetric",
  "rand",
 ]
@@ -365,7 +357,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "p3-test-machine"
+name = "p3-test"
 version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
@@ -396,15 +388,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "p3-test-macro"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "p3-uni-stark"
 version = "0.1.0"
 dependencies = [
@@ -431,7 +414,7 @@ dependencies = [
 [[package]]
 name = "p3-util"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#54c3e4c1a67c96b9717a1289d3cc108225bfca15"
+source = "git+https://github.com/Plonky3/Plonky3.git#7e4f7afedeffbc49c9c123e21f29e0eb1a9b2227"
 dependencies = [
  "serde",
 ]

@@ -93,7 +93,7 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
         let receive = Interaction {
             fields,
             count: is_real,
-            argument_index: 1,
+            argument_index: 0,
         };
         vec![receive]
     }

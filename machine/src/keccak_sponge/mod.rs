@@ -4,6 +4,9 @@ mod columns;
 mod generation;
 mod util;
 
+pub(crate) use columns::KECCAK_RATE_BYTES;
+pub(crate) use util::keccakf_u8s;
+
 use p3_field::PrimeField64;
 use p3_uni_stark::{StarkGenericConfig, Val};
 

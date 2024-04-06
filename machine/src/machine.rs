@@ -7,6 +7,7 @@ use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
+use tiny_keccak::keccakf;
 use tracing::instrument;
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
     error::VerificationError,
     interaction::{Interaction, InteractionType},
     keccak_permute::KeccakPermuteChip,
-    keccak_sponge::KeccakSpongeChip,
+    keccak_sponge::{keccakf_u8s, KeccakSpongeChip, KECCAK_RATE_BYTES},
     merkle_tree::MerkleTreeChip,
     permutation::generate_permutation_trace,
     proof::{ChipProof, Commitments, MachineProof, OpenedValues},
@@ -126,14 +127,14 @@ impl Machine {
 }
 
 impl Machine {
-    pub fn new(digests: Vec<Vec<[u8; 32]>>, leaf_index: usize) -> Self {
+    pub fn new(preimage_bytes: Vec<u8>, digests: Vec<Vec<[u8; 32]>>, leaf_index: usize) -> Self {
         let leaf = digests[0][leaf_index];
 
         let height = digests.len() - 1;
         let siblings = (0..height)
             .map(|i| digests[i][(leaf_index >> i) ^ 1])
             .collect::<Vec<[u8; 32]>>();
-        let keccak_inputs = (0..height)
+        let mut keccak_inputs = (0..height)
             .map(|i| {
                 let index = leaf_index >> i;
                 let parity = index & 1;
@@ -160,17 +161,53 @@ impl Machine {
             })
             .collect_vec();
 
-        let keccak_permute_chip = KeccakPermuteChip {
-            inputs: keccak_inputs,
-        };
-
         let merkle_tree_chip = MerkleTreeChip {
             leaves: vec![leaf],
             leaf_indices: vec![leaf_index],
             siblings: vec![siblings.try_into().unwrap()],
         };
 
-        let keccak_sponge_chip = KeccakSpongeChip { inputs: vec![] };
+        let keccak_sponge_chip = KeccakSpongeChip {
+            inputs: vec![preimage_bytes.clone()],
+        };
+
+        let preimage_len = preimage_bytes.len();
+
+        let mut padded_preimage = preimage_bytes;
+        let padding_len = KECCAK_RATE_BYTES - (preimage_len % KECCAK_RATE_BYTES);
+        padded_preimage.resize(preimage_len + padding_len, 0);
+        padded_preimage[preimage_len] = 1;
+        *padded_preimage.last_mut().unwrap() |= 0b10000000;
+
+        let mut state = [0u8; 200];
+        keccak_inputs.push(
+            padded_preimage
+                .chunks(KECCAK_RATE_BYTES)
+                .into_iter()
+                .map(|b| {
+                    state[..KECCAK_RATE_BYTES]
+                        .iter_mut()
+                        .zip(b.iter())
+                        .for_each(|(s, b)| {
+                            *s ^= *b;
+                        });
+                    let input = state
+                        .chunks_exact(8)
+                        .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+                        .collect_vec();
+
+                    keccakf_u8s(&mut state);
+                    input
+                })
+                .flatten()
+                .collect_vec()
+                .try_into()
+                .unwrap(),
+        );
+
+        let keccak_permute_chip = KeccakPermuteChip {
+            inputs: keccak_inputs,
+        };
 
         Self {
             keccak_permute_chip: ChipType::KeccakPermute(keccak_permute_chip),
@@ -759,7 +796,7 @@ mod tests {
 
         let leaf_index = 0;
         // let machine = Machine::new(merkle_tree.digest_layers, leaf_index);
-        let machine = Machine::new(digests, leaf_index);
+        let machine = Machine::new(vec![], digests, leaf_index);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
         let proof = machine.prove(&config, &mut challenger);
