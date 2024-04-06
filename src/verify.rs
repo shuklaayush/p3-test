@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use p3_air::TwoRowMatrixView;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, Field};
@@ -34,7 +35,7 @@ pub fn verify_constraints<SC: StarkGenericConfig, C: MachineChip<SC>>(
                 })
                 .product::<SC::Challenge>()
         })
-        .collect::<Vec<_>>();
+        .collect_vec();
 
     let quotient = opened_values
         .quotient_chunks

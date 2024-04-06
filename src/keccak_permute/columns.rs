@@ -1,9 +1,8 @@
 use core::borrow::{Borrow, BorrowMut};
 use core::mem::{size_of, transmute};
 
-use p3_util::indices_arr;
-
 use p3_keccak_air::{NUM_ROUNDS, R, RATE_LIMBS, U64_LIMBS};
+use p3_util::indices_arr;
 
 /// Note: The ordering of each array is based on the input mapping. As the spec says,
 ///

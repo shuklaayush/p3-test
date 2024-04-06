@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use p3_air::TwoRowMatrixView;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, PackedValue};
@@ -55,7 +56,7 @@ where
             //             preprocessed_trace_on_quotient_domain.get(wrap(i_start + offset), col)
             //         })
             //     })
-            //     .collect::<Vec<_>>();
+            //     .collect_vec();
             // let preprocessed_next = (0..preprocessed_width)
             //     .map(|col| {
             //         PackedVal::<SC>::from_fn(|offset| {
@@ -63,7 +64,7 @@ where
             //                 .get(wrap(i_start + next_step + offset), col)
             //         })
             //     })
-            //     .collect::<Vec<_>>();
+            //     .collect_vec();
 
             let local = (0..main_width)
                 .map(|col| {
@@ -71,7 +72,7 @@ where
                         main_trace_on_quotient_domain.get(wrap(i_start + offset), col)
                     })
                 })
-                .collect::<Vec<_>>();
+                .collect_vec();
 
             let next = (0..main_width)
                 .map(|col| {
@@ -79,7 +80,7 @@ where
                         main_trace_on_quotient_domain.get(wrap(i_start + next_step + offset), col)
                     })
                 })
-                .collect::<Vec<_>>();
+                .collect_vec();
 
             let perm_local: Vec<_> = (0..perm_width)
                 .step_by(SC::Challenge::D)
@@ -137,7 +138,7 @@ where
             (0..PackedVal::<SC>::WIDTH).map(move |idx_in_packing| {
                 let quotient_value = (0..<SC::Challenge as AbstractExtensionField<Val<SC>>>::D)
                     .map(|coeff_idx| quotient.as_base_slice()[coeff_idx].as_slice()[idx_in_packing])
-                    .collect::<Vec<_>>();
+                    .collect_vec();
                 SC::Challenge::from_base_slice(&quotient_value)
             })
         })

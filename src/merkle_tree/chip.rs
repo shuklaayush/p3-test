@@ -4,14 +4,11 @@ use p3_matrix::dense::RowMajorMatrix;
 use tracing::instrument;
 
 use super::{
-    columns::{MerkleTreeCols, NUM_MERKLE_TREE_COLS},
+    columns::{MerkleTreeCols, MERKLE_TREE_COL_MAP, NUM_MERKLE_TREE_COLS},
+    generation::generate_trace_rows_for_leaf,
     MerkleTreeChip,
 };
-use crate::{
-    chip::Chip,
-    interaction::Interaction,
-    merkle_tree::{columns::MERKLE_TREE_COL_MAP, generation::generate_trace_rows_for_leaf},
-};
+use crate::{chip::Chip, interaction::Interaction};
 
 impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
     #[instrument(name = "generate MerkleTree trace", skip_all)]

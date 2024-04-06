@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
@@ -128,19 +129,19 @@ impl Machine {
                 input[0..4].copy_from_slice(
                     left.chunks_exact(8)
                         .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
-                        .collect::<Vec<_>>()
+                        .collect_vec()
                         .as_slice(),
                 );
                 input[4..8].copy_from_slice(
                     right
                         .chunks_exact(8)
                         .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
-                        .collect::<Vec<_>>()
+                        .collect_vec()
                         .as_slice(),
                 );
                 input
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let keccak_permute_chip = KeccakPermuteChip {
             inputs: keccak_inputs,
@@ -180,19 +181,19 @@ impl Machine {
         //         self.chips()
         //             .par_iter()
         //             .flat_map(|chip| chip.preprocessed_trace())
-        //             .collect::<Vec<_>>()
+        //             .collect_vec()
         //     });
         // let preprocessed_degrees = preprocessed_traces
         //     .iter()
         //     .map(|trace| trace.height())
-        //     .collect::<Vec<_>>();
+        //     .collect_vec();
         // let preprocessed_domains = preprocessed_degrees
         //     .iter()
         //     .map(|&degree| pcs.natural_domain_for_degree(degree));
         // let (preprocessed_commit, preprocessed_data) =
         //     tracing::info_span!("commit to preprocessed traces").in_scope(|| {
         //         pcs.commit(
-        //             std::iter::zip(preprocessed_domains, preprocessed_traces).collect::<Vec<_>>(),
+        //             std::iter::zip(preprocessed_domains, preprocessed_traces).collect_vec(),
         //         )
         //     });
         // challenger.observe(preprocessed_commit.clone());
@@ -202,22 +203,17 @@ impl Machine {
             self.chips()
                 .par_iter()
                 .map(|chip| chip.generate_trace())
-                .collect::<Vec<_>>()
+                .collect_vec()
         });
-        let main_degrees = main_traces
-            .iter()
-            .map(|trace| trace.height())
-            .collect::<Vec<_>>();
+        let main_degrees = main_traces.iter().map(|trace| trace.height()).collect_vec();
         let main_domains = main_degrees
             .iter()
             .map(|&degree| pcs.natural_domain_for_degree(degree))
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let (main_commit, main_data) =
             tracing::info_span!("commit to main traces").in_scope(|| {
-                pcs.commit(
-                    std::iter::zip(main_domains.clone(), main_traces.clone()).collect::<Vec<_>>(),
-                )
+                pcs.commit(std::iter::zip(main_domains.clone(), main_traces.clone()).collect_vec())
             });
         challenger.observe(main_commit.clone());
 
@@ -238,31 +234,31 @@ impl Machine {
                         perm_challenges.clone(),
                     )
                 })
-                .collect::<Vec<_>>()
+                .collect_vec()
         });
         // TODO: Assert equal to main trace degrees?
         let perm_degrees = perm_traces
             .iter()
             .map(|trace: &RowMajorMatrix<SC::Challenge>| trace.height())
-            .collect::<Vec<_>>();
+            .collect_vec();
         let perm_domains = perm_degrees
             .iter()
             .map(|&degree| pcs.natural_domain_for_degree(degree))
-            .collect::<Vec<_>>();
+            .collect_vec();
         let (perm_commit, perm_data) = tracing::info_span!("commit to permutation traces")
             .in_scope(|| {
                 let flattened_perm_traces = perm_traces
                     .iter()
                     .map(|trace| trace.flatten_to_base())
-                    .collect::<Vec<_>>();
-                pcs.commit(std::iter::zip(perm_domains, flattened_perm_traces).collect::<Vec<_>>())
+                    .collect_vec();
+                pcs.commit(std::iter::zip(perm_domains, flattened_perm_traces).collect_vec())
             });
         challenger.observe(perm_commit.clone());
         let alpha: SC::Challenge = challenger.sample_ext_element();
         let cumulative_sums = perm_traces
             .iter()
             .map(|trace| *trace.row_slice(trace.height() - 1).last().unwrap())
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         // 4. Verify constraints
         #[cfg(debug_assertions)]
@@ -280,16 +276,13 @@ impl Machine {
         let log_degrees = main_degrees
             .iter()
             .map(|&d| log2_strict_usize(d))
-            .collect::<Vec<_>>();
+            .collect_vec();
         let log_quotient_degrees = self
             .chips()
             .iter()
             .map(|&chip| get_log_quotient_degree::<Val<SC>, _>(chip, 0))
-            .collect::<Vec<_>>();
-        let quotient_degrees = log_quotient_degrees
-            .iter()
-            .map(|d| 1 << d)
-            .collect::<Vec<_>>();
+            .collect_vec();
+        let quotient_degrees = log_quotient_degrees.iter().map(|d| 1 << d).collect_vec();
         let quotient_domains = main_domains
             .iter()
             .zip(log_degrees.iter())
@@ -297,7 +290,7 @@ impl Machine {
             .map(|((domain, log_degree), log_quotient_degree)| {
                 domain.create_disjoint_domain(1 << (log_degree + log_quotient_degree))
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let quotient_values = quotient_domains
             .clone()
@@ -323,7 +316,7 @@ impl Machine {
                     alpha,
                 )
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
         let quotient_chunks = quotient_domains
             .clone()
             .into_iter()
@@ -333,14 +326,14 @@ impl Machine {
                 let quotient_flat = RowMajorMatrix::new_col(values).flatten_to_base();
                 domain.split_evals(degree, quotient_flat)
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
         let qc_domains = quotient_domains
             .into_iter()
             .zip(quotient_degrees.clone())
             .map(|(quotient_domain, quotient_degree)| {
                 quotient_domain.split_domains(quotient_degree)
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let (quotient_commit, quotient_data) = tracing::info_span!("commit to quotient chunks")
             .in_scope(|| {
@@ -349,7 +342,7 @@ impl Machine {
                         .into_iter()
                         .flatten()
                         .zip(quotient_chunks.into_iter().flatten())
-                        .collect::<Vec<_>>(),
+                        .collect_vec(),
                 )
             });
         challenger.observe(quotient_commit.clone());
@@ -364,7 +357,7 @@ impl Machine {
         let zeta_and_next = main_domains
             .iter()
             .map(|domain| vec![zeta, domain.next_point(zeta).unwrap()])
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let (opening_values, opening_proof) = pcs.open(
             vec![
@@ -376,9 +369,9 @@ impl Machine {
                     quotient_degrees
                         .iter()
                         .flat_map(|&quotient_degree| {
-                            (0..quotient_degree).map(|_| vec![zeta]).collect::<Vec<_>>()
+                            (0..quotient_degree).map(|_| vec![zeta]).collect_vec()
                         })
-                        .collect::<Vec<_>>(),
+                        .collect_vec(),
                 ),
             ],
             challenger,
@@ -386,6 +379,7 @@ impl Machine {
         let [main_openings, perm_openings, quotient_openings] = opening_values
             .try_into()
             .expect("Should have 3 rounds of openings");
+        // Unflatten quotient openings
         let quotient_openings = quotient_degrees
             .iter()
             .scan(0, |start, &chunk_size| {
@@ -394,7 +388,7 @@ impl Machine {
                 *start = end;
                 res
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let chip_proofs = log_degrees
             .iter()
@@ -409,7 +403,7 @@ impl Machine {
                 let quotient_chunks = quotient
                     .into_iter()
                     .map(|mut chunk| chunk.remove(0))
-                    .collect::<Vec<_>>();
+                    .collect_vec();
                 let opened_values = OpenedValues {
                     preprocessed_local,
                     preprocessed_next,
@@ -429,7 +423,7 @@ impl Machine {
                     cumulative_sum,
                 }
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         MachineProof {
             commitments,
@@ -456,27 +450,27 @@ impl Machine {
         let log_degrees = chip_proofs
             .iter()
             .map(|chip_proof| chip_proof.degree_bits)
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let degrees = log_degrees
             .iter()
             .map(|degree_bits| 1 << degree_bits)
-            .collect::<Vec<_>>();
+            .collect_vec();
         let log_quotient_degrees = self
             .chips()
             .iter()
             .map(|&chip| get_log_quotient_degree::<Val<SC>, _>(chip, 0))
-            .collect::<Vec<_>>();
+            .collect_vec();
         let quotient_degrees = log_quotient_degrees
             .iter()
             .map(|&log_degree| 1 << log_degree)
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let pcs = config.pcs();
         let main_domains = degrees
             .iter()
             .map(|&degree| pcs.natural_domain_for_degree(degree))
-            .collect::<Vec<_>>();
+            .collect_vec();
         let quotient_domains = main_domains
             .iter()
             .zip(log_degrees.iter())
@@ -484,20 +478,20 @@ impl Machine {
             .map(|((domain, log_degree), log_quotient_degree)| {
                 domain.create_disjoint_domain(1 << (log_degree + log_quotient_degree))
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
         let quotient_chunks_domains = quotient_domains
             .into_iter()
             .zip(quotient_degrees.clone())
             .map(|(quotient_domain, quotient_degree)| {
                 quotient_domain.split_domains(quotient_degree)
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let air_widths = self
             .chips()
             .iter()
             .map(|chip| <ChipType as BaseAir<Val<SC>>>::width(chip))
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let valid_shape =
             chip_proofs
@@ -521,20 +515,20 @@ impl Machine {
         //         self.chips()
         //             .par_iter()
         //             .flat_map(|chip| chip.preprocessed_trace())
-        //             .collect::<Vec<_>>()
+        //             .collect_vec()
         //     });
         // let preprocessed_degrees = preprocessed_traces
         //     .iter()
         //     .map(|trace| trace.height())
-        //     .collect::<Vec<_>>();
+        //     .collect_vec();
         // let preprocessed_domains = preprocessed_degrees
         //     .iter()
         //     .map(|&degree| pcs.natural_domain_for_degree(degree))
-        //     .collect::<Vec<_>>();
+        //     .collect_vec();
         // let (preprocessed_commit, preprocessed_data) =
         //     tracing::info_span!("commit to preprocessed traces").in_scope(|| {
         //         pcs.commit(
-        //             std::iter::zip(preprocessed_domains, preprocessed_traces).collect::<Vec<_>>(),
+        //             std::iter::zip(preprocessed_domains, preprocessed_traces).collect_vec(),
         //         )
         //     });
         // challenger.observe(preprocessed_commit.clone());
@@ -552,7 +546,7 @@ impl Machine {
         let zeta_nexts = main_domains
             .iter()
             .map(|domain| domain.next_point(zeta).unwrap())
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         pcs.verify(
             vec![
@@ -571,7 +565,7 @@ impl Machine {
                                 ],
                             )
                         })
-                        .collect::<Vec<_>>(),
+                        .collect_vec(),
                 ),
                 (
                     commitments.perm_trace.clone(),
@@ -588,7 +582,7 @@ impl Machine {
                                 ],
                             )
                         })
-                        .collect::<Vec<_>>(),
+                        .collect_vec(),
                 ),
                 (
                     commitments.quotient_chunks.clone(),
@@ -603,7 +597,7 @@ impl Machine {
                         .map(|(&domain, opened_values)| {
                             (domain, vec![(zeta, opened_values.clone())])
                         })
-                        .collect::<Vec<_>>(),
+                        .collect_vec(),
                 ),
             ],
             opening_proof,
@@ -733,7 +727,7 @@ mod tests {
         let leaf_hashes = (0..2u64.pow(HEIGHT as u32))
             .map(|_| [0; 32])
             .map(|_| random())
-            .collect::<Vec<_>>();
+            .collect_vec();
         let digests = generate_digests(leaf_hashes);
 
         let leaf_index = 0;

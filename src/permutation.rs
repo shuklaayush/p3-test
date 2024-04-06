@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use p3_air::{ExtensionBuilder, PairBuilder, PermutationAirBuilder, VirtualPairCol};
 use p3_field::{AbstractField, ExtensionField, Field, Powers};
 use p3_matrix::dense::RowMajorMatrix;
@@ -157,7 +158,6 @@ where
     builder
         .when_first_row()
         .assert_eq_ext(*perm_local.last().unwrap(), phi_0);
-    // TODO: Do I need this?
     builder.when_last_row().assert_eq_ext(
         *perm_local.last().unwrap(),
         AB::ExprEF::from_f(cumulative_sum),
@@ -180,7 +180,7 @@ fn generate_rlc_elements<SC: StarkGenericConfig, C: MachineChip<SC>>(
                 .unwrap_or(0)
                 + 1,
         )
-        .collect::<Vec<_>>()
+        .collect_vec()
 }
 
 // TODO: Use Var and Expr type bounds in place of concrete fields so that

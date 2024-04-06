@@ -1,16 +1,18 @@
+use itertools::Itertools;
 use p3_air::VirtualPairCol;
 use p3_field::PrimeField64;
 use p3_keccak_air::{NUM_ROUNDS, U64_LIMBS};
 use p3_matrix::dense::RowMajorMatrix;
+use tracing::instrument;
 
 use super::columns::KECCAK_COL_MAP;
 use super::generation::generate_trace_rows;
-use super::KeccakPermuteChip;
+use super::{KeccakPermuteChip, NUM_U64_HASH_ELEMS};
 use crate::chip::Chip;
 use crate::interaction::Interaction;
-use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 
 impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
+    #[instrument(name = "generate Keccak trace", skip_all)]
     fn generate_trace(&self) -> RowMajorMatrix<F> {
         generate_trace_rows(self.inputs.clone())
     }
@@ -20,7 +22,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
             .flat_map(|i| {
                 (0..U64_LIMBS)
                     .map(|limb| KECCAK_COL_MAP.a_prime_prime_prime(i % 5, i / 5, limb))
-                    .collect::<Vec<_>>()
+                    .collect_vec()
             })
             .map(VirtualPairCol::single_main)
             .collect();

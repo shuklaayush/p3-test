@@ -5,6 +5,7 @@ mod error;
 mod folder;
 mod interaction;
 mod keccak_permute;
+mod keccak_sponge;
 mod machine;
 mod merkle_tree;
 mod permutation;

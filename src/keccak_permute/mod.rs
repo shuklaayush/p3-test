@@ -21,10 +21,10 @@ impl<SC: StarkGenericConfig> MachineChip<SC> for KeccakPermuteChip where Val<SC>
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::chip::Chip;
 
-    use super::*;
-
+    use itertools::Itertools;
     use p3_baby_bear::BabyBear;
     use p3_challenger::{HashChallenger, SerializingChallenger32};
     use p3_commit::ExtensionMmcs;
@@ -65,7 +65,7 @@ mod tests {
 
         type Challenger = SerializingChallenger32<Val, HashChallenger<u8, ByteHash, 32>>;
 
-        let inputs = (0..NUM_HASHES).map(|_| random()).collect::<Vec<_>>();
+        let inputs = (0..NUM_HASHES).map(|_| random()).collect_vec();
         let chip = KeccakPermuteChip { inputs };
         let trace = chip.generate_trace();
 

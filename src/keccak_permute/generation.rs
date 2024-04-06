@@ -2,11 +2,9 @@ use p3_field::PrimeField64;
 use p3_keccak_air::logic::{andn, xor};
 use p3_keccak_air::{rc_value_limb, BITS_PER_LIMB, NUM_ROUNDS, U64_LIMBS};
 use p3_matrix::dense::RowMajorMatrix;
-use tracing::instrument;
 
 use super::columns::{KeccakCols, NUM_KECCAK_COLS};
 
-#[instrument(name = "generate Keccak trace", skip_all)]
 pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<[u64; 25]>) -> RowMajorMatrix<F> {
     let num_rows = (inputs.len() * NUM_ROUNDS).next_power_of_two();
     let mut trace =
@@ -16,8 +14,8 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<[u64; 25]>) -> RowMajorM
     assert!(suffix.is_empty(), "Alignment should match");
     assert_eq!(rows.len(), num_rows);
 
-    for (row, input) in rows.chunks_mut(NUM_ROUNDS).zip(inputs.into_iter()) {
-        generate_trace_rows_for_perm(row, input);
+    for (irows, input) in rows.chunks_mut(NUM_ROUNDS).zip(inputs.into_iter()) {
+        generate_trace_rows_for_perm(irows, input);
     }
 
     trace

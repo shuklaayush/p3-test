@@ -22,6 +22,7 @@ impl<SC: StarkGenericConfig> MachineChip<SC> for MerkleTreeChip where Val<SC>: P
 mod tests {
     use super::*;
 
+    use itertools::Itertools;
     use p3_baby_bear::BabyBear;
     use p3_challenger::{HashChallenger, SerializingChallenger32};
     use p3_commit::ExtensionMmcs;
@@ -86,9 +87,7 @@ mod tests {
         type Challenger = SerializingChallenger32<Val, HashChallenger<u8, ByteHash, 32>>;
 
         const HEIGHT: usize = 3;
-        let leaf_hashes = (0..2u64.pow(HEIGHT as u32))
-            .map(|_| random())
-            .collect::<Vec<_>>();
+        let leaf_hashes = (0..2u64.pow(HEIGHT as u32)).map(|_| random()).collect_vec();
         let digests = generate_digests(leaf_hashes);
 
         let leaf_index = 0;
