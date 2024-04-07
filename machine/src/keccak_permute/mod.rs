@@ -14,7 +14,7 @@ pub const NUM_U64_HASH_ELEMS: usize = 4;
 
 /// Assumes the field size is at least 16 bits.
 pub struct KeccakPermuteChip {
-    pub inputs: Vec<[u64; 25]>,
+    pub inputs: Vec<([u64; 25], bool)>,
 }
 
 impl<SC: StarkGenericConfig> MachineChip<SC> for KeccakPermuteChip where Val<SC>: PrimeField64 {}

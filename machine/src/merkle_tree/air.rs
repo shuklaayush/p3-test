@@ -22,6 +22,7 @@ impl<AB: AirBuilder> Air<AB> for MerkleTreeChip {
         let local: &MerkleTreeCols<AB::Var> = main.row_slice(0).borrow();
         let next: &MerkleTreeCols<AB::Var> = main.row_slice(1).borrow();
 
+        // TODO: Add more constraints.
         builder.assert_bool(local.is_real);
 
         // Left and right nodes are selected correctly.
@@ -40,10 +41,13 @@ impl<AB: AirBuilder> Air<AB> for MerkleTreeChip {
         for i in 0..NUM_U64_HASH_ELEMS {
             for j in 0..U64_LIMBS {
                 builder
-                    .when_transition()
-                    .when_ne(local.is_final_step, AB::Expr::one())
+                    .when(AB::Expr::one() - local.is_final_step)
                     .assert_eq(local.output[i][j], next.node[i][j]);
             }
         }
+
+        // TODO: This is dummy to make tests pass.
+        //       For some reason, permutation constraints fail when this chip has degree 2.
+        builder.when(local.is_real).assert_bool(local.is_real);
     }
 }

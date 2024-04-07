@@ -48,16 +48,16 @@ impl<F: Field> BaseAir<F> for ChipType {
     fn width(&self) -> usize {
         match self {
             ChipType::KeccakPermute(chip) => <KeccakPermuteChip as BaseAir<F>>::width(chip),
-            ChipType::MerkleTree(chip) => <MerkleTreeChip as BaseAir<F>>::width(chip),
             ChipType::KeccakSponge(chip) => <KeccakSpongeChip as BaseAir<F>>::width(chip),
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as BaseAir<F>>::width(chip),
         }
     }
 
     fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
         match self {
             ChipType::KeccakPermute(chip) => chip.preprocessed_trace(),
-            ChipType::MerkleTree(chip) => chip.preprocessed_trace(),
             ChipType::KeccakSponge(chip) => chip.preprocessed_trace(),
+            ChipType::MerkleTree(chip) => chip.preprocessed_trace(),
         }
     }
 }
@@ -66,8 +66,8 @@ impl<AB: AirBuilder> Air<AB> for ChipType {
     fn eval(&self, builder: &mut AB) {
         match self {
             ChipType::KeccakPermute(chip) => chip.eval(builder),
-            ChipType::MerkleTree(chip) => chip.eval(builder),
             ChipType::KeccakSponge(chip) => chip.eval(builder),
+            ChipType::MerkleTree(chip) => chip.eval(builder),
         }
     }
 }
@@ -76,32 +76,32 @@ impl<F: PrimeField64> Chip<F> for ChipType {
     fn generate_trace(&self) -> RowMajorMatrix<F> {
         match self {
             ChipType::KeccakPermute(chip) => chip.generate_trace(),
-            ChipType::MerkleTree(chip) => chip.generate_trace(),
             ChipType::KeccakSponge(chip) => chip.generate_trace(),
+            ChipType::MerkleTree(chip) => chip.generate_trace(),
         }
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
         match self {
             ChipType::KeccakPermute(chip) => chip.sends(),
-            ChipType::MerkleTree(chip) => chip.sends(),
             ChipType::KeccakSponge(chip) => chip.sends(),
+            ChipType::MerkleTree(chip) => chip.sends(),
         }
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
         match self {
             ChipType::KeccakPermute(chip) => chip.receives(),
-            ChipType::MerkleTree(chip) => chip.receives(),
             ChipType::KeccakSponge(chip) => chip.receives(),
+            ChipType::MerkleTree(chip) => chip.receives(),
         }
     }
 
     fn all_interactions(&self) -> Vec<(Interaction<F>, InteractionType)> {
         match self {
             ChipType::KeccakPermute(chip) => chip.all_interactions(),
-            ChipType::MerkleTree(chip) => chip.all_interactions(),
             ChipType::KeccakSponge(chip) => chip.all_interactions(),
+            ChipType::MerkleTree(chip) => chip.all_interactions(),
         }
     }
 
@@ -109,8 +109,8 @@ impl<F: PrimeField64> Chip<F> for ChipType {
     fn main_headers(&self) -> Vec<String> {
         match self {
             ChipType::KeccakPermute(chip) => <KeccakPermuteChip as Chip<F>>::main_headers(chip),
-            ChipType::MerkleTree(chip) => <MerkleTreeChip as Chip<F>>::main_headers(chip),
             ChipType::KeccakSponge(chip) => <KeccakSpongeChip as Chip<F>>::main_headers(chip),
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as Chip<F>>::main_headers(chip),
         }
     }
 }
@@ -124,10 +124,10 @@ where
             ChipType::KeccakPermute(chip) => {
                 <KeccakPermuteChip as MachineChip<SC>>::trace_width(chip)
             }
-            ChipType::MerkleTree(chip) => <MerkleTreeChip as MachineChip<SC>>::trace_width(chip),
             ChipType::KeccakSponge(chip) => {
                 <KeccakSpongeChip as MachineChip<SC>>::trace_width(chip)
             }
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as MachineChip<SC>>::trace_width(chip),
         }
     }
 }
@@ -179,7 +179,7 @@ impl Machine {
                         .collect_vec()
                         .as_slice(),
                 );
-                input
+                (input, true)
             })
             .collect_vec();
 
@@ -222,6 +222,7 @@ impl Machine {
                 })
                 .collect_vec()
                 .try_into()
+                .map(|input| (input, false))
                 .unwrap(),
         );
 
@@ -479,40 +480,41 @@ impl Machine {
             })
             .collect_vec();
 
-        let chip_proofs = log_degrees
-            .iter()
-            .zip(main_openings)
-            .zip(perm_openings)
-            .zip(quotient_openings)
-            .zip(perm_traces)
-            .map(|((((log_degree, main), perm), quotient), perm_trace)| {
-                let [preprocessed_local, preprocessed_next] = [vec![], vec![]];
-                let [main_local, main_next] = main.try_into().expect("Should have 2 openings");
-                let [perm_local, perm_next] = perm.try_into().expect("Should have 2 openings");
-                let quotient_chunks = quotient
-                    .into_iter()
-                    .map(|mut chunk| chunk.remove(0))
-                    .collect_vec();
-                let opened_values = OpenedValues {
-                    preprocessed_local,
-                    preprocessed_next,
-                    trace_local: main_local,
-                    trace_next: main_next,
-                    permutation_local: perm_local,
-                    permutation_next: perm_next,
-                    quotient_chunks,
-                };
-                let cumulative_sum = *perm_trace
-                    .row_slice(perm_trace.height() - 1)
-                    .last()
-                    .unwrap();
-                ChipProof {
-                    degree_bits: *log_degree,
-                    opened_values,
-                    cumulative_sum,
-                }
-            })
-            .collect_vec();
+        let chip_proofs = izip!(
+            log_degrees,
+            main_openings,
+            perm_openings,
+            quotient_openings,
+            perm_traces
+        )
+        .map(|(log_degree, main, perm, quotient, perm_trace)| {
+            let [preprocessed_local, preprocessed_next] = [vec![], vec![]];
+            let [main_local, main_next] = main.try_into().expect("Should have 2 openings");
+            let [perm_local, perm_next] = perm.try_into().expect("Should have 2 openings");
+            let quotient_chunks = quotient
+                .into_iter()
+                .map(|mut chunk| chunk.remove(0))
+                .collect_vec();
+            let opened_values = OpenedValues {
+                preprocessed_local,
+                preprocessed_next,
+                trace_local: main_local,
+                trace_next: main_next,
+                permutation_local: perm_local,
+                permutation_next: perm_next,
+                quotient_chunks,
+            };
+            let cumulative_sum = *perm_trace
+                .row_slice(perm_trace.height() - 1)
+                .last()
+                .unwrap();
+            ChipProof {
+                degree_bits: log_degree,
+                opened_values,
+                cumulative_sum,
+            }
+        })
+        .collect_vec();
 
         MachineProof {
             commitments,
@@ -694,12 +696,12 @@ impl Machine {
         )
         .map_err(|_| VerificationError::InvalidOpeningArgument)?;
 
-        for (((qc_domains, chip_proof), &main_domain), &chip) in quotient_chunks_domains
-            .iter()
-            .zip(chip_proofs.iter())
-            .zip(main_domains.iter())
-            .zip(self.chips().iter())
-        {
+        for (qc_domains, chip_proof, &main_domain, &chip) in izip!(
+            quotient_chunks_domains.iter(),
+            chip_proofs.iter(),
+            main_domains.iter(),
+            self.chips().iter()
+        ) {
             verify_constraints::<SC, _>(
                 chip,
                 &chip_proof.opened_values,
@@ -770,13 +772,13 @@ mod tests {
     };
     use p3_uni_stark::StarkConfig;
     use p3_util::log2_ceil_usize;
-    use rand::random;
+    use rand::{random, thread_rng, Rng};
     use tracing_forest::{util::LevelFilter, ForestLayer};
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
-    fn generate_digests(leaf_hashes: Vec<[u8; 32]>) -> Vec<Vec<[u8; 32]>> {
+    fn generate_digests(leaf_hashes: &[[u8; 32]]) -> Vec<Vec<[u8; 32]>> {
         let keccak = TruncatedPermutation::new(KeccakF {});
-        let mut digests = vec![leaf_hashes];
+        let mut digests = vec![leaf_hashes.to_vec()];
 
         while let Some(last_level) = digests.last().cloned() {
             if last_level.len() == 1 {
@@ -840,14 +842,10 @@ mod tests {
         let config = MyConfig::new(pcs);
 
         const HEIGHT: usize = 3;
-        let leaf_hashes = (0..2u64.pow(HEIGHT as u32))
-            .map(|_| [0; 32])
-            .map(|_| random())
-            .collect_vec();
-        let digests = generate_digests(leaf_hashes);
+        let leaf_hashes = (0..2u64.pow(HEIGHT as u32)).map(|_| random()).collect_vec();
+        let digests = generate_digests(&leaf_hashes);
 
-        let leaf_index = 0;
-        // let machine = Machine::new(merkle_tree.digest_layers, leaf_index);
+        let leaf_index = thread_rng().gen_range(0..leaf_hashes.len());
         let machine = Machine::new(vec![], digests, leaf_index);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);

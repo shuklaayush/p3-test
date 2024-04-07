@@ -5,11 +5,11 @@ use p3_matrix::dense::RowMajorMatrix;
 use tracing::instrument;
 
 use super::{
-    columns::{MerkleTreeCols, MERKLE_TREE_COL_MAP, NUM_MERKLE_TREE_COLS},
+    columns::{MerkleTreeCols, NUM_MERKLE_TREE_COLS},
     generation::generate_trace_rows_for_leaf,
     MerkleTreeChip, NUM_U8_HASH_ELEMS,
 };
-use crate::{chip::Chip, interaction::Interaction};
+use crate::{chip::Chip, interaction::Interaction, merkle_tree::columns::MERKLE_TREE_COL_MAP};
 
 impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
     // TODO: Allow empty traces
@@ -55,36 +55,30 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
-        let fields = MERKLE_TREE_COL_MAP
-            .left_node
-            .into_iter()
-            .chain(MERKLE_TREE_COL_MAP.right_node)
-            .flatten()
-            .map(VirtualPairCol::single_main)
-            .collect();
-        let is_real = VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real);
-        let send = Interaction {
-            fields,
-            count: is_real,
-            argument_index: 1,
-        };
-        vec![send]
+        vec![Interaction {
+            fields: MERKLE_TREE_COL_MAP
+                .left_node
+                .into_iter()
+                .chain(MERKLE_TREE_COL_MAP.right_node)
+                .flatten()
+                .map(VirtualPairCol::single_main)
+                .collect(),
+            count: VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real),
+            argument_index: 0,
+        }]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
-        let fields = MERKLE_TREE_COL_MAP
-            .output
-            .into_iter()
-            .flatten()
-            .map(VirtualPairCol::single_main)
-            .collect();
-        let is_real = VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real);
-        let receive = Interaction {
-            fields,
-            count: is_real,
-            argument_index: 0,
-        };
-        vec![receive]
+        vec![Interaction {
+            fields: MERKLE_TREE_COL_MAP
+                .output
+                .into_iter()
+                .flatten()
+                .map(VirtualPairCol::single_main)
+                .collect(),
+            count: VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real),
+            argument_index: 2,
+        }]
     }
 
     #[cfg(feature = "debug-trace")]

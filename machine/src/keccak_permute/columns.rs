@@ -23,6 +23,8 @@ pub struct KeccakCols<T> {
 
     pub is_real_output: T,
 
+    pub is_real_digest: T,
+
     /// The `i`th value is set to 1 if we are in the `i`th round, otherwise 0.
     pub step_flags: [T; NUM_ROUNDS],
 

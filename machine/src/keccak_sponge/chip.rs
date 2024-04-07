@@ -31,29 +31,22 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
         assert_eq!(rows.len(), num_rows);
 
         generate_trace_rows(rows, self.inputs.as_slice());
-
         generate_range_checks(rows);
-
-        // println!("Trace: {:?}", trace);
-        // println!("headers: {:?}", KeccakSpongeCols::<F>::headers());
 
         trace
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
-        let fields = KECCAK_SPONGE_COL_MAP
-            .xored_rate_u16s
-            .into_iter()
-            .chain(KECCAK_SPONGE_COL_MAP.original_capacity_u16s)
-            .map(VirtualPairCol::single_main)
-            .collect();
-        let is_real = VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real);
-        let send = Interaction {
-            fields,
-            count: is_real,
-            argument_index: 1,
-        };
-        vec![send]
+        vec![Interaction {
+            fields: KECCAK_SPONGE_COL_MAP
+                .xored_rate_u16s
+                .into_iter()
+                .chain(KECCAK_SPONGE_COL_MAP.original_capacity_u16s)
+                .map(VirtualPairCol::single_main)
+                .collect(),
+            count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
+            argument_index: 0,
+        }]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
@@ -83,7 +76,7 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
         let receive = Interaction {
             fields,
             count: is_real,
-            argument_index: 0,
+            argument_index: 1,
         };
         vec![receive]
     }

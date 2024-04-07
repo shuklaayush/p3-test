@@ -5,7 +5,7 @@ use p3_matrix::dense::RowMajorMatrix;
 
 use super::columns::{KeccakCols, NUM_KECCAK_COLS};
 
-pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<[u64; 25]>) -> RowMajorMatrix<F> {
+pub fn generate_trace_rows<F: PrimeField64>(inputs: &[([u64; 25], bool)]) -> RowMajorMatrix<F> {
     let num_real_rows = inputs.len() * NUM_ROUNDS;
     let num_rows = num_real_rows.next_power_of_two();
     let mut trace =
@@ -15,15 +15,19 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<[u64; 25]>) -> RowMajorM
     assert!(suffix.is_empty(), "Alignment should match");
     assert_eq!(rows.len(), num_rows);
 
-    for (input_rows, input) in rows.chunks_mut(NUM_ROUNDS).zip(inputs.iter()) {
+    for (input_rows, (input, is_digest)) in rows.chunks_mut(NUM_ROUNDS).zip(inputs.iter()) {
         generate_trace_rows_for_perm(input_rows, input);
 
-        // TODO: This is unconstrained
+        // TODO: These are unconstrained
         for row in input_rows.iter_mut() {
             row.is_real = F::one();
         }
         input_rows[0].is_real_input = F::one();
-        input_rows[NUM_ROUNDS - 1].is_real_output = F::one();
+        if *is_digest {
+            input_rows[NUM_ROUNDS - 1].is_real_digest = F::one();
+        } else {
+            input_rows[NUM_ROUNDS - 1].is_real_output = F::one();
+        }
     }
 
     // Fill padding rows
