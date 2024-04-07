@@ -21,7 +21,7 @@ pub fn quotient_values<SC, C, Mat>(
     // preprocessed_trace_on_quotient_domain: Mat,
     main_trace_on_quotient_domain: Mat,
     perm_trace_on_quotient_domain: Mat,
-    perm_challenges: &[SC::Challenge],
+    perm_challenges: &[PackedChallenge<SC>],
     alpha: SC::Challenge,
 ) -> Vec<SC::Challenge>
 where

@@ -5,7 +5,7 @@ use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, Field, PrimeField64};
 use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
-use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val};
+use p3_uni_stark::{get_log_quotient_degree, PackedChallenge, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
 use std::fmt::{self, Display, Formatter};
 use tracing::instrument;
@@ -307,6 +307,10 @@ impl Machine {
         for _ in 0..2 {
             perm_challenges.push(challenger.sample_ext_element::<SC::Challenge>());
         }
+        let packed_perm_challenges = perm_challenges
+            .iter()
+            .map(|c| PackedChallenge::<SC>::from_f(*c))
+            .collect::<Vec<_>>();
 
         let perm_traces = tracing::info_span!("generate permutation traces").in_scope(|| {
             self.chips()
@@ -402,7 +406,7 @@ impl Machine {
                     // preprocessed_trace_on_quotient_domains,
                     main_trace_on_quotient_domains,
                     permutation_trace_on_quotient_domains,
-                    &perm_challenges,
+                    &packed_perm_challenges,
                     alpha,
                 )
             })

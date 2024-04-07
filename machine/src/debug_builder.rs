@@ -118,6 +118,8 @@ where
 {
     type MP = TwoRowMatrixView<'a, SC::Challenge>;
 
+    type RandomVar = SC::Challenge;
+
     fn permutation(&self) -> Self::MP {
         self.perm
     }

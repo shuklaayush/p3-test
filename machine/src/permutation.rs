@@ -17,7 +17,7 @@ pub fn generate_permutation_trace<SC: StarkGenericConfig, C: MachineChip<SC>>(
     random_elements: Vec<SC::Challenge>,
 ) -> RowMajorMatrix<SC::Challenge> {
     let all_interactions = chip.all_interactions();
-    let alphas = generate_rlc_elements(chip, &random_elements);
+    let alphas = generate_rlc_elements(chip, random_elements[0]);
     let betas = random_elements[1].powers();
 
     let preprocessed = chip.preprocessed_trace();
@@ -117,8 +117,8 @@ where
 
     let all_interactions = chip.all_interactions();
 
-    let alphas = generate_rlc_elements(chip, &rand_elems);
-    let betas = rand_elems[1].powers();
+    let alphas = generate_rlc_elements(chip, rand_elems[0].into());
+    let betas = rand_elems[1].into().powers();
 
     let lhs = phi_next.into() - phi_local.into();
     let mut rhs = AB::ExprEF::zero();
@@ -128,9 +128,9 @@ where
         let mut rlc = AB::ExprEF::zero();
         for (field, beta) in interaction.fields.iter().zip(betas.clone()) {
             let elem = field.apply::<AB::Expr, AB::Var>(preprocessed_local, main_local);
-            rlc += AB::ExprEF::from_f(beta) * elem;
+            rlc += beta * elem;
         }
-        rlc += AB::ExprEF::from_f(alphas[interaction.argument_index]);
+        rlc += alphas[interaction.argument_index].clone();
         builder.assert_one_ext(rlc * perm_local[m].into());
 
         let mult_local = interaction
@@ -164,11 +164,11 @@ where
     );
 }
 
-fn generate_rlc_elements<SC: StarkGenericConfig, C: MachineChip<SC>>(
+fn generate_rlc_elements<SC: StarkGenericConfig, C: MachineChip<SC>, AF: AbstractField>(
     chip: &C,
-    random_elements: &[SC::Challenge],
-) -> Vec<SC::Challenge> {
-    random_elements[0]
+    random_element: AF,
+) -> Vec<AF> {
+    random_element
         .powers()
         .skip(1)
         .take(

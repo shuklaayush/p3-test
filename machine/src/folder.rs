@@ -12,7 +12,7 @@ pub struct ProverConstraintFolder<'a, SC: StarkGenericConfig> {
     pub main: TwoRowMatrixView<'a, PackedVal<SC>>,
     pub public_values: &'a Vec<Val<SC>>,
     pub perm: TwoRowMatrixView<'a, PackedChallenge<SC>>,
-    pub perm_challenges: &'a [SC::Challenge],
+    pub perm_challenges: &'a [PackedChallenge<SC>],
     pub cumulative_sum: SC::Challenge,
     pub is_first_row: PackedVal<SC>,
     pub is_last_row: PackedVal<SC>,
@@ -103,12 +103,13 @@ where
 {
     type MP = TwoRowMatrixView<'a, PackedChallenge<SC>>;
 
+    type RandomVar = PackedChallenge<SC>;
+
     fn permutation(&self) -> Self::MP {
         self.perm
     }
 
-    fn permutation_randomness(&self) -> &[Self::EF] {
-        // TODO: implement
+    fn permutation_randomness(&self) -> &[Self::RandomVar] {
         self.perm_challenges
     }
 }
@@ -187,11 +188,13 @@ where
 {
     type MP = TwoRowMatrixView<'a, SC::Challenge>;
 
+    type RandomVar = SC::Challenge;
+
     fn permutation(&self) -> Self::MP {
         self.perm
     }
 
-    fn permutation_randomness(&self) -> &[Self::EF] {
+    fn permutation_randomness(&self) -> &[Self::RandomVar] {
         // TODO: implement
         self.perm_challenges
     }
