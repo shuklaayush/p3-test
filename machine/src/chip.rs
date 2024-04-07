@@ -72,7 +72,7 @@ pub trait Chip<F: Field> {
             .collect_vec();
         let perm_headers = h1
             .into_iter()
-            .chain(h2.into_iter())
+            .chain(h2)
             .chain(once("cumulative_sum".to_string()))
             .collect_vec();
 

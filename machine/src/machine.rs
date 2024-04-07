@@ -205,8 +205,7 @@ impl Machine {
         keccak_inputs.push(
             padded_preimage
                 .chunks(KECCAK_RATE_BYTES)
-                .into_iter()
-                .map(|b| {
+                .flat_map(|b| {
                     state[..KECCAK_RATE_BYTES]
                         .iter_mut()
                         .zip(b.iter())
@@ -221,7 +220,6 @@ impl Machine {
                     keccakf_u8s(&mut state);
                     input
                 })
-                .flatten()
                 .collect_vec()
                 .try_into()
                 .unwrap(),

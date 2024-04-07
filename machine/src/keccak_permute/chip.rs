@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use p3_air::VirtualPairCol;
 use p3_field::PrimeField64;
-use p3_keccak_air::{NUM_ROUNDS, U64_LIMBS};
+use p3_keccak_air::{U64_LIMBS};
 use p3_matrix::dense::RowMajorMatrix;
 use tracing::instrument;
 
@@ -26,7 +26,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
             })
             .map(VirtualPairCol::single_main)
             .collect();
-        let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.step_flags[NUM_ROUNDS - 1]);
+        let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.is_real_output);
         let send = Interaction {
             fields,
             count: is_real,
@@ -44,7 +44,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
             .flatten()
             .map(VirtualPairCol::single_main)
             .collect();
-        let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.step_flags[0]);
+        let is_real = VirtualPairCol::single_main(KECCAK_COL_MAP.is_real_input);
         let receive = Interaction {
             fields,
             count: is_real,

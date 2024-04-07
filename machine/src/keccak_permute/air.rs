@@ -24,7 +24,11 @@ impl<AB: AirBuilder> Air<AB> for KeccakPermuteChip {
         let local: &KeccakCols<AB::Var> = main.row_slice(0).borrow();
         let next: &KeccakCols<AB::Var> = main.row_slice(1).borrow();
 
-        let mut builder = builder.when(local.is_real);
+        builder.assert_eq(local.is_real * local.step_flags[0], local.is_real_input);
+        builder.assert_eq(
+            local.is_real * local.step_flags[NUM_ROUNDS - 1],
+            local.is_real_output,
+        );
 
         // If this is not the final step, the export flag must be off.
         let final_step = local.step_flags[NUM_ROUNDS - 1];

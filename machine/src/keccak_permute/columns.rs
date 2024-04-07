@@ -19,6 +19,10 @@ use p3_test_macro::Headers;
 pub struct KeccakCols<T> {
     pub is_real: T,
 
+    pub is_real_input: T,
+
+    pub is_real_output: T,
+
     /// The `i`th value is set to 1 if we are in the `i`th round, otherwise 0.
     pub step_flags: [T; NUM_ROUNDS],
 

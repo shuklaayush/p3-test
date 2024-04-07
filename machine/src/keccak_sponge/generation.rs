@@ -1,19 +1,29 @@
 use itertools::Itertools;
-use p3_field::PrimeField64;
+use p3_field::{PackedValue, PrimeField64};
 
 use super::{
     columns::{KECCAK_DIGEST_U16S, KECCAK_RATE_BYTES, KECCAK_RATE_U16S, KECCAK_WIDTH_U16S},
     util::keccakf_u16s,
 };
-use crate::keccak_sponge::{columns::KeccakSpongeCols, BYTE_RANGE_MAX};
+use crate::keccak_sponge::columns::KeccakSpongeCols;
 
 pub fn generate_trace_rows<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>], inputs: &[Vec<u8>]) {
     let mut offset = 0;
     for input in inputs {
         let len = input.len() / KECCAK_RATE_BYTES + 1;
-        let irows = &mut rows[offset..offset + len];
-        generate_rows_for_input(irows, input);
+        let input_rows = &mut rows[offset..offset + len];
+        generate_rows_for_input(input_rows, input);
         offset += len;
+
+        // TODO: This is unconstrained
+        for row in input_rows.iter_mut() {
+            row.is_real = F::one();
+        }
+    }
+
+    // Pad the trace.
+    for input_rows in rows.chunks_mut(1).skip(offset) {
+        generate_rows_for_input(input_rows, vec![].as_slice());
     }
 }
 
@@ -191,7 +201,7 @@ fn generate_common_fields<F: PrimeField64>(
 }
 
 /// Expects input in *column*-major layout
-pub fn generate_range_checks<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>]) {
+pub fn generate_range_checks<F: PrimeField64>(_rows: &mut [KeccakSpongeCols<F>]) {
     // for i in 0..BYTE_RANGE_MAX {
     //     rows[i].range_counter = F::from_canonical_usize(i);
     // }

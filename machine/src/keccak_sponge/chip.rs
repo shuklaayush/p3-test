@@ -47,12 +47,7 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
             .chain(KECCAK_SPONGE_COL_MAP.original_capacity_u16s)
             .map(VirtualPairCol::single_main)
             .collect();
-        let is_real = VirtualPairCol::sum_main(
-            vec![KECCAK_SPONGE_COL_MAP.is_full_input_block]
-                .into_iter()
-                .chain(KECCAK_SPONGE_COL_MAP.is_final_input_len.into_iter())
-                .collect_vec(),
-        );
+        let is_real = VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real);
         let send = Interaction {
             fields,
             count: is_real,
@@ -67,7 +62,6 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
         let mut fields = KECCAK_SPONGE_COL_MAP
             .updated_digest_state_bytes
             .chunks(2)
-            .into_iter()
             .map(|cols| {
                 let column_weights = cols
                     .iter()
@@ -85,12 +79,7 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                 .map(|c| VirtualPairCol::single_main(c)),
         );
 
-        let is_real = VirtualPairCol::sum_main(
-            vec![KECCAK_SPONGE_COL_MAP.is_full_input_block]
-                .into_iter()
-                .chain(KECCAK_SPONGE_COL_MAP.is_final_input_len.into_iter())
-                .collect_vec(),
-        );
+        let is_real = VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real);
         let receive = Interaction {
             fields,
             count: is_real,

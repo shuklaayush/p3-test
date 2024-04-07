@@ -8,7 +8,7 @@ use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 
 pub fn generate_trace_rows_for_leaf<F: PrimeField64>(
     rows: &mut [MerkleTreeCols<F>],
-    leaf: [u8; NUM_U8_HASH_ELEMS],
+    leaf: &[u8; NUM_U8_HASH_ELEMS],
     leaf_index: usize,
     siblings: &[[u8; NUM_U8_HASH_ELEMS]],
 ) {
@@ -24,7 +24,7 @@ pub fn generate_trace_rows_for_leaf<F: PrimeField64>(
         }
     }
 
-    let mut node = generate_trace_row_for_round(&mut rows[0], leaf_index & 1, leaf, siblings[0]);
+    let mut node = generate_trace_row_for_round(&mut rows[0], leaf_index & 1, leaf, &siblings[0]);
 
     for round in 1..rows.len() {
         // Copy previous row's output to next row's input.
@@ -37,8 +37,8 @@ pub fn generate_trace_rows_for_leaf<F: PrimeField64>(
         node = generate_trace_row_for_round(
             &mut rows[round],
             (leaf_index >> round) & 1,
-            node,
-            siblings[round],
+            &node,
+            &siblings[round],
         );
     }
 
@@ -49,11 +49,9 @@ pub fn generate_trace_rows_for_leaf<F: PrimeField64>(
 pub fn generate_trace_row_for_round<F: PrimeField64>(
     row: &mut MerkleTreeCols<F>,
     parity_bit: usize,
-    node: [u8; NUM_U8_HASH_ELEMS],
-    sibling: [u8; NUM_U8_HASH_ELEMS],
+    node: &[u8; NUM_U8_HASH_ELEMS],
+    sibling: &[u8; NUM_U8_HASH_ELEMS],
 ) -> [u8; NUM_U8_HASH_ELEMS] {
-    row.is_real = F::one();
-
     let (left_node, right_node) = if parity_bit == 0 {
         (node, sibling)
     } else {
@@ -61,7 +59,7 @@ pub fn generate_trace_row_for_round<F: PrimeField64>(
     };
 
     let keccak = TruncatedPermutation::new(KeccakF {});
-    let output = keccak.compress([left_node, right_node]);
+    let output = keccak.compress([*left_node, *right_node]);
 
     row.parity_selector = F::from_canonical_usize(parity_bit);
     for x in 0..NUM_U64_HASH_ELEMS {

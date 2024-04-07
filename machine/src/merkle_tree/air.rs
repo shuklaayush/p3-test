@@ -24,8 +24,6 @@ impl<AB: AirBuilder> Air<AB> for MerkleTreeChip {
 
         builder.assert_bool(local.is_real);
 
-        let mut builder = builder.when(local.is_real);
-
         // Left and right nodes are selected correctly.
         for i in 0..NUM_U64_HASH_ELEMS {
             for j in 0..U64_LIMBS {

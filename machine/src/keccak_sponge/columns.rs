@@ -30,6 +30,8 @@ pub(crate) const KECCAK_DIGEST_U16S: usize = KECCAK_DIGEST_BYTES / 2;
 #[repr(C)]
 #[cfg_attr(feature = "debug-trace", derive(Headers))]
 pub struct KeccakSpongeCols<T> {
+    pub is_real: T,
+
     /// 1 if this row represents a full input block, i.e. one in which each byte
     /// is an input byte, not a padding byte; 0 otherwise.
     pub is_full_input_block: T,

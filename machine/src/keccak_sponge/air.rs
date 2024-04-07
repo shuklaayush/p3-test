@@ -7,7 +7,7 @@ use super::columns::{
     KeccakSpongeCols, KECCAK_DIGEST_U16S, KECCAK_RATE_BYTES, KECCAK_RATE_U16S,
     NUM_KECCAK_SPONGE_COLS,
 };
-use super::{KeccakSpongeChip, BYTE_RANGE_MAX};
+use super::{KeccakSpongeChip};
 
 impl<F> BaseAir<F> for KeccakSpongeChip {
     fn width(&self) -> usize {
@@ -20,8 +20,6 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
         let main = builder.main();
         let local: &KeccakSpongeCols<AB::Var> = main.row_slice(0).borrow();
         let next: &KeccakSpongeCols<AB::Var> = main.row_slice(1).borrow();
-
-        // let mut builder = builder.when(local.is_real);
 
         // // Check the range column: First value must be 0, last row
         // // must be 255, and intermediate rows must increment by 0
