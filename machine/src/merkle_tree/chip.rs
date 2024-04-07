@@ -69,4 +69,9 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
         };
         vec![receive]
     }
+
+    #[cfg(feature = "debug-trace")]
+    fn main_headers(&self) -> Vec<String> {
+        MerkleTreeCols::<F>::headers()
+    }
 }

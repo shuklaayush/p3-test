@@ -3,10 +3,13 @@ use core::mem::{size_of, transmute};
 use p3_keccak_air::U64_LIMBS;
 use p3_util::indices_arr;
 
+#[cfg(feature = "debug-trace")]
+use p3_test_macro::Headers;
+
 use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 
 #[repr(C)]
-#[derive(Debug)]
+#[cfg_attr(feature = "debug-trace", derive(Headers))]
 pub struct MerkleTreeCols<T> {
     pub is_real: T,
 

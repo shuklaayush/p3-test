@@ -35,6 +35,7 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
         generate_range_checks(rows);
 
         // println!("Trace: {:?}", trace);
+        // println!("headers: {:?}", KeccakSpongeCols::<F>::headers());
 
         trace
     }
@@ -96,6 +97,11 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
             argument_index: 0,
         };
         vec![receive]
+    }
+
+    #[cfg(feature = "debug-trace")]
+    fn main_headers(&self) -> Vec<String> {
+        KeccakSpongeCols::<F>::headers()
     }
 }
 

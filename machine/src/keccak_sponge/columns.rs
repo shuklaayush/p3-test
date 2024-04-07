@@ -3,6 +3,9 @@ use core::mem::{size_of, transmute};
 
 use p3_util::indices_arr;
 
+#[cfg(feature = "debug-trace")]
+use p3_test_macro::Headers;
+
 /// Total number of sponge bytes: number of rate bytes + number of capacity
 /// bytes.
 pub(crate) const KECCAK_WIDTH_BYTES: usize = 200;
@@ -25,6 +28,7 @@ pub(crate) const KECCAK_DIGEST_BYTES: usize = 32;
 pub(crate) const KECCAK_DIGEST_U16S: usize = KECCAK_DIGEST_BYTES / 2;
 
 #[repr(C)]
+#[cfg_attr(feature = "debug-trace", derive(Headers))]
 pub struct KeccakSpongeCols<T> {
     /// 1 if this row represents a full input block, i.e. one in which each byte
     /// is an input byte, not a padding byte; 0 otherwise.

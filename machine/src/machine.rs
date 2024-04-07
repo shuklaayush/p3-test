@@ -1,4 +1,4 @@
-use itertools::Itertools;
+use itertools::{izip, Itertools};
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
@@ -7,8 +7,11 @@ use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_uni_stark::{get_log_quotient_degree, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
-use tiny_keccak::keccakf;
+use std::fmt::{self, Display, Formatter};
 use tracing::instrument;
+
+#[cfg(feature = "debug-trace")]
+use std::error::Error;
 
 use crate::{
     check_constraints::{check_constraints, check_cumulative_sums},
@@ -28,6 +31,16 @@ pub enum ChipType {
     KeccakPermute(KeccakPermuteChip),
     KeccakSponge(KeccakSpongeChip),
     MerkleTree(MerkleTreeChip),
+}
+
+impl Display for ChipType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            ChipType::KeccakPermute(_) => write!(f, "KeccakPermute"),
+            ChipType::KeccakSponge(_) => write!(f, "KeccakSponge"),
+            ChipType::MerkleTree(_) => write!(f, "MerkleTree"),
+        }
+    }
 }
 
 // TODO: Write a proc_macro for enum dispatch
@@ -89,6 +102,15 @@ impl<F: PrimeField64> Chip<F> for ChipType {
             ChipType::KeccakPermute(chip) => chip.all_interactions(),
             ChipType::MerkleTree(chip) => chip.all_interactions(),
             ChipType::KeccakSponge(chip) => chip.all_interactions(),
+        }
+    }
+
+    #[cfg(feature = "debug-trace")]
+    fn main_headers(&self) -> Vec<String> {
+        match self {
+            ChipType::KeccakPermute(chip) => <KeccakPermuteChip as Chip<F>>::main_headers(chip),
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as Chip<F>>::main_headers(chip),
+            ChipType::KeccakSponge(chip) => <KeccakSpongeChip as Chip<F>>::main_headers(chip),
         }
     }
 }
@@ -325,14 +347,19 @@ impl Machine {
             .collect_vec();
 
         // 4. Verify constraints
+        #[cfg(feature = "debug-trace")]
+        let _ = self.write_traces_to_file::<SC>(
+            "trace.xlsx",
+            self.chips().iter().map(|_| None).collect_vec().as_slice(),
+            main_traces.as_slice(),
+            perm_traces.as_slice(),
+        );
         #[cfg(debug_assertions)]
-        self.chips()
-            .iter()
-            .zip(main_traces.iter())
-            .zip(perm_traces.iter())
-            .for_each(|((&chip, main_trace), perm_trace)| {
-                check_constraints::<_, SC>(chip, main_trace, perm_trace, &perm_challenges, &vec![]);
-            });
+        for (chip, main_trace, perm_trace) in
+            izip!(self.chips(), main_traces.iter(), perm_traces.iter())
+        {
+            check_constraints::<_, SC>(chip, main_trace, perm_trace, &perm_challenges, &vec![]);
+        }
         #[cfg(debug_assertions)]
         check_cumulative_sums(&perm_traces[..]);
 
@@ -695,6 +722,33 @@ impl Machine {
         if sum != SC::Challenge::zero() {
             return Err(VerificationError::NonZeroCumulativeSum);
         }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "debug-trace")]
+    fn write_traces_to_file<SC: StarkGenericConfig>(
+        &self,
+        path: &str,
+        preprocessed_traces: &[Option<&RowMajorMatrix<Val<SC>>>],
+        main_traces: &[RowMajorMatrix<Val<SC>>],
+        perm_traces: &[RowMajorMatrix<SC::Challenge>],
+    ) -> Result<(), Box<dyn Error>>
+    where
+        Val<SC>: PrimeField64,
+    {
+        use rust_xlsxwriter::Workbook;
+
+        let mut workbook = Workbook::new();
+        for (chip, preprocessed_trace, main_trace, perm_trace) in
+            izip!(self.chips(), preprocessed_traces, main_traces, perm_traces)
+        {
+            let worksheet = workbook.add_worksheet();
+            worksheet.set_name(format!("{}", chip))?;
+            chip.write_traces_to_worksheet(worksheet, *preprocessed_trace, main_trace, perm_trace)?;
+        }
+
+        workbook.save(path)?;
 
         Ok(())
     }

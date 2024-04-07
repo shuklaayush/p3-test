@@ -5,7 +5,7 @@ use p3_keccak_air::{NUM_ROUNDS, U64_LIMBS};
 use p3_matrix::dense::RowMajorMatrix;
 use tracing::instrument;
 
-use super::columns::KECCAK_COL_MAP;
+use super::columns::{KeccakCols, KECCAK_COL_MAP};
 use super::generation::generate_trace_rows;
 use super::{KeccakPermuteChip, NUM_U64_HASH_ELEMS};
 use crate::chip::Chip;
@@ -51,5 +51,10 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
             argument_index: 1,
         };
         vec![receive]
+    }
+
+    #[cfg(feature = "debug-trace")]
+    fn main_headers(&self) -> Vec<String> {
+        KeccakCols::<F>::headers()
     }
 }

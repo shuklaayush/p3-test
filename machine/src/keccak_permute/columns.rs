@@ -4,6 +4,9 @@ use core::mem::{size_of, transmute};
 use p3_keccak_air::{NUM_ROUNDS, R, RATE_LIMBS, U64_LIMBS};
 use p3_util::indices_arr;
 
+#[cfg(feature = "debug-trace")]
+use p3_test_macro::Headers;
+
 /// Note: The ordering of each array is based on the input mapping. As the spec says,
 ///
 /// > The mapping between the bits of s and those of a is `s[w(5y + x) + z] = a[x][y][z]`.
@@ -12,6 +15,7 @@ use p3_util::indices_arr;
 /// convention of `x, y, z` order, but it has the benefit that input lists map to AIR columns in a
 /// nicer way.
 #[repr(C)]
+#[cfg_attr(feature = "debug-trace", derive(Headers))]
 pub struct KeccakCols<T> {
     pub is_real: T,
 
