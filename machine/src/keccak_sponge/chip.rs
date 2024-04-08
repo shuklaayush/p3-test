@@ -9,7 +9,10 @@ use super::{
     generation::{generate_range_checks, generate_trace_rows},
     KeccakSpongeChip,
 };
-use crate::{chip::Chip, interaction::Interaction, keccak_sponge::columns::KECCAK_SPONGE_COL_MAP};
+use crate::{
+    chip::Chip, interaction::Interaction, keccak_sponge::columns::KECCAK_SPONGE_COL_MAP,
+    machine::MachineBus,
+};
 
 impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
     #[instrument(name = "generate KeccakSponge trace", skip_all)]
@@ -45,7 +48,7 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                 .map(VirtualPairCol::single_main)
                 .collect(),
             count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
-            argument_index: 0,
+            argument_index: MachineBus::KeccakPermuteInput as usize,
         }]
     }
 
@@ -76,7 +79,7 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
         let receive = Interaction {
             fields,
             count: is_real,
-            argument_index: 1,
+            argument_index: MachineBus::KeccakPermuteOutput as usize,
         };
         vec![receive]
     }

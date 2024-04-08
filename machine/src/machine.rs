@@ -148,7 +148,15 @@ impl Machine {
     }
 }
 
+pub enum MachineBus {
+    KeccakPermuteInput = 0,
+    KeccakPermuteOutput = 1,
+    KeccakPermuteDigest = 2,
+    Range8 = 3,
+}
+
 impl Machine {
+    // TODO: Proper execution function for the machine that minimizes redundant computation
     pub fn new(preimage_bytes: Vec<u8>, digests: Vec<Vec<[u8; 32]>>, leaf_index: usize) -> Self {
         let leaf = digests[0][leaf_index];
 

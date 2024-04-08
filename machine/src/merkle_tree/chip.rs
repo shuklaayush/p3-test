@@ -9,7 +9,10 @@ use super::{
     generation::generate_trace_rows_for_leaf,
     MerkleTreeChip, NUM_U8_HASH_ELEMS,
 };
-use crate::{chip::Chip, interaction::Interaction, merkle_tree::columns::MERKLE_TREE_COL_MAP};
+use crate::{
+    chip::Chip, interaction::Interaction, machine::MachineBus,
+    merkle_tree::columns::MERKLE_TREE_COL_MAP,
+};
 
 impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
     // TODO: Allow empty traces
@@ -64,7 +67,7 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
                 .map(VirtualPairCol::single_main)
                 .collect(),
             count: VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real),
-            argument_index: 0,
+            argument_index: MachineBus::KeccakPermuteInput as usize,
         }]
     }
 
@@ -77,7 +80,7 @@ impl<F: PrimeField64> Chip<F> for MerkleTreeChip {
                 .map(VirtualPairCol::single_main)
                 .collect(),
             count: VirtualPairCol::single_main(MERKLE_TREE_COL_MAP.is_real),
-            argument_index: 2,
+            argument_index: MachineBus::KeccakPermuteDigest as usize,
         }]
     }
 

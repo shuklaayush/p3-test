@@ -12,6 +12,7 @@ use crate::chip::Chip;
 use crate::interaction::Interaction;
 use crate::keccak_permute::columns::KECCAK_COL_MAP;
 use crate::keccak_permute::NUM_U64_HASH_ELEMS;
+use crate::machine::MachineBus;
 
 impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
     #[instrument(name = "generate Keccak trace", skip_all)]
@@ -31,7 +32,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
                     .map(VirtualPairCol::single_main)
                     .collect(),
                 count: VirtualPairCol::single_main(KECCAK_COL_MAP.is_real_output),
-                argument_index: 1,
+                argument_index: MachineBus::KeccakPermuteOutput as usize,
             },
             Interaction {
                 fields: (0..NUM_U64_HASH_ELEMS)
@@ -43,7 +44,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
                     .map(VirtualPairCol::single_main)
                     .collect(),
                 count: VirtualPairCol::single_main(KECCAK_COL_MAP.is_real_digest),
-                argument_index: 2,
+                argument_index: MachineBus::KeccakPermuteDigest as usize,
             },
         ]
     }
@@ -58,7 +59,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
                 .map(VirtualPairCol::single_main)
                 .collect(),
             count: VirtualPairCol::single_main(KECCAK_COL_MAP.is_real_input),
-            argument_index: 0,
+            argument_index: MachineBus::KeccakPermuteInput as usize,
         }]
     }
 

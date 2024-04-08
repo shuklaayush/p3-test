@@ -11,5 +11,6 @@ mod merkle_tree;
 mod permutation;
 mod proof;
 mod quotient;
+mod range;
 mod util;
 mod verify;
