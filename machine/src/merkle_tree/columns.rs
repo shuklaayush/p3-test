@@ -1,14 +1,15 @@
-use core::borrow::{Borrow, BorrowMut};
 use core::mem::{size_of, transmute};
 use p3_keccak_air::U64_LIMBS;
+use p3_test_derive::AlignedBorrow;
 use p3_util::indices_arr;
 
 #[cfg(feature = "debug-trace")]
-use p3_test_macro::Headers;
+use p3_test_derive::Headers;
 
 use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 
 #[repr(C)]
+#[derive(AlignedBorrow)]
 #[cfg_attr(feature = "debug-trace", derive(Headers))]
 pub struct MerkleTreeCols<T> {
     pub is_real: T,
@@ -36,26 +37,4 @@ pub(crate) const MERKLE_TREE_COL_MAP: MerkleTreeCols<usize> = make_col_map();
 const fn make_col_map() -> MerkleTreeCols<usize> {
     let indices_arr = indices_arr::<NUM_MERKLE_TREE_COLS>();
     unsafe { transmute::<[usize; NUM_MERKLE_TREE_COLS], MerkleTreeCols<usize>>(indices_arr) }
-}
-
-impl<T> Borrow<MerkleTreeCols<T>> for [T] {
-    fn borrow(&self) -> &MerkleTreeCols<T> {
-        debug_assert_eq!(self.len(), NUM_MERKLE_TREE_COLS);
-        let (prefix, shorts, suffix) = unsafe { self.align_to::<MerkleTreeCols<T>>() };
-        debug_assert!(prefix.is_empty(), "Alignment should match");
-        debug_assert!(suffix.is_empty(), "Alignment should match");
-        debug_assert_eq!(shorts.len(), 1);
-        &shorts[0]
-    }
-}
-
-impl<T> BorrowMut<MerkleTreeCols<T>> for [T] {
-    fn borrow_mut(&mut self) -> &mut MerkleTreeCols<T> {
-        debug_assert_eq!(self.len(), NUM_MERKLE_TREE_COLS);
-        let (prefix, shorts, suffix) = unsafe { self.align_to_mut::<MerkleTreeCols<T>>() };
-        debug_assert!(prefix.is_empty(), "Alignment should match");
-        debug_assert!(suffix.is_empty(), "Alignment should match");
-        debug_assert_eq!(shorts.len(), 1);
-        &mut shorts[0]
-    }
 }

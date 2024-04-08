@@ -411,6 +411,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "p3-test-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "p3-test-machine"
 version = "0.1.0"
 dependencies = [
@@ -431,7 +440,7 @@ dependencies = [
  "p3-merkle-tree",
  "p3-poseidon2",
  "p3-symmetric",
- "p3-test-macro",
+ "p3-test-derive",
  "p3-uni-stark",
  "p3-util 0.1.0 (git+https://github.com/Plonky3/Plonky3.git)",
  "rand",
@@ -441,15 +450,6 @@ dependencies = [
  "tracing",
  "tracing-forest",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "p3-test-macro"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

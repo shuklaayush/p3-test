@@ -1,10 +1,9 @@
-use core::borrow::{Borrow, BorrowMut};
 use core::mem::{size_of, transmute};
-
+use p3_test_derive::AlignedBorrow;
 use p3_util::indices_arr;
 
 #[cfg(feature = "debug-trace")]
-use p3_test_macro::Headers;
+use p3_test_derive::Headers;
 
 /// Total number of sponge bytes: number of rate bytes + number of capacity
 /// bytes.
@@ -28,6 +27,7 @@ pub(crate) const KECCAK_DIGEST_BYTES: usize = 32;
 pub(crate) const KECCAK_DIGEST_U16S: usize = KECCAK_DIGEST_BYTES / 2;
 
 #[repr(C)]
+#[derive(AlignedBorrow)]
 #[cfg_attr(feature = "debug-trace", derive(Headers))]
 pub struct KeccakSpongeCols<T> {
     pub is_real: T,
@@ -87,26 +87,4 @@ pub(crate) const KECCAK_SPONGE_COL_MAP: KeccakSpongeCols<usize> = make_col_map()
 const fn make_col_map() -> KeccakSpongeCols<usize> {
     let indices_arr = indices_arr::<NUM_KECCAK_SPONGE_COLS>();
     unsafe { transmute::<[usize; NUM_KECCAK_SPONGE_COLS], KeccakSpongeCols<usize>>(indices_arr) }
-}
-
-impl<T> Borrow<KeccakSpongeCols<T>> for [T] {
-    fn borrow(&self) -> &KeccakSpongeCols<T> {
-        debug_assert_eq!(self.len(), NUM_KECCAK_SPONGE_COLS);
-        let (prefix, shorts, suffix) = unsafe { self.align_to::<KeccakSpongeCols<T>>() };
-        debug_assert!(prefix.is_empty(), "Alignment should match");
-        debug_assert!(suffix.is_empty(), "Alignment should match");
-        debug_assert_eq!(shorts.len(), 1);
-        &shorts[0]
-    }
-}
-
-impl<T> BorrowMut<KeccakSpongeCols<T>> for [T] {
-    fn borrow_mut(&mut self) -> &mut KeccakSpongeCols<T> {
-        debug_assert_eq!(self.len(), NUM_KECCAK_SPONGE_COLS);
-        let (prefix, shorts, suffix) = unsafe { self.align_to_mut::<KeccakSpongeCols<T>>() };
-        debug_assert!(prefix.is_empty(), "Alignment should match");
-        debug_assert!(suffix.is_empty(), "Alignment should match");
-        debug_assert_eq!(shorts.len(), 1);
-        &mut shorts[0]
-    }
 }

@@ -1,11 +1,11 @@
-use core::borrow::{Borrow, BorrowMut};
 use core::mem::{size_of, transmute};
 
 use p3_keccak_air::{NUM_ROUNDS, R, RATE_LIMBS, U64_LIMBS};
+use p3_test_derive::AlignedBorrow;
 use p3_util::indices_arr;
 
 #[cfg(feature = "debug-trace")]
-use p3_test_macro::Headers;
+use p3_test_derive::Headers;
 
 /// Note: The ordering of each array is based on the input mapping. As the spec says,
 ///
@@ -15,6 +15,7 @@ use p3_test_macro::Headers;
 /// convention of `x, y, z` order, but it has the benefit that input lists map to AIR columns in a
 /// nicer way.
 #[repr(C)]
+#[derive(AlignedBorrow)]
 #[cfg_attr(feature = "debug-trace", derive(Headers))]
 pub struct KeccakCols<T> {
     pub is_real: T,
@@ -127,26 +128,4 @@ pub(crate) const KECCAK_COL_MAP: KeccakCols<usize> = make_col_map();
 const fn make_col_map() -> KeccakCols<usize> {
     let indices_arr = indices_arr::<NUM_KECCAK_COLS>();
     unsafe { transmute::<[usize; NUM_KECCAK_COLS], KeccakCols<usize>>(indices_arr) }
-}
-
-impl<T> Borrow<KeccakCols<T>> for [T] {
-    fn borrow(&self) -> &KeccakCols<T> {
-        debug_assert_eq!(self.len(), NUM_KECCAK_COLS);
-        let (prefix, shorts, suffix) = unsafe { self.align_to::<KeccakCols<T>>() };
-        debug_assert!(prefix.is_empty(), "Alignment should match");
-        debug_assert!(suffix.is_empty(), "Alignment should match");
-        debug_assert_eq!(shorts.len(), 1);
-        &shorts[0]
-    }
-}
-
-impl<T> BorrowMut<KeccakCols<T>> for [T] {
-    fn borrow_mut(&mut self) -> &mut KeccakCols<T> {
-        debug_assert_eq!(self.len(), NUM_KECCAK_COLS);
-        let (prefix, shorts, suffix) = unsafe { self.align_to_mut::<KeccakCols<T>>() };
-        debug_assert!(prefix.is_empty(), "Alignment should match");
-        debug_assert!(suffix.is_empty(), "Alignment should match");
-        debug_assert_eq!(shorts.len(), 1);
-        &mut shorts[0]
-    }
 }

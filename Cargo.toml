@@ -1,5 +1,5 @@
 [workspace]
-members = ["machine", "macro"]
+members = ["machine", "derive"]
 resolver = "2"
 
 [patch."https://github.com/Plonky3/Plonky3"]

@@ -1,5 +1,5 @@
 [package]
-name = "p3-test-macro"
+name = "p3-test-derive"
 version = "0.1.0"
 edition = "2021"
 
