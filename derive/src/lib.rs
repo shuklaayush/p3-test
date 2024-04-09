@@ -73,9 +73,7 @@ pub fn aligned_borrow_derive(input: TokenStream) -> TokenStream {
     // Get struct name from ast
     let name = &ast.ident;
     let methods = quote! {
-        use core::borrow::{Borrow, BorrowMut};
-
-        impl<T> Borrow<#name<T>> for [T] {
+        impl<T> core::borrow::Borrow<#name<T>> for [T] {
             fn borrow(&self) -> &#name<T> {
                 debug_assert_eq!(self.len(), size_of::<#name<u8>>());
                 let (prefix, shorts, _suffix) = unsafe { self.align_to::<#name<T>>() };
@@ -85,7 +83,7 @@ pub fn aligned_borrow_derive(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl<T> BorrowMut<#name<T>> for [T] {
+        impl<T> core::borrow::BorrowMut<#name<T>> for [T] {
             fn borrow_mut(&mut self) -> &mut #name<T> {
                 debug_assert_eq!(self.len(), size_of::<#name<u8>>());
                 let (prefix, shorts, _suffix) = unsafe { self.align_to_mut::<#name<T>>() };

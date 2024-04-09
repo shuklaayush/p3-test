@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use p3_field::{PackedValue, PrimeField64};
+use p3_field::PrimeField64;
 
 use super::{
     columns::{KECCAK_DIGEST_U16S, KECCAK_RATE_BYTES, KECCAK_RATE_U16S, KECCAK_WIDTH_U16S},

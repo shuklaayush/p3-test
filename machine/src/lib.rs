@@ -1,5 +1,6 @@
 mod check_constraints;
 mod chip;
+mod cpu;
 mod debug_builder;
 mod error;
 mod folder;

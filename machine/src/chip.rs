@@ -43,7 +43,7 @@ pub trait Chip<F: Field> {
     fn write_traces_to_worksheet<E: Field>(
         &self,
         ws: &mut Worksheet,
-        preprocessed_trace: Option<&RowMajorMatrix<F>>,
+        preprocessed_trace: &Option<RowMajorMatrix<F>>,
         main_trace: &RowMajorMatrix<F>,
         perm_trace: &RowMajorMatrix<E>,
     ) -> Result<(), Box<dyn Error>>
@@ -54,6 +54,10 @@ pub trait Chip<F: Field> {
 
         use itertools::Itertools;
         use p3_matrix::{Matrix, MatrixGet};
+
+        let perprocessed_headers = (0..preprocessed_trace.as_ref().map_or(0, |t| t.width()))
+            .map(|i| format!("preprocessed[{}]", i))
+            .collect_vec();
 
         let main_headers = self.main_headers();
 
@@ -76,23 +80,29 @@ pub trait Chip<F: Field> {
             .chain(once("cumulative_sum".to_string()))
             .collect_vec();
 
-        let perprocessed_headers = (0..preprocessed_trace.map_or(0, |t| t.width()))
-            .map(|i| format!("preprocessed[{}]", i))
-            .collect_vec();
-
-        let headers = main_headers
+        let headers = perprocessed_headers
             .iter()
+            .chain(main_headers.iter())
             .chain(perm_headers.iter())
-            .chain(perprocessed_headers.iter())
             .collect_vec();
         ws.write_row(0, 0, headers)?;
 
         let max_height = main_trace
             .height()
             .max(perm_trace.height())
-            .max(preprocessed_trace.map_or(0, |t| t.height()));
+            .max(preprocessed_trace.as_ref().map_or(0, |t| t.height()));
         for i in 0..max_height {
             let mut offset = 0;
+            if let Some(preprocessed_trace) = preprocessed_trace {
+                for j in 0..preprocessed_trace.width() {
+                    ws.write_number(
+                        i as u32 + 1,
+                        offset + j as u16,
+                        preprocessed_trace.get(i, j).as_canonical_u64() as f64,
+                    )?;
+                }
+                offset += preprocessed_trace.width() as u16;
+            }
             for j in 0..main_trace.width() {
                 ws.write_number(
                     i as u32 + 1,
@@ -107,15 +117,6 @@ pub trait Chip<F: Field> {
                     offset + j as u16,
                     perm_trace.get(i, j).to_string(),
                 )?;
-            }
-            if let Some(preprocessed_trace) = preprocessed_trace {
-                for j in 0..preprocessed_trace.width() {
-                    ws.write_number(
-                        i as u32 + 1,
-                        offset + j as u16,
-                        preprocessed_trace.get(i, j).as_canonical_u64() as f64,
-                    )?;
-                }
             }
         }
 

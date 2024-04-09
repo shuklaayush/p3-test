@@ -9,6 +9,7 @@ use p3_uni_stark::{get_log_quotient_degree, PackedChallenge, StarkGenericConfig,
 use p3_util::log2_strict_usize;
 use std::{
     collections::BTreeMap,
+    convert::identity,
     fmt::{self, Display, Formatter},
 };
 use tracing::instrument;
@@ -220,7 +221,7 @@ impl Machine {
 
         let preimage_len = preimage_bytes.len();
 
-        let mut padded_preimage = preimage_bytes;
+        let mut padded_preimage = preimage_bytes.clone();
         let padding_len = KECCAK_RATE_BYTES - (preimage_len % KECCAK_RATE_BYTES);
         padded_preimage.resize(preimage_len + padding_len, 0);
         padded_preimage[preimage_len] = 1;
@@ -255,8 +256,16 @@ impl Machine {
             inputs: keccak_inputs,
         };
 
+        let mut range_counts = BTreeMap::new();
+        for byte in preimage_bytes {
+            range_counts
+                .entry(byte as u32)
+                .and_modify(|c| *c += 1)
+                .or_insert(1);
+        }
+
         let range_chip = RangeCheckerChip {
-            count: BTreeMap::new(),
+            count: range_counts,
         };
 
         Self {
@@ -284,27 +293,43 @@ impl Machine {
         let pcs = config.pcs();
 
         // 1. Generate and commit to preprocessed traces
-        // let preprocessed_traces: Vec<RowMajorMatrix<Val<SC>>> =
-        //     tracing::info_span!("generate preprocessed traces").in_scope(|| {
-        //         self.chips()
-        //             .par_iter()
-        //             .flat_map(|chip| chip.preprocessed_trace())
-        //             .collect_vec()
-        //     });
-        // let preprocessed_degrees = preprocessed_traces
-        //     .iter()
-        //     .map(|trace| trace.height())
-        //     .collect_vec();
-        // let preprocessed_domains = preprocessed_degrees
-        //     .iter()
-        //     .map(|&degree| pcs.natural_domain_for_degree(degree));
-        // let (preprocessed_commit, preprocessed_data) =
-        //     tracing::info_span!("commit to preprocessed traces").in_scope(|| {
-        //         pcs.commit(
-        //             std::iter::zip(preprocessed_domains, preprocessed_traces).collect_vec(),
-        //         )
-        //     });
-        // challenger.observe(preprocessed_commit.clone());
+        // TODO: Move to ProvingKey
+        let maybe_preprocessed_traces = tracing::info_span!("generate preprocessed traces")
+            .in_scope(|| {
+                self.chips()
+                    .par_iter()
+                    .map(|chip| chip.preprocessed_trace())
+                    .collect_vec()
+            });
+        let (preprocessed_indices, preprocessed_traces) = maybe_preprocessed_traces
+            .clone()
+            .into_iter()
+            .fold((vec![], vec![]), |(mut indices, mut traces), trace| {
+                if let Some(trace) = trace {
+                    indices.push(Some(traces.len()));
+                    traces.push(trace);
+                } else {
+                    indices.push(None);
+                }
+                (indices, traces)
+            });
+
+        let preprocessed_degrees = preprocessed_traces
+            .iter()
+            .map(|trace| trace.height())
+            .collect_vec();
+        let preprocessed_domains = preprocessed_degrees
+            .iter()
+            .map(|&degree| pcs.natural_domain_for_degree(degree))
+            .collect_vec();
+        let (preprocessed_commit, preprocessed_data) =
+            tracing::info_span!("commit to preprocessed traces").in_scope(|| {
+                pcs.commit(
+                    std::iter::zip(preprocessed_domains.clone(), preprocessed_traces.clone())
+                        .collect_vec(),
+                )
+            });
+        challenger.observe(preprocessed_commit.clone());
 
         // 2. Generate and commit to main trace
         let main_traces = tracing::info_span!("generate main traces").in_scope(|| {
@@ -383,7 +408,7 @@ impl Machine {
         #[cfg(feature = "debug-trace")]
         let _ = self.write_traces_to_file::<SC>(
             "trace.xlsx",
-            self.chips().iter().map(|_| None).collect_vec().as_slice(),
+            maybe_preprocessed_traces.as_slice(),
             main_traces.as_slice(),
             perm_traces.as_slice(),
         );
@@ -422,8 +447,12 @@ impl Machine {
             .zip(self.chips().par_iter())
             .enumerate()
             .map(|(i, (quotient_domain, &chip))| {
-                // let preprocessed_trace_on_quotient_domains =
-                //     pcs.get_evaluations_on_domain(&preprocessed_data, i, quotient_domain);
+                let preprocessed_trace_on_quotient_domains =
+                    if let Some(index) = preprocessed_indices[i] {
+                        pcs.get_evaluations_on_domain(&preprocessed_data, index, quotient_domain)
+                    } else {
+                        RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
+                    };
                 let main_trace_on_quotient_domains =
                     pcs.get_evaluations_on_domain(&main_data, i, quotient_domain);
                 let permutation_trace_on_quotient_domains =
@@ -433,7 +462,7 @@ impl Machine {
                     cumulative_sums[i],
                     main_domains[i],
                     quotient_domain,
-                    // preprocessed_trace_on_quotient_domains,
+                    preprocessed_trace_on_quotient_domains,
                     main_trace_on_quotient_domains,
                     permutation_trace_on_quotient_domains,
                     &packed_perm_challenges,
@@ -478,31 +507,37 @@ impl Machine {
         };
 
         let zeta: SC::Challenge = challenger.sample_ext_element();
-        let zeta_and_next = main_domains
+        let preprocessed_opening_points = preprocessed_domains
             .iter()
             .map(|domain| vec![zeta, domain.next_point(zeta).unwrap()])
+            .collect_vec();
+        let main_opening_points = main_domains
+            .iter()
+            .map(|domain| vec![zeta, domain.next_point(zeta).unwrap()])
+            .collect_vec();
+        // open every chunk at zeta
+        let quotient_opening_points = quotient_degrees
+            .iter()
+            .flat_map(|&quotient_degree| (0..quotient_degree).map(|_| vec![zeta]).collect_vec())
             .collect_vec();
 
         let (opening_values, opening_proof) = pcs.open(
             vec![
-                (&main_data, zeta_and_next.clone()),
-                (&perm_data, zeta_and_next),
-                (
-                    &quotient_data,
-                    // open every chunk at zeta
-                    quotient_degrees
-                        .iter()
-                        .flat_map(|&quotient_degree| {
-                            (0..quotient_degree).map(|_| vec![zeta]).collect_vec()
-                        })
-                        .collect_vec(),
-                ),
+                (&preprocessed_data, preprocessed_opening_points),
+                (&main_data, main_opening_points.clone()),
+                (&perm_data, main_opening_points),
+                (&quotient_data, quotient_opening_points),
             ],
             challenger,
         );
-        let [main_openings, perm_openings, quotient_openings] = opening_values
-            .try_into()
-            .expect("Should have 3 rounds of openings");
+        let [preprocessed_openings, main_openings, perm_openings, quotient_openings] =
+            opening_values
+                .try_into()
+                .expect("Should have 3 rounds of openings");
+        let preprocessed_openings = preprocessed_indices
+            .iter()
+            .map(|index| index.map(|index| preprocessed_openings[index].clone()))
+            .collect_vec();
         // Unflatten quotient openings
         let quotient_openings = quotient_degrees
             .iter()
@@ -516,38 +551,46 @@ impl Machine {
 
         let chip_proofs = izip!(
             log_degrees,
+            preprocessed_openings,
             main_openings,
             perm_openings,
             quotient_openings,
             perm_traces
         )
-        .map(|(log_degree, main, perm, quotient, perm_trace)| {
-            let [preprocessed_local, preprocessed_next] = [vec![], vec![]];
-            let [main_local, main_next] = main.try_into().expect("Should have 2 openings");
-            let [perm_local, perm_next] = perm.try_into().expect("Should have 2 openings");
-            let quotient_chunks = quotient
-                .into_iter()
-                .map(|mut chunk| chunk.remove(0))
-                .collect_vec();
-            let opened_values = OpenedValues {
-                preprocessed_local,
-                preprocessed_next,
-                trace_local: main_local,
-                trace_next: main_next,
-                permutation_local: perm_local,
-                permutation_next: perm_next,
-                quotient_chunks,
-            };
-            let cumulative_sum = *perm_trace
-                .row_slice(perm_trace.height() - 1)
-                .last()
-                .unwrap();
-            ChipProof {
-                degree_bits: log_degree,
-                opened_values,
-                cumulative_sum,
-            }
-        })
+        .map(
+            |(log_degree, preprocessed, main, perm, quotient, perm_trace)| {
+                let [preprocessed_local, preprocessed_next] =
+                    if let Some(preprocessed) = preprocessed {
+                        preprocessed.try_into().expect("Should have 2 openings")
+                    } else {
+                        [vec![], vec![]]
+                    };
+                let [main_local, main_next] = main.try_into().expect("Should have 2 openings");
+                let [perm_local, perm_next] = perm.try_into().expect("Should have 2 openings");
+                let quotient_chunks = quotient
+                    .into_iter()
+                    .map(|mut chunk| chunk.remove(0))
+                    .collect_vec();
+                let opened_values = OpenedValues {
+                    preprocessed_local,
+                    preprocessed_next,
+                    trace_local: main_local,
+                    trace_next: main_next,
+                    permutation_local: perm_local,
+                    permutation_next: perm_next,
+                    quotient_chunks,
+                };
+                let cumulative_sum = *perm_trace
+                    .row_slice(perm_trace.height() - 1)
+                    .last()
+                    .unwrap();
+                ChipProof {
+                    degree_bits: log_degree,
+                    opened_values,
+                    cumulative_sum,
+                }
+            },
+        )
         .collect_vec();
 
         MachineProof {
@@ -618,6 +661,7 @@ impl Machine {
             .map(|chip| <ChipType as BaseAir<Val<SC>>>::width(chip))
             .collect_vec();
 
+        // TODO: Add preprocessed and permutation size check
         let valid_shape =
             chip_proofs
                 .iter()
@@ -635,28 +679,40 @@ impl Machine {
             return Err(VerificationError::InvalidProofShape);
         }
 
-        // let preprocessed_traces: Vec<RowMajorMatrix<Val<SC>>> =
-        //     tracing::info_span!("generate preprocessed traces").in_scope(|| {
-        //         self.chips()
-        //             .par_iter()
-        //             .flat_map(|chip| chip.preprocessed_trace())
-        //             .collect_vec()
-        //     });
-        // let preprocessed_degrees = preprocessed_traces
-        //     .iter()
-        //     .map(|trace| trace.height())
-        //     .collect_vec();
-        // let preprocessed_domains = preprocessed_degrees
-        //     .iter()
-        //     .map(|&degree| pcs.natural_domain_for_degree(degree))
-        //     .collect_vec();
-        // let (preprocessed_commit, preprocessed_data) =
-        //     tracing::info_span!("commit to preprocessed traces").in_scope(|| {
-        //         pcs.commit(
-        //             std::iter::zip(preprocessed_domains, preprocessed_traces).collect_vec(),
-        //         )
-        //     });
-        // challenger.observe(preprocessed_commit.clone());
+        let maybe_preprocessed_traces = tracing::info_span!("generate preprocessed traces")
+            .in_scope(|| {
+                self.chips()
+                    .par_iter()
+                    .map(|chip| chip.preprocessed_trace())
+                    .collect_vec()
+            });
+        let (preprocessed_indices, preprocessed_traces) = maybe_preprocessed_traces
+            .into_iter()
+            .fold((vec![], vec![]), |(mut indices, mut traces), trace| {
+                if let Some(trace) = trace {
+                    indices.push(Some(traces.len()));
+                    traces.push(trace);
+                } else {
+                    indices.push(None);
+                }
+                (indices, traces)
+            });
+        let preprocessed_degrees = preprocessed_traces
+            .iter()
+            .map(|trace| trace.height())
+            .collect_vec();
+        let preprocessed_domains = preprocessed_degrees
+            .iter()
+            .map(|&degree| pcs.natural_domain_for_degree(degree))
+            .collect_vec();
+        let (preprocessed_commit, _preprocessed_data) =
+            tracing::info_span!("commit to preprocessed traces").in_scope(|| {
+                pcs.commit(
+                    std::iter::zip(preprocessed_domains.clone(), preprocessed_traces.clone())
+                        .collect_vec(),
+                )
+            });
+        challenger.observe(preprocessed_commit.clone());
 
         challenger.observe(commitments.main_trace.clone());
         let mut perm_challenges = Vec::new();
@@ -668,61 +724,85 @@ impl Machine {
         challenger.observe(commitments.quotient_chunks.clone());
 
         let zeta: SC::Challenge = challenger.sample_ext_element();
-        let zeta_nexts = main_domains
+        let preprocessed_domains_and_openings = preprocessed_domains
             .iter()
-            .map(|domain| domain.next_point(zeta).unwrap())
+            .zip(
+                chip_proofs
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, chip_proof)| {
+                        if preprocessed_indices[i].is_some() {
+                            Some(chip_proof)
+                        } else {
+                            None
+                        }
+                    }),
+            )
+            .map(|(&domain, proof)| {
+                (
+                    domain,
+                    vec![
+                        (zeta, proof.opened_values.preprocessed_local.clone()),
+                        (
+                            domain.next_point(zeta).unwrap(),
+                            proof.opened_values.preprocessed_next.clone(),
+                        ),
+                    ],
+                )
+            })
+            .collect_vec();
+        let main_domains_and_openings = main_domains
+            .iter()
+            .zip(chip_proofs.iter())
+            .map(|(&domain, proof)| {
+                (
+                    domain,
+                    vec![
+                        (zeta, proof.opened_values.trace_local.clone()),
+                        (
+                            domain.next_point(zeta).unwrap(),
+                            proof.opened_values.trace_next.clone(),
+                        ),
+                    ],
+                )
+            })
+            .collect_vec();
+
+        let perm_domains_and_openings = main_domains
+            .iter()
+            .zip(chip_proofs.iter())
+            .map(|(&domain, proof)| {
+                (
+                    domain,
+                    vec![
+                        (zeta, proof.opened_values.permutation_local.clone()),
+                        (
+                            domain.next_point(zeta).unwrap(),
+                            proof.opened_values.permutation_next.clone(),
+                        ),
+                    ],
+                )
+            })
+            .collect_vec();
+        let quotient_chunks_domains_and_openings = quotient_chunks_domains
+            .iter()
+            .flatten()
+            .zip(
+                chip_proofs
+                    .iter()
+                    .flat_map(|proof| &proof.opened_values.quotient_chunks),
+            )
+            .map(|(&domain, opened_values)| (domain, vec![(zeta, opened_values.clone())]))
             .collect_vec();
 
         pcs.verify(
             vec![
-                (
-                    commitments.main_trace.clone(),
-                    main_domains
-                        .iter()
-                        .zip(chip_proofs.iter())
-                        .zip(zeta_nexts.iter())
-                        .map(|((&domain, proof), &zeta_next)| {
-                            (
-                                domain,
-                                vec![
-                                    (zeta, proof.opened_values.trace_local.clone()),
-                                    (zeta_next, proof.opened_values.trace_next.clone()),
-                                ],
-                            )
-                        })
-                        .collect_vec(),
-                ),
-                (
-                    commitments.perm_trace.clone(),
-                    main_domains
-                        .iter()
-                        .zip(chip_proofs.iter())
-                        .zip(zeta_nexts.iter())
-                        .map(|((&domain, proof), &zeta_next)| {
-                            (
-                                domain,
-                                vec![
-                                    (zeta, proof.opened_values.permutation_local.clone()),
-                                    (zeta_next, proof.opened_values.permutation_next.clone()),
-                                ],
-                            )
-                        })
-                        .collect_vec(),
-                ),
+                (preprocessed_commit, preprocessed_domains_and_openings),
+                (commitments.main_trace.clone(), main_domains_and_openings),
+                (commitments.perm_trace.clone(), perm_domains_and_openings),
                 (
                     commitments.quotient_chunks.clone(),
-                    quotient_chunks_domains
-                        .iter()
-                        .flatten()
-                        .zip(
-                            chip_proofs
-                                .iter()
-                                .flat_map(|proof| &proof.opened_values.quotient_chunks),
-                        )
-                        .map(|(&domain, opened_values)| {
-                            (domain, vec![(zeta, opened_values.clone())])
-                        })
-                        .collect_vec(),
+                    quotient_chunks_domains_and_openings,
                 ),
             ],
             opening_proof,
@@ -764,7 +844,7 @@ impl Machine {
     fn write_traces_to_file<SC: StarkGenericConfig>(
         &self,
         path: &str,
-        preprocessed_traces: &[Option<&RowMajorMatrix<Val<SC>>>],
+        preprocessed_traces: &[Option<RowMajorMatrix<Val<SC>>>],
         main_traces: &[RowMajorMatrix<Val<SC>>],
         perm_traces: &[RowMajorMatrix<SC::Challenge>],
     ) -> Result<(), Box<dyn Error>>
@@ -779,7 +859,7 @@ impl Machine {
         {
             let worksheet = workbook.add_worksheet();
             worksheet.set_name(format!("{}", chip))?;
-            chip.write_traces_to_worksheet(worksheet, *preprocessed_trace, main_trace, perm_trace)?;
+            chip.write_traces_to_worksheet(worksheet, preprocessed_trace, main_trace, perm_trace)?;
         }
 
         workbook.save(path)?;
@@ -880,7 +960,7 @@ mod tests {
         let digests = generate_digests(&leaf_hashes);
 
         let leaf_index = thread_rng().gen_range(0..leaf_hashes.len());
-        let machine = Machine::new(vec![], digests, leaf_index);
+        let machine = Machine::new(vec![0], digests, leaf_index);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
         let proof = machine.prove(&config, &mut challenger);
