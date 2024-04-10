@@ -51,13 +51,13 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
             argument_index: MachineBus::KeccakPermuteInput as usize,
         }]
         .into_iter()
-        // .chain((0..KECCAK_RATE_BYTES).map(|i| Interaction {
-        //     fields: vec![VirtualPairCol::single_main(
-        //         KECCAK_SPONGE_COL_MAP.block_bytes[i],
-        //     )],
-        //     count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
-        //     argument_index: MachineBus::Range8 as usize,
-        // }))
+        .chain((0..KECCAK_RATE_BYTES).map(|i| Interaction {
+            fields: vec![VirtualPairCol::single_main(
+                KECCAK_SPONGE_COL_MAP.block_bytes[i],
+            )],
+            count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
+            argument_index: MachineBus::Range8 as usize,
+        }))
         .collect_vec()
     }
 

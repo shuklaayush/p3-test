@@ -27,15 +27,15 @@ impl<F: PrimeField64, const MAX: u32> Chip<F> for RangeCheckerChip<MAX> {
         RowMajorMatrix::new(rows.concat(), NUM_RANGE_COLS)
     }
 
-    // fn receives(&self) -> Vec<Interaction<F>> {
-    //     vec![Interaction {
-    //         fields: vec![VirtualPairCol::single_preprocessed(
-    //             RANGE_PREPROCESSED_COL_MAP.counter,
-    //         )],
-    //         count: VirtualPairCol::single_main(RANGE_COL_MAP.mult),
-    //         argument_index: MachineBus::Range8 as usize,
-    //     }]
-    // }
+    fn receives(&self) -> Vec<Interaction<F>> {
+        vec![Interaction {
+            fields: vec![VirtualPairCol::single_preprocessed(
+                RANGE_PREPROCESSED_COL_MAP.counter,
+            )],
+            count: VirtualPairCol::single_main(RANGE_COL_MAP.mult),
+            argument_index: MachineBus::Range8 as usize,
+        }]
+    }
 
     #[cfg(feature = "debug-trace")]
     fn main_headers(&self) -> Vec<String> {
