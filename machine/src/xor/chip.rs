@@ -56,31 +56,31 @@ impl<F: PrimeField64> Chip<F> for XorChip {
         }]
     }
 
-    // fn receives(&self) -> Vec<Interaction<F>> {
-    //     let vc1 = {
-    //         let column_weights = XOR_COL_MAP
-    //             .input1
-    //             .into_iter()
-    //             .enumerate()
-    //             .map(|(i, c)| (c, F::from_canonical_usize(1 << (8 * i))))
-    //             .collect_vec();
-    //         VirtualPairCol::new_main(column_weights, F::zero())
-    //     };
-    //     let vc2 = {
-    //         let column_weights = XOR_COL_MAP
-    //             .input2
-    //             .into_iter()
-    //             .enumerate()
-    //             .map(|(i, c)| (c, F::from_canonical_usize(1 << (8 * i))))
-    //             .collect_vec();
-    //         VirtualPairCol::new_main(column_weights, F::zero())
-    //     };
-    //     vec![Interaction {
-    //         fields: vec![vc1, vc2],
-    //         count: VirtualPairCol::single_main(XOR_COL_MAP.is_real),
-    //         argument_index: MachineBus::XorInput as usize,
-    //     }]
-    // }
+    fn receives(&self) -> Vec<Interaction<F>> {
+        let vc1 = {
+            let column_weights = XOR_COL_MAP
+                .input1
+                .into_iter()
+                .enumerate()
+                .map(|(i, c)| (c, F::from_canonical_usize(1 << (8 * i))))
+                .collect_vec();
+            VirtualPairCol::new_main(column_weights, F::zero())
+        };
+        let vc2 = {
+            let column_weights = XOR_COL_MAP
+                .input2
+                .into_iter()
+                .enumerate()
+                .map(|(i, c)| (c, F::from_canonical_usize(1 << (8 * i))))
+                .collect_vec();
+            VirtualPairCol::new_main(column_weights, F::zero())
+        };
+        vec![Interaction {
+            fields: vec![vc1, vc2],
+            count: VirtualPairCol::single_main(XOR_COL_MAP.is_real),
+            argument_index: MachineBus::XorInput as usize,
+        }]
+    }
 
     #[cfg(feature = "debug-trace")]
     fn main_headers(&self) -> Vec<String> {

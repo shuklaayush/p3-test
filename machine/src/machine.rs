@@ -190,6 +190,7 @@ pub enum MachineBus {
 
 impl Machine {
     // TODO: Proper execution function for the machine that minimizes redundant computation
+    //       Store logs/events during execution first and then generate the traces
     pub fn new(preimage_bytes: Vec<u8>, digests: Vec<Vec<[u8; 32]>>, leaf_index: usize) -> Self {
         let leaf = digests[0][leaf_index];
 
@@ -253,7 +254,7 @@ impl Machine {
                         .chunks(4)
                         .zip(b.chunks(4))
                         .for_each(|(s, b)| {
-                            xor_inputs.push((s.try_into().unwrap(), b.try_into().unwrap()));
+                            xor_inputs.push((b.try_into().unwrap(), s.try_into().unwrap()));
                         });
                     state[..KECCAK_RATE_BYTES]
                         .iter_mut()

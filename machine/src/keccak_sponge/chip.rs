@@ -41,35 +41,33 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
-        // KECCAK_SPONGE_COL_MAP
-        //     .block_bytes
-        //     .chunks(4)
-        //     .zip(KECCAK_SPONGE_COL_MAP.original_rate_u16s.chunks(2))
-        //     .map(|(block, rate)| {
-        //         let vc1 = {
-        //             let column_weights = block
-        //                 .iter()
-        //                 .enumerate()
-        //                 .map(|(i, &c)| (c, F::from_canonical_usize(1 << (8 * i))))
-        //                 .collect_vec();
-        //             VirtualPairCol::new_main(column_weights, F::zero())
-        //         };
-        //         let vc2 = {
-        //             let column_weights = rate
-        //                 .iter()
-        //                 .enumerate()
-        //                 .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
-        //                 .collect_vec();
-        //             VirtualPairCol::new_main(column_weights, F::zero())
-        //         };
-        //         Interaction {
-        //             fields: vec![vc1, vc2],
-        //             count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
-        //             argument_index: MachineBus::XorInput as usize,
-        //         }
-        //     })
-        Vec::new()
-            .into_iter()
+        KECCAK_SPONGE_COL_MAP
+            .block_bytes
+            .chunks(4)
+            .zip(KECCAK_SPONGE_COL_MAP.original_rate_u16s.chunks(2))
+            .map(|(block, rate)| {
+                let vc1 = {
+                    let column_weights = block
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &c)| (c, F::from_canonical_usize(1 << (8 * i))))
+                        .collect_vec();
+                    VirtualPairCol::new_main(column_weights, F::zero())
+                };
+                let vc2 = {
+                    let column_weights = rate
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
+                        .collect_vec();
+                    VirtualPairCol::new_main(column_weights, F::zero())
+                };
+                Interaction {
+                    fields: vec![vc1, vc2],
+                    count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
+                    argument_index: MachineBus::XorInput as usize,
+                }
+            })
             .chain(once(Interaction {
                 fields: KECCAK_SPONGE_COL_MAP
                     .xored_rate_u16s
