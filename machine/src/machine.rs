@@ -257,7 +257,8 @@ impl Machine {
         };
 
         let mut range_counts = BTreeMap::new();
-        for byte in preimage_bytes {
+        // TODO: This is wrong, should be just the preimage
+        for byte in padded_preimage {
             range_counts
                 .entry(byte as u32)
                 .and_modify(|c| *c += 1)
