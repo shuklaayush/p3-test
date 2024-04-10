@@ -64,6 +64,7 @@ pub trait Chip<F: Field> {
         let sends: Vec<Interaction<F>> = self.sends();
         let receives: Vec<Interaction<F>> = self.receives();
 
+        // TODO: Change name to bus name
         let h1 = sends
             .iter()
             .enumerate()

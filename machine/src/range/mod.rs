@@ -1,3 +1,7 @@
+mod air;
+mod chip;
+mod columns;
+
 extern crate alloc;
 
 use alloc::collections::BTreeMap;
@@ -5,10 +9,6 @@ use p3_field::PrimeField64;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
 use crate::chip::MachineChip;
-
-pub mod air;
-pub mod chip;
-pub mod columns;
 
 #[derive(Default)]
 pub struct RangeCheckerChip<const MAX: u32> {

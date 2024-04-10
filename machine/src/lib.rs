@@ -1,6 +1,5 @@
 mod check_constraints;
 mod chip;
-mod cpu;
 mod debug_builder;
 mod error;
 mod folder;
@@ -15,3 +14,4 @@ mod quotient;
 mod range;
 mod util;
 mod verify;
+mod xor;

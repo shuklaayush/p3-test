@@ -9,7 +9,6 @@ use p3_uni_stark::{get_log_quotient_degree, PackedChallenge, StarkGenericConfig,
 use p3_util::log2_strict_usize;
 use std::{
     collections::BTreeMap,
-    convert::identity,
     fmt::{self, Display, Formatter},
 };
 use tracing::instrument;
@@ -30,6 +29,7 @@ use crate::{
     quotient::quotient_values,
     range::RangeCheckerChip,
     verify::verify_constraints,
+    xor::XorChip,
 };
 
 pub enum ChipType {
@@ -37,6 +37,7 @@ pub enum ChipType {
     KeccakSponge(KeccakSpongeChip),
     MerkleTree(MerkleTreeChip),
     Range8(RangeCheckerChip<256>),
+    Xor(XorChip),
 }
 
 impl Display for ChipType {
@@ -46,6 +47,7 @@ impl Display for ChipType {
             ChipType::KeccakSponge(_) => write!(f, "KeccakSponge"),
             ChipType::MerkleTree(_) => write!(f, "MerkleTree"),
             ChipType::Range8(_) => write!(f, "Range8"),
+            ChipType::Xor(_) => write!(f, "Xor"),
         }
     }
 }
@@ -58,6 +60,7 @@ impl<F: Field> BaseAir<F> for ChipType {
             ChipType::KeccakSponge(chip) => <KeccakSpongeChip as BaseAir<F>>::width(chip),
             ChipType::MerkleTree(chip) => <MerkleTreeChip as BaseAir<F>>::width(chip),
             ChipType::Range8(chip) => <RangeCheckerChip<256> as BaseAir<F>>::width(chip),
+            ChipType::Xor(chip) => <XorChip as BaseAir<F>>::width(chip),
         }
     }
 
@@ -67,6 +70,7 @@ impl<F: Field> BaseAir<F> for ChipType {
             ChipType::KeccakSponge(chip) => chip.preprocessed_trace(),
             ChipType::MerkleTree(chip) => chip.preprocessed_trace(),
             ChipType::Range8(chip) => chip.preprocessed_trace(),
+            ChipType::Xor(chip) => chip.preprocessed_trace(),
         }
     }
 }
@@ -78,6 +82,7 @@ impl<AB: AirBuilder> Air<AB> for ChipType {
             ChipType::KeccakSponge(chip) => chip.eval(builder),
             ChipType::MerkleTree(chip) => chip.eval(builder),
             ChipType::Range8(chip) => chip.eval(builder),
+            ChipType::Xor(chip) => chip.eval(builder),
         }
     }
 }
@@ -89,6 +94,7 @@ impl<F: PrimeField64> Chip<F> for ChipType {
             ChipType::KeccakSponge(chip) => chip.generate_trace(),
             ChipType::MerkleTree(chip) => chip.generate_trace(),
             ChipType::Range8(chip) => chip.generate_trace(),
+            ChipType::Xor(chip) => chip.generate_trace(),
         }
     }
 
@@ -98,6 +104,7 @@ impl<F: PrimeField64> Chip<F> for ChipType {
             ChipType::KeccakSponge(chip) => chip.sends(),
             ChipType::MerkleTree(chip) => chip.sends(),
             ChipType::Range8(chip) => chip.sends(),
+            ChipType::Xor(chip) => chip.sends(),
         }
     }
 
@@ -107,6 +114,7 @@ impl<F: PrimeField64> Chip<F> for ChipType {
             ChipType::KeccakSponge(chip) => chip.receives(),
             ChipType::MerkleTree(chip) => chip.receives(),
             ChipType::Range8(chip) => chip.receives(),
+            ChipType::Xor(chip) => chip.receives(),
         }
     }
 
@@ -116,6 +124,7 @@ impl<F: PrimeField64> Chip<F> for ChipType {
             ChipType::KeccakSponge(chip) => chip.all_interactions(),
             ChipType::MerkleTree(chip) => chip.all_interactions(),
             ChipType::Range8(chip) => chip.all_interactions(),
+            ChipType::Xor(chip) => chip.all_interactions(),
         }
     }
 
@@ -126,6 +135,7 @@ impl<F: PrimeField64> Chip<F> for ChipType {
             ChipType::KeccakSponge(chip) => <KeccakSpongeChip as Chip<F>>::main_headers(chip),
             ChipType::MerkleTree(chip) => <MerkleTreeChip as Chip<F>>::main_headers(chip),
             ChipType::Range8(chip) => <RangeCheckerChip<256> as Chip<F>>::main_headers(chip),
+            ChipType::Xor(chip) => <XorChip as Chip<F>>::main_headers(chip),
         }
     }
 }
@@ -144,6 +154,7 @@ where
             }
             ChipType::MerkleTree(chip) => <MerkleTreeChip as MachineChip<SC>>::trace_width(chip),
             ChipType::Range8(chip) => <RangeCheckerChip<256> as MachineChip<SC>>::trace_width(chip),
+            ChipType::Xor(chip) => <XorChip as MachineChip<SC>>::trace_width(chip),
         }
     }
 }
@@ -153,6 +164,7 @@ pub struct Machine {
     keccak_sponge_chip: ChipType,
     merkle_tree_chip: ChipType,
     range_chip: ChipType,
+    xor_chip: ChipType,
 }
 
 impl Machine {
@@ -162,6 +174,7 @@ impl Machine {
             &self.keccak_sponge_chip,
             &self.merkle_tree_chip,
             &self.range_chip,
+            &self.xor_chip,
         ]
     }
 }
@@ -171,6 +184,8 @@ pub enum MachineBus {
     KeccakPermuteOutput = 1,
     KeccakPermuteDigest = 2,
     Range8 = 3,
+    XorInput = 4,
+    XorOutput = 5,
 }
 
 impl Machine {
@@ -227,11 +242,19 @@ impl Machine {
         padded_preimage[preimage_len] = 1;
         *padded_preimage.last_mut().unwrap() |= 0b10000000;
 
+        let mut xor_inputs = Vec::new();
+
         let mut state = [0u8; 200];
         keccak_inputs.push(
             padded_preimage
                 .chunks(KECCAK_RATE_BYTES)
                 .flat_map(|b| {
+                    state[..KECCAK_RATE_BYTES]
+                        .chunks(4)
+                        .zip(b.chunks(4))
+                        .for_each(|(s, b)| {
+                            xor_inputs.push((s.try_into().unwrap(), b.try_into().unwrap()));
+                        });
                     state[..KECCAK_RATE_BYTES]
                         .iter_mut()
                         .zip(b.iter())
@@ -269,11 +292,16 @@ impl Machine {
             count: range_counts,
         };
 
+        let xor_chip = XorChip {
+            operations: xor_inputs,
+        };
+
         Self {
             keccak_permute_chip: ChipType::KeccakPermute(keccak_permute_chip),
             keccak_sponge_chip: ChipType::KeccakSponge(keccak_sponge_chip),
             merkle_tree_chip: ChipType::MerkleTree(merkle_tree_chip),
             range_chip: ChipType::Range8(range_chip),
+            xor_chip: ChipType::Xor(xor_chip),
         }
     }
 
