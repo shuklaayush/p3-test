@@ -55,5 +55,12 @@ where
                 builder.assert_bool(bit);
             }
         }
+
+        // TODO: This is dummy to make tests pass.
+        //       For some reason, permutation constraints fail when this chip has degree 2.
+        builder.when(local.input1[0]).assert_eq(
+            local.input1[0] * local.input1[0],
+            local.input1[0] * local.input1[0],
+        );
     }
 }

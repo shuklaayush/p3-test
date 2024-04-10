@@ -113,24 +113,22 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                 .map(|c| VirtualPairCol::single_main(c)),
         );
 
-        // KECCAK_SPONGE_COL_MAP
-        //     .xored_rate_u16s
-        //     .chunks(2)
-        //     .into_iter()
-        //     .map(|rate| {
-        //         let column_weights = rate
-        //             .iter()
-        //             .enumerate()
-        //             .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
-        //             .collect_vec();
-        //         Interaction {
-        //             fields: vec![VirtualPairCol::new_main(column_weights, F::zero())],
-        //             count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
-        //             argument_index: MachineBus::XorOutput as usize,
-        //         }
-        //     })
-        Vec::new()
+        KECCAK_SPONGE_COL_MAP
+            .xored_rate_u16s
+            .chunks(2)
             .into_iter()
+            .map(|rate| {
+                let column_weights = rate
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
+                    .collect_vec();
+                Interaction {
+                    fields: vec![VirtualPairCol::new_main(column_weights, F::zero())],
+                    count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
+                    argument_index: MachineBus::XorOutput as usize,
+                }
+            })
             .chain(once(Interaction {
                 fields,
                 count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),

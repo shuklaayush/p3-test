@@ -42,19 +42,19 @@ impl<F: PrimeField64> Chip<F> for XorChip {
         trace
     }
 
-    // fn sends(&self) -> Vec<Interaction<F>> {
-    //     let column_weights = XOR_COL_MAP
-    //         .output
-    //         .into_iter()
-    //         .enumerate()
-    //         .map(|(i, c)| (c, F::from_canonical_usize(1 << (8 * i))))
-    //         .collect_vec();
-    //     vec![Interaction {
-    //         fields: vec![VirtualPairCol::new_main(column_weights, F::zero())],
-    //         count: VirtualPairCol::single_main(XOR_COL_MAP.is_real),
-    //         argument_index: MachineBus::XorOutput as usize,
-    //     }]
-    // }
+    fn sends(&self) -> Vec<Interaction<F>> {
+        let column_weights = XOR_COL_MAP
+            .output
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| (c, F::from_canonical_usize(1 << (8 * i))))
+            .collect_vec();
+        vec![Interaction {
+            fields: vec![VirtualPairCol::new_main(column_weights, F::zero())],
+            count: VirtualPairCol::single_main(XOR_COL_MAP.is_real),
+            argument_index: MachineBus::XorOutput as usize,
+        }]
+    }
 
     // fn receives(&self) -> Vec<Interaction<F>> {
     //     let vc1 = {
