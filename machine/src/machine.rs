@@ -246,35 +246,33 @@ impl Machine {
         let mut xor_inputs = Vec::new();
 
         let mut state = [0u8; 200];
-        keccak_inputs.push(
-            padded_preimage
-                .chunks(KECCAK_RATE_BYTES)
-                .flat_map(|b| {
-                    state[..KECCAK_RATE_BYTES]
-                        .chunks(4)
-                        .zip(b.chunks(4))
-                        .for_each(|(s, b)| {
-                            xor_inputs.push((b.try_into().unwrap(), s.try_into().unwrap()));
-                        });
-                    state[..KECCAK_RATE_BYTES]
-                        .iter_mut()
-                        .zip(b.iter())
-                        .for_each(|(s, b)| {
-                            *s ^= *b;
-                        });
-                    let input = state
-                        .chunks_exact(8)
-                        .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
-                        .collect_vec();
+        let keccak_inputs_full = padded_preimage
+            .chunks(KECCAK_RATE_BYTES)
+            .map(|b| {
+                state[..KECCAK_RATE_BYTES]
+                    .chunks(4)
+                    .zip(b.chunks(4))
+                    .for_each(|(s, b)| {
+                        xor_inputs.push((b.try_into().unwrap(), s.try_into().unwrap()));
+                    });
+                state[..KECCAK_RATE_BYTES]
+                    .iter_mut()
+                    .zip(b.iter())
+                    .for_each(|(s, b)| {
+                        *s ^= *b;
+                    });
+                let input: [u64; 25] = state
+                    .chunks_exact(8)
+                    .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+                    .collect_vec()
+                    .try_into()
+                    .unwrap();
 
-                    keccakf_u8s(&mut state);
-                    input
-                })
-                .collect_vec()
-                .try_into()
-                .map(|input| (input, false))
-                .unwrap(),
-        );
+                keccakf_u8s(&mut state);
+                input
+            })
+            .collect_vec();
+        keccak_inputs.extend(keccak_inputs_full.into_iter().map(|input| (input, false)));
 
         let keccak_permute_chip = KeccakPermuteChip {
             inputs: keccak_inputs,
@@ -980,17 +978,21 @@ mod tests {
             mmcs: challenge_mmcs,
         };
         type Pcs = TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
-        let pcs = Pcs::new(log2_ceil_usize(256), dft, val_mmcs, fri_config);
+        const MAX_TABLE_HEIGHT: usize = 1024;
+        let pcs = Pcs::new(log2_ceil_usize(MAX_TABLE_HEIGHT), dft, val_mmcs, fri_config);
 
         type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
         let config = MyConfig::new(pcs);
 
-        const HEIGHT: usize = 3;
+        const NUM_BYTES: usize = 1000;
+        let preimage = (0..NUM_BYTES).map(|_| random()).collect_vec();
+
+        const HEIGHT: usize = 8;
         let leaf_hashes = (0..2u64.pow(HEIGHT as u32)).map(|_| random()).collect_vec();
         let digests = generate_digests(&leaf_hashes);
 
         let leaf_index = thread_rng().gen_range(0..leaf_hashes.len());
-        let machine = Machine::new(vec![0], digests, leaf_index);
+        let machine = Machine::new(preimage, digests, leaf_index);
 
         let mut challenger = Challenger::from_hasher(vec![], byte_hash);
         let proof = machine.prove(&config, &mut challenger);

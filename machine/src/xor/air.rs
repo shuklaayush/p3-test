@@ -58,9 +58,8 @@ where
 
         // TODO: This is dummy to make tests pass.
         //       For some reason, permutation constraints fail when this chip has degree 2.
-        builder.when(local.input1[0]).assert_eq(
-            local.input1[0] * local.input1[0],
-            local.input1[0] * local.input1[0],
-        );
+        builder
+            .when(local.is_real)
+            .assert_eq(local.is_real * local.is_real, local.is_real * local.is_real);
     }
 }

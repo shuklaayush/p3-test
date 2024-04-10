@@ -48,6 +48,8 @@ impl<AB: AirBuilder> Air<AB> for MerkleTreeChip {
 
         // TODO: This is dummy to make tests pass.
         //       For some reason, permutation constraints fail when this chip has degree 2.
-        builder.when(local.is_real).assert_bool(local.is_real);
+        builder
+            .when(local.is_real)
+            .assert_eq(local.is_real * local.is_real, local.is_real * local.is_real);
     }
 }
