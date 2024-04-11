@@ -37,6 +37,9 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
         let is_full_input_block = local.is_full_input_block;
         builder.assert_bool(is_full_input_block);
 
+        let is_multi_padding_block = local.is_multi_padding_block;
+        builder.assert_bool(is_multi_padding_block);
+
         let is_final_block = local
             .is_final_input_len
             .iter()
@@ -120,6 +123,38 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
                 - next.already_absorbed_bytes,
         );
 
+        // If the first padding byte is at the end of the block, then the block has a
+        // single padding byte
+        let has_single_padding_byte = local.is_final_input_len[KECCAK_RATE_BYTES - 1];
+
+        // If this is the final block, then it can either contain a single padding byte
+        // or be a row with multiple padding bytes
+        builder.assert_eq(
+            is_final_block * (AB::Expr::one() - has_single_padding_byte),
+            is_multi_padding_block,
+        );
+
+        // If the row has a single padding byte, then it must be the last byte with
+        // value 0b10000001
+        builder.when(has_single_padding_byte).assert_eq(
+            local.block_bytes[KECCAK_RATE_BYTES - 1],
+            AB::Expr::from_canonical_u8(0b10000001),
+        );
+
+        // If the row has multiple padding bytes, then the first padding byte must be 1
+        for i in 0..KECCAK_RATE_BYTES - 1 {
+            builder
+                .when(is_multi_padding_block)
+                .when(local.is_final_input_len[i])
+                .assert_eq(local.block_bytes[i], AB::Expr::one());
+        }
+        // If the row has multiple padding bytes, then the last byte must be 0b10000000
+        builder.when(is_multi_padding_block).assert_eq(
+            local.block_bytes[KECCAK_RATE_BYTES - 1],
+            AB::Expr::from_canonical_u8(0b10000000),
+        );
+
+        // TODO: Add back
         // // A dummy row is always followed by another dummy row, so the prover can't put
         // // dummy rows "in between" to avoid the above checks.
         // let is_dummy = AB::Expr::one() - is_full_input_block - is_final_block;
@@ -133,8 +168,9 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
 
         // TODO: This is dummy to make tests pass.
         //       For some reason, permutation constraints fail when this chip has degree 2.
-        builder
-            .when(local.is_real)
-            .assert_eq(local.is_real * local.is_real, local.is_real * local.is_real);
+        builder.when(local.is_full_input_block).assert_eq(
+            local.is_full_input_block * local.is_full_input_block,
+            local.is_full_input_block * local.is_full_input_block,
+        );
     }
 }

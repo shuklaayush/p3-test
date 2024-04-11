@@ -14,11 +14,6 @@ pub fn generate_trace_rows<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>], in
         let input_rows = &mut rows[offset..offset + len];
         generate_rows_for_input(input_rows, input);
         offset += len;
-
-        // TODO: This is unconstrained
-        for row in input_rows.iter_mut() {
-            row.is_real = F::one();
-        }
     }
 
     // Pad the trace.
@@ -87,6 +82,7 @@ fn generate_full_input_row<F: PrimeField64>(
     sponge_state: [u16; KECCAK_WIDTH_U16S],
     block: [u8; KECCAK_RATE_BYTES],
 ) {
+    // TODO: This is unconstrained
     row.is_full_input_block = F::one();
     row.block_bytes = block.map(F::from_canonical_u8);
 
@@ -115,6 +111,7 @@ fn generate_final_row<F: PrimeField64>(
         // Both 1s are placed in the same byte.
         row.block_bytes[final_inputs.len()] = F::from_canonical_u8(0b10000001);
     } else {
+        row.is_multi_padding_block = F::one();
         row.block_bytes[final_inputs.len()] = F::one();
         row.block_bytes[KECCAK_RATE_BYTES - 1] = F::from_canonical_u8(0b10000000);
     }

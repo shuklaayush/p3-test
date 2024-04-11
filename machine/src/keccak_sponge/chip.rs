@@ -6,7 +6,7 @@ use std::iter::once;
 use tracing::instrument;
 
 use super::{
-    columns::{KeccakSpongeCols, KECCAK_RATE_BYTES, KECCAK_RATE_U16S, NUM_KECCAK_SPONGE_COLS},
+    columns::{KeccakSpongeCols, KECCAK_RATE_BYTES, NUM_KECCAK_SPONGE_COLS},
     generation::{generate_range_checks, generate_trace_rows},
     KeccakSpongeChip,
 };
@@ -41,6 +41,15 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
+        // TODO: Does it make sense to make this into a separate column to avoid runtime calcs?
+        let is_real = VirtualPairCol::sum_main(
+            KECCAK_SPONGE_COL_MAP
+                .is_final_input_len
+                .into_iter()
+                .chain(once(KECCAK_SPONGE_COL_MAP.is_full_input_block))
+                .collect_vec(),
+        );
+
         KECCAK_SPONGE_COL_MAP
             .block_bytes
             .chunks(4)
@@ -64,7 +73,7 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                 };
                 Interaction {
                     fields: vec![vc1, vc2],
-                    count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
+                    count: is_real.clone(),
                     argument_index: MachineBus::XorInput as usize,
                 }
             })
@@ -75,20 +84,37 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                     .chain(KECCAK_SPONGE_COL_MAP.original_capacity_u16s)
                     .map(VirtualPairCol::single_main)
                     .collect(),
-                count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
+                count: is_real.clone(),
                 argument_index: MachineBus::KeccakPermuteInput as usize,
             }))
-            .chain((0..KECCAK_RATE_BYTES).map(|i| Interaction {
-                fields: vec![VirtualPairCol::single_main(
-                    KECCAK_SPONGE_COL_MAP.block_bytes[i],
-                )],
-                count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
-                argument_index: MachineBus::Range8 as usize,
+            .chain((0..KECCAK_RATE_BYTES).map(|i| {
+                Interaction {
+                    fields: vec![VirtualPairCol::single_main(
+                        KECCAK_SPONGE_COL_MAP.block_bytes[i],
+                    )],
+                    count: VirtualPairCol::sum_main(
+                        KECCAK_SPONGE_COL_MAP
+                            .is_final_input_len
+                            .into_iter()
+                            .chain(once(KECCAK_SPONGE_COL_MAP.is_full_input_block))
+                            .collect_vec(),
+                    ),
+                    argument_index: MachineBus::Range8 as usize,
+                }
             }))
             .collect_vec()
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
+        // TODO: Does it make sense to make this into a separate column to avoid runtime calcs?
+        let is_real = VirtualPairCol::sum_main(
+            KECCAK_SPONGE_COL_MAP
+                .is_final_input_len
+                .into_iter()
+                .chain(once(KECCAK_SPONGE_COL_MAP.is_full_input_block))
+                .collect_vec(),
+        );
+
         // We recover the 16-bit digest limbs from their corresponding bytes,
         // and then append them to the rest of the updated state limbs.
         let mut fields = KECCAK_SPONGE_COL_MAP
@@ -114,7 +140,6 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
         KECCAK_SPONGE_COL_MAP
             .xored_rate_u16s
             .chunks(2)
-            .into_iter()
             .map(|rate| {
                 let column_weights = rate
                     .iter()
@@ -123,13 +148,13 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                     .collect_vec();
                 Interaction {
                     fields: vec![VirtualPairCol::new_main(column_weights, F::zero())],
-                    count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
+                    count: is_real.clone(),
                     argument_index: MachineBus::XorOutput as usize,
                 }
             })
             .chain(once(Interaction {
                 fields,
-                count: VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_real),
+                count: is_real.clone(),
                 argument_index: MachineBus::KeccakPermuteOutput as usize,
             }))
             .collect_vec()
