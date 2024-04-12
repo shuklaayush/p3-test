@@ -32,25 +32,24 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
         // let range_max = AB::Expr::from_canonical_u64((BYTE_RANGE_MAX - 1) as u64);
         // builder.when_last_row().assert_eq(rc1, range_max);
 
-        // Each flag (full-input block, final block or implied dummy flag) must be
+        // Each flag (full-input block, padding byte or implied dummy flag) must be
         // boolean.
         let is_full_input_block = local.is_full_input_block;
         builder.assert_bool(is_full_input_block);
 
-        let is_final_block = local
-            .is_final_input_len
-            .iter()
-            .copied()
-            .fold(AB::Expr::zero(), |acc, is_final_len| acc + is_final_len);
-        builder.assert_bool(is_final_block.clone());
-
-        for &is_final_len in local.is_final_input_len.iter() {
-            builder.assert_bool(is_final_len);
+        let is_final_block = local.is_padding_byte[KECCAK_RATE_BYTES - 1];
+        for &is_padding_byte in local.is_padding_byte.iter() {
+            builder.assert_bool(is_padding_byte);
+        }
+        for i in 1..KECCAK_RATE_BYTES {
+            builder
+                .when(local.is_padding_byte[i - 1])
+                .assert_one(local.is_padding_byte[i]);
         }
 
         // Ensure that full-input block and final block flags are not set to 1 at the
         // same time.
-        builder.assert_zero(is_final_block.clone() * is_full_input_block);
+        builder.assert_zero(is_final_block * is_full_input_block);
 
         // If this is the first row, the original sponge state should be 0 and
         // already_absorbed_bytes = 0.
@@ -66,16 +65,14 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
         // If this is a final block, the next row's original sponge state should be 0
         // and already_absorbed_bytes = 0.
         builder
-            .when(is_final_block.clone())
+            .when(is_final_block)
             .assert_zero(next.already_absorbed_bytes);
         for &original_rate_elem in next.original_rate_u16s.iter() {
-            builder
-                .when(is_final_block.clone())
-                .assert_zero(original_rate_elem);
+            builder.when(is_final_block).assert_zero(original_rate_elem);
         }
         for &original_capacity_elem in next.original_capacity_u16s.iter() {
             builder
-                .when(is_final_block.clone())
+                .when(is_final_block)
                 .assert_zero(original_capacity_elem);
         }
 
@@ -122,27 +119,33 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
 
         // If the first padding byte is at the end of the block, then the block has a
         // single padding byte
-        let has_single_padding_byte = local.is_final_input_len[KECCAK_RATE_BYTES - 1];
+        let has_single_padding_byte = local.is_padding_byte[KECCAK_RATE_BYTES - 1]
+            - local.is_padding_byte[KECCAK_RATE_BYTES - 2];
 
         // If the row has a single padding byte, then it must be the last byte with
         // value 0b10000001
-        builder.when(has_single_padding_byte).assert_eq(
+        builder.when(has_single_padding_byte.clone()).assert_eq(
             local.block_bytes[KECCAK_RATE_BYTES - 1],
             AB::Expr::from_canonical_u8(0b10000001),
         );
 
-        let mut is_padding_byte = AB::Expr::zero();
         for i in 0..KECCAK_RATE_BYTES - 1 {
-            is_padding_byte = is_padding_byte + local.is_final_input_len[i];
+            let is_first_padding_byte = {
+                if i > 0 {
+                    local.is_padding_byte[i] - local.is_padding_byte[i - 1]
+                } else {
+                    local.is_padding_byte[i].into()
+                }
+            };
             // If the row has multiple padding bytes, the first padding byte must be 1
             builder
-                .when(local.is_final_input_len[i])
-                .assert_eq(local.block_bytes[i], AB::Expr::one());
+                .when(is_first_padding_byte.clone())
+                .assert_one(local.block_bytes[i]);
             // If the row has multiple padding bytes, the other padding bytes
             // except the last one must be 0
             builder
-                .when(is_padding_byte.clone())
-                .when_ne(local.is_final_input_len[i], AB::Expr::one())
+                .when(local.is_padding_byte[i])
+                .when_ne(is_first_padding_byte, AB::Expr::one())
                 .assert_zero(local.block_bytes[i]);
         }
 

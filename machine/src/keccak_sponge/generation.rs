@@ -90,9 +90,6 @@ fn generate_full_input_row<F: PrimeField64>(
 }
 
 /// Generates a row containing the last input bytes.
-/// On top of computing one absorption and padding the input,
-/// we indicate the last non-padding input byte by setting
-/// `row.is_final_input_len[final_inputs.len()]` to 1.
 fn generate_final_row<F: PrimeField64>(
     row: &mut KeccakSpongeCols<F>,
     input: &[u8],
@@ -115,7 +112,9 @@ fn generate_final_row<F: PrimeField64>(
         row.block_bytes[KECCAK_RATE_BYTES - 1] = F::from_canonical_u8(0b10000000);
     }
 
-    row.is_final_input_len[final_inputs.len()] = F::one();
+    for i in final_inputs.len()..KECCAK_RATE_BYTES {
+        row.is_padding_byte[i] = F::one();
+    }
 
     generate_common_fields(row, already_absorbed_bytes, sponge_state)
 }

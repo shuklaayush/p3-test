@@ -38,12 +38,8 @@ pub struct KeccakSpongeCols<T> {
     /// block.
     pub already_absorbed_bytes: T,
 
-    /// If this row represents a final block row, the `i`th entry should be 1 if
-    /// the final chunk of input has length `i` (in other words if `len -
-    /// already_absorbed == i`), otherwise 0.
-    ///
-    /// If this row represents a full input block, this should contain all 0s.
-    pub is_final_input_len: [T; KECCAK_RATE_BYTES],
+    /// Whether the current byte is a padding byte.
+    pub is_padding_byte: [T; KECCAK_RATE_BYTES],
 
     /// The initial rate part of the sponge, at the start of this step.
     pub original_rate_u16s: [T; KECCAK_RATE_U16S],

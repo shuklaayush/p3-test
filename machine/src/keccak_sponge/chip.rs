@@ -41,14 +41,10 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
-        // TODO: Does it make sense to make this into a separate column to avoid runtime calcs?
-        let is_real = VirtualPairCol::sum_main(
-            KECCAK_SPONGE_COL_MAP
-                .is_final_input_len
-                .into_iter()
-                .chain(once(KECCAK_SPONGE_COL_MAP.is_full_input_block))
-                .collect_vec(),
-        );
+        let is_real = VirtualPairCol::sum_main(vec![
+            KECCAK_SPONGE_COL_MAP.is_padding_byte[KECCAK_RATE_BYTES - 1],
+            KECCAK_SPONGE_COL_MAP.is_full_input_block,
+        ]);
 
         KECCAK_SPONGE_COL_MAP
             .block_bytes
@@ -87,33 +83,21 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                 count: is_real.clone(),
                 argument_index: MachineBus::KeccakPermuteInput as usize,
             }))
-            .chain((0..KECCAK_RATE_BYTES).map(|i| {
-                Interaction {
-                    fields: vec![VirtualPairCol::single_main(
-                        KECCAK_SPONGE_COL_MAP.block_bytes[i],
-                    )],
-                    count: VirtualPairCol::sum_main(
-                        KECCAK_SPONGE_COL_MAP
-                            .is_final_input_len
-                            .into_iter()
-                            .chain(once(KECCAK_SPONGE_COL_MAP.is_full_input_block))
-                            .collect_vec(),
-                    ),
-                    argument_index: MachineBus::Range8 as usize,
-                }
+            .chain((0..KECCAK_RATE_BYTES).map(|i| Interaction {
+                fields: vec![VirtualPairCol::single_main(
+                    KECCAK_SPONGE_COL_MAP.block_bytes[i],
+                )],
+                count: is_real.clone(),
+                argument_index: MachineBus::Range8 as usize,
             }))
             .collect_vec()
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
-        // TODO: Does it make sense to make this into a separate column to avoid runtime calcs?
-        let is_real = VirtualPairCol::sum_main(
-            KECCAK_SPONGE_COL_MAP
-                .is_final_input_len
-                .into_iter()
-                .chain(once(KECCAK_SPONGE_COL_MAP.is_full_input_block))
-                .collect_vec(),
-        );
+        let is_real = VirtualPairCol::sum_main(vec![
+            KECCAK_SPONGE_COL_MAP.is_padding_byte[KECCAK_RATE_BYTES - 1],
+            KECCAK_SPONGE_COL_MAP.is_full_input_block,
+        ]);
 
         // We recover the 16-bit digest limbs from their corresponding bytes,
         // and then append them to the rest of the updated state limbs.
