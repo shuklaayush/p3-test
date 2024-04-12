@@ -34,10 +34,6 @@ pub struct KeccakSpongeCols<T> {
     /// is an input byte, not a padding byte; 0 otherwise.
     pub is_full_input_block: T,
 
-    /// 1 if this row represents a block containing padding bytes and the
-    /// padding spans more than 1 byte
-    pub is_multi_padding_block: T,
-
     /// The number of input bytes that have already been absorbed prior to this
     /// block.
     pub already_absorbed_bytes: T,

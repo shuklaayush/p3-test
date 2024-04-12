@@ -111,7 +111,6 @@ fn generate_final_row<F: PrimeField64>(
         // Both 1s are placed in the same byte.
         row.block_bytes[final_inputs.len()] = F::from_canonical_u8(0b10000001);
     } else {
-        row.is_multi_padding_block = F::one();
         row.block_bytes[final_inputs.len()] = F::one();
         row.block_bytes[KECCAK_RATE_BYTES - 1] = F::from_canonical_u8(0b10000000);
     }

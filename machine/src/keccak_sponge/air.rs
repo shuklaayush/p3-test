@@ -37,9 +37,6 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
         let is_full_input_block = local.is_full_input_block;
         builder.assert_bool(is_full_input_block);
 
-        let is_multi_padding_block = local.is_multi_padding_block;
-        builder.assert_bool(is_multi_padding_block);
-
         let is_final_block = local
             .is_final_input_len
             .iter()
@@ -127,13 +124,6 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
         // single padding byte
         let has_single_padding_byte = local.is_final_input_len[KECCAK_RATE_BYTES - 1];
 
-        // If this is the final block, then it can either contain a single padding byte
-        // or be a row with multiple padding bytes
-        builder.assert_eq(
-            is_final_block * (AB::Expr::one() - has_single_padding_byte),
-            is_multi_padding_block,
-        );
-
         // If the row has a single padding byte, then it must be the last byte with
         // value 0b10000001
         builder.when(has_single_padding_byte).assert_eq(
@@ -141,18 +131,29 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
             AB::Expr::from_canonical_u8(0b10000001),
         );
 
-        // If the row has multiple padding bytes, then the first padding byte must be 1
+        let mut is_padding_byte = AB::Expr::zero();
         for i in 0..KECCAK_RATE_BYTES - 1 {
+            is_padding_byte = is_padding_byte + local.is_final_input_len[i];
+            // If the row has multiple padding bytes, the first padding byte must be 1
             builder
-                .when(is_multi_padding_block)
                 .when(local.is_final_input_len[i])
                 .assert_eq(local.block_bytes[i], AB::Expr::one());
+            // If the row has multiple padding bytes, the other padding bytes
+            // except the last one must be 0
+            builder
+                .when(is_padding_byte.clone())
+                .when_ne(local.is_final_input_len[i], AB::Expr::one())
+                .assert_zero(local.block_bytes[i]);
         }
+
         // If the row has multiple padding bytes, then the last byte must be 0b10000000
-        builder.when(is_multi_padding_block).assert_eq(
-            local.block_bytes[KECCAK_RATE_BYTES - 1],
-            AB::Expr::from_canonical_u8(0b10000000),
-        );
+        builder
+            .when(is_final_block)
+            .when_ne(has_single_padding_byte, AB::Expr::one())
+            .assert_eq(
+                local.block_bytes[KECCAK_RATE_BYTES - 1],
+                AB::Expr::from_canonical_u8(0b10000000),
+            );
 
         // TODO: Add back
         // // A dummy row is always followed by another dummy row, so the prover can't put
