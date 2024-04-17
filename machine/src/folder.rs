@@ -9,6 +9,7 @@ use p3_uni_stark::{PackedChallenge, PackedVal, StarkGenericConfig, Val};
 
 /// A folder for prover constraints.
 pub struct ProverConstraintFolder<'a, SC: StarkGenericConfig> {
+    // TODO: Why is this RowMajorMatrix?
     pub preprocessed: RowMajorMatrix<PackedVal<SC>>,
     pub main: RowMajorMatrix<PackedVal<SC>>,
     pub perm: RowMajorMatrix<PackedChallenge<SC>>,

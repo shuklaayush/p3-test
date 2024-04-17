@@ -60,7 +60,7 @@ where
             let inv_zeroifier = *PackedVal::<SC>::from_slice(&sels.inv_zeroifier[i_range.clone()]);
 
             // TODO: Do like others
-            let perm_local: Vec<_> = (0..perm_width)
+            let perm_local = (0..perm_width)
                 .step_by(SC::Challenge::D)
                 .map(|col| {
                     PackedChallenge::<SC>::from_base_fn(|i| {
@@ -69,9 +69,9 @@ where
                         })
                     })
                 })
-                .collect();
+                .collect_vec();
 
-            let perm_next: Vec<_> = (0..perm_width)
+            let perm_next = (0..perm_width)
                 .step_by(SC::Challenge::D)
                 .map(|col| {
                     PackedChallenge::<SC>::from_base_fn(|i| {
@@ -81,7 +81,7 @@ where
                         })
                     })
                 })
-                .collect();
+                .collect_vec();
 
             let accumulator = PackedChallenge::<SC>::zero();
             let mut folder = ProverConstraintFolder {
@@ -110,7 +110,7 @@ where
                         .chain(perm_local)
                         .chain(perm_next)
                         .collect_vec(),
-                    perm_width,
+                    perm_width / SC::Challenge::D,
                 ),
                 perm_challenges,
                 public_values: &vec![],

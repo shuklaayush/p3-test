@@ -393,7 +393,7 @@ impl Machine {
         let packed_perm_challenges = perm_challenges
             .iter()
             .map(|c| PackedChallenge::<SC>::from_f(*c))
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let perm_traces = tracing::info_span!("generate permutation traces").in_scope(|| {
             self.chips()
