@@ -100,15 +100,6 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
@@ -212,6 +203,7 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 [[package]]
 name = "p3-air"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
  "p3-field",
  "p3-matrix",
@@ -220,7 +212,7 @@ dependencies = [
 [[package]]
 name = "p3-baby-bear"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#cbbcbe1c1353f742782323676af55e59b4318d94"
+source = "git+https://github.com/Plonky3/Plonky3.git#10b6d44d4eb8b604fba633cdc3a84c5c3720749b"
 dependencies = [
  "num-bigint",
  "p3-field",
@@ -234,45 +226,49 @@ dependencies = [
 [[package]]
 name = "p3-challenger"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
  "p3-field",
- "p3-maybe-rayon 0.1.0",
+ "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "p3-symmetric",
- "p3-util 0.1.0",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "tracing",
 ]
 
 [[package]]
 name = "p3-commit"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
- "itertools 0.12.1",
+ "itertools",
  "p3-challenger",
  "p3-field",
  "p3-matrix",
- "p3-util 0.1.0",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "serde",
 ]
 
 [[package]]
 name = "p3-dft"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
  "p3-field",
  "p3-matrix",
- "p3-maybe-rayon 0.1.0",
- "p3-util 0.1.0",
+ "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "tracing",
 ]
 
 [[package]]
 name = "p3-field"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
- "itertools 0.12.1",
+ "itertools",
  "num-bigint",
  "num-traits",
- "p3-util 0.1.0",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "rand",
  "serde",
 ]
@@ -280,16 +276,17 @@ dependencies = [
 [[package]]
 name = "p3-fri"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
- "itertools 0.12.1",
+ "itertools",
  "p3-challenger",
  "p3-commit",
  "p3-dft",
  "p3-field",
  "p3-interpolation",
  "p3-matrix",
- "p3-maybe-rayon 0.1.0",
- "p3-util 0.1.0",
+ "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "serde",
  "tracing",
 ]
@@ -297,7 +294,7 @@ dependencies = [
 [[package]]
 name = "p3-goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#cbbcbe1c1353f742782323676af55e59b4318d94"
+source = "git+https://github.com/Plonky3/Plonky3.git#10b6d44d4eb8b604fba633cdc3a84c5c3720749b"
 dependencies = [
  "num-bigint",
  "p3-dft",
@@ -313,15 +310,17 @@ dependencies = [
 [[package]]
 name = "p3-interpolation"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
  "p3-field",
  "p3-matrix",
- "p3-util 0.1.0",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
 ]
 
 [[package]]
 name = "p3-keccak"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
  "p3-symmetric",
  "tiny-keccak",
@@ -330,22 +329,24 @@ dependencies = [
 [[package]]
 name = "p3-keccak-air"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
  "p3-air",
  "p3-field",
  "p3-matrix",
- "p3-util 0.1.0",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "tracing",
 ]
 
 [[package]]
 name = "p3-matrix"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
- "itertools 0.12.1",
+ "itertools",
  "p3-field",
- "p3-maybe-rayon 0.1.0",
- "p3-util 0.1.0",
+ "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "rand",
  "serde",
  "tracing",
@@ -354,18 +355,19 @@ dependencies = [
 [[package]]
 name = "p3-maybe-rayon"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 
 [[package]]
 name = "p3-maybe-rayon"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#cbbcbe1c1353f742782323676af55e59b4318d94"
+source = "git+https://github.com/Plonky3/Plonky3.git#10b6d44d4eb8b604fba633cdc3a84c5c3720749b"
 
 [[package]]
 name = "p3-mds"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#cbbcbe1c1353f742782323676af55e59b4318d94"
+source = "git+https://github.com/Plonky3/Plonky3.git#10b6d44d4eb8b604fba633cdc3a84c5c3720749b"
 dependencies = [
- "itertools 0.11.0",
+ "itertools",
  "p3-dft",
  "p3-field",
  "p3-matrix",
@@ -377,14 +379,15 @@ dependencies = [
 [[package]]
 name = "p3-merkle-tree"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
- "itertools 0.12.1",
+ "itertools",
  "p3-commit",
  "p3-field",
  "p3-matrix",
- "p3-maybe-rayon 0.1.0",
+ "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "p3-symmetric",
- "p3-util 0.1.0",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "serde",
  "tracing",
 ]
@@ -392,7 +395,7 @@ dependencies = [
 [[package]]
 name = "p3-poseidon2"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#cbbcbe1c1353f742782323676af55e59b4318d94"
+source = "git+https://github.com/Plonky3/Plonky3.git#10b6d44d4eb8b604fba633cdc3a84c5c3720749b"
 dependencies = [
  "gcd",
  "p3-field",
@@ -404,8 +407,9 @@ dependencies = [
 [[package]]
 name = "p3-symmetric"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
- "itertools 0.12.1",
+ "itertools",
  "p3-field",
  "serde",
 ]
@@ -423,7 +427,7 @@ dependencies = [
 name = "p3-test-machine"
 version = "0.1.0"
 dependencies = [
- "itertools 0.12.1",
+ "itertools",
  "p3-air",
  "p3-baby-bear",
  "p3-challenger",
@@ -455,16 +459,17 @@ dependencies = [
 [[package]]
 name = "p3-uni-stark"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
- "itertools 0.12.1",
+ "itertools",
  "p3-air",
  "p3-challenger",
  "p3-commit",
  "p3-dft",
  "p3-field",
  "p3-matrix",
- "p3-maybe-rayon 0.1.0",
- "p3-util 0.1.0",
+ "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "serde",
  "tracing",
 ]
@@ -472,6 +477,7 @@ dependencies = [
 [[package]]
 name = "p3-util"
 version = "0.1.0"
+source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#6e6938809754bb92d6a6c16c6975f10b5239bb90"
 dependencies = [
  "serde",
 ]
@@ -479,7 +485,7 @@ dependencies = [
 [[package]]
 name = "p3-util"
 version = "0.1.0"
-source = "git+https://github.com/Plonky3/Plonky3.git#cbbcbe1c1353f742782323676af55e59b4318d94"
+source = "git+https://github.com/Plonky3/Plonky3.git#10b6d44d4eb8b604fba633cdc3a84c5c3720749b"
 dependencies = [
  "serde",
 ]
