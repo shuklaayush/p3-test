@@ -3,7 +3,7 @@ use p3_air::{Air, AirBuilder, BaseAir};
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, Field, PrimeField64};
-use p3_matrix::{dense::RowMajorMatrix, Matrix, MatrixRowSlices};
+use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_uni_stark::{get_log_quotient_degree, PackedChallenge, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
@@ -475,16 +475,21 @@ impl Machine {
             .zip(self.chips().par_iter())
             .enumerate()
             .map(|(i, (quotient_domain, &chip))| {
-                let preprocessed_trace_on_quotient_domains =
-                    if let Some(index) = preprocessed_indices[i] {
+                let preprocessed_trace_on_quotient_domains = preprocessed_indices[i]
+                    .map(|index| {
                         pcs.get_evaluations_on_domain(&preprocessed_data, index, quotient_domain)
-                    } else {
-                        RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
-                    };
-                let main_trace_on_quotient_domains =
-                    pcs.get_evaluations_on_domain(&main_data, i, quotient_domain);
-                let permutation_trace_on_quotient_domains =
-                    pcs.get_evaluations_on_domain(&perm_data, i, quotient_domain);
+                            .to_row_major_matrix()
+                    })
+                    .unwrap_or(RowMajorMatrix::new_col(vec![
+                        Val::<SC>::zero();
+                        quotient_domain.size()
+                    ]));
+                let main_trace_on_quotient_domains = pcs
+                    .get_evaluations_on_domain(&main_data, i, quotient_domain)
+                    .to_row_major_matrix();
+                let permutation_trace_on_quotient_domains = pcs
+                    .get_evaluations_on_domain(&perm_data, i, quotient_domain)
+                    .to_row_major_matrix();
                 quotient_values::<SC, _, _>(
                     chip,
                     cumulative_sums[i],
@@ -587,12 +592,9 @@ impl Machine {
         )
         .map(
             |(log_degree, preprocessed, main, perm, quotient, perm_trace)| {
-                let [preprocessed_local, preprocessed_next] =
-                    if let Some(preprocessed) = preprocessed {
-                        preprocessed.try_into().expect("Should have 2 openings")
-                    } else {
-                        [vec![], vec![]]
-                    };
+                let [preprocessed_local, preprocessed_next] = preprocessed
+                    .map(|preprocessed| preprocessed.try_into().expect("Should have 2 openings"))
+                    .unwrap_or_default();
                 let [main_local, main_next] = main.try_into().expect("Should have 2 openings");
                 let [perm_local, perm_next] = perm.try_into().expect("Should have 2 openings");
                 let quotient_chunks = quotient
@@ -758,13 +760,7 @@ impl Machine {
                 chip_proofs
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, chip_proof)| {
-                        if preprocessed_indices[i].is_some() {
-                            Some(chip_proof)
-                        } else {
-                            None
-                        }
-                    }),
+                    .filter_map(|(i, chip_proof)| preprocessed_indices[i].map(|_| chip_proof)),
             )
             .map(|(&domain, proof)| {
                 (

@@ -2,7 +2,7 @@ use core::borrow::Borrow;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::AbstractField;
 use p3_keccak_air::U64_LIMBS;
-use p3_matrix::MatrixRowSlices;
+use p3_matrix::Matrix;
 
 use super::{
     columns::{MerkleTreeCols, NUM_MERKLE_TREE_COLS},
@@ -19,8 +19,10 @@ impl<F> BaseAir<F> for MerkleTreeChip {
 impl<AB: AirBuilder> Air<AB> for MerkleTreeChip {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local: &MerkleTreeCols<AB::Var> = main.row_slice(0).borrow();
-        let next: &MerkleTreeCols<AB::Var> = main.row_slice(1).borrow();
+        let local = main.row_slice(0);
+        let next = main.row_slice(1);
+        let local: &MerkleTreeCols<AB::Var> = (*local).borrow();
+        let next: &MerkleTreeCols<AB::Var> = (*next).borrow();
 
         // TODO: Add more constraints.
         builder.assert_bool(local.is_real);

@@ -1,7 +1,7 @@
 use core::borrow::Borrow;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::AbstractField;
-use p3_matrix::MatrixRowSlices;
+use p3_matrix::Matrix;
 
 use super::columns::{
     KeccakSpongeCols, KECCAK_DIGEST_U16S, KECCAK_RATE_BYTES, KECCAK_RATE_U16S,
@@ -18,8 +18,10 @@ impl<F> BaseAir<F> for KeccakSpongeChip {
 impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local: &KeccakSpongeCols<AB::Var> = main.row_slice(0).borrow();
-        let next: &KeccakSpongeCols<AB::Var> = main.row_slice(1).borrow();
+        let local = main.row_slice(0);
+        let next = main.row_slice(1);
+        let local: &KeccakSpongeCols<AB::Var> = (*local).borrow();
+        let next: &KeccakSpongeCols<AB::Var> = (*next).borrow();
 
         // // Check the range column: First value must be 0, last row
         // // must be 255, and intermediate rows must increment by 0
@@ -32,8 +34,8 @@ impl<AB: AirBuilder> Air<AB> for KeccakSpongeChip {
         // let range_max = AB::Expr::from_canonical_u64((BYTE_RANGE_MAX - 1) as u64);
         // builder.when_last_row().assert_eq(rc1, range_max);
 
-        // Each flag (full-input block, padding byte or implied dummy flag) must be
-        // boolean.
+        // Each flag (full-input block, final block, padding byte or implied dummy flag)
+        // must be boolean.
         let is_full_input_block = local.is_full_input_block;
         builder.assert_bool(is_full_input_block);
 

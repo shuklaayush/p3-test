@@ -1,18 +1,19 @@
 // Folder: Folding builder
 use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
-    TwoRowMatrixView,
 };
 use p3_field::AbstractField;
+use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixView};
+use p3_matrix::stack::VerticalPair;
 use p3_uni_stark::{PackedChallenge, PackedVal, StarkGenericConfig, Val};
 
 /// A folder for prover constraints.
 pub struct ProverConstraintFolder<'a, SC: StarkGenericConfig> {
-    pub preprocessed: TwoRowMatrixView<'a, PackedVal<SC>>,
-    pub main: TwoRowMatrixView<'a, PackedVal<SC>>,
-    pub public_values: &'a Vec<Val<SC>>,
-    pub perm: TwoRowMatrixView<'a, PackedChallenge<SC>>,
+    pub preprocessed: RowMajorMatrix<PackedVal<SC>>,
+    pub main: RowMajorMatrix<PackedVal<SC>>,
+    pub perm: RowMajorMatrix<PackedChallenge<SC>>,
     pub perm_challenges: &'a [PackedChallenge<SC>],
+    pub public_values: &'a Vec<Val<SC>>,
     pub cumulative_sum: SC::Challenge,
     pub is_first_row: PackedVal<SC>,
     pub is_last_row: PackedVal<SC>,
@@ -21,12 +22,14 @@ pub struct ProverConstraintFolder<'a, SC: StarkGenericConfig> {
     pub accumulator: PackedChallenge<SC>,
 }
 
+type ViewPair<'a, T> = VerticalPair<RowMajorMatrixView<'a, T>, RowMajorMatrixView<'a, T>>;
+
 pub struct VerifierConstraintFolder<'a, SC: StarkGenericConfig> {
-    pub preprocessed: TwoRowMatrixView<'a, SC::Challenge>,
-    pub main: TwoRowMatrixView<'a, SC::Challenge>,
-    pub public_values: &'a Vec<Val<SC>>,
-    pub perm: TwoRowMatrixView<'a, SC::Challenge>,
+    pub preprocessed: ViewPair<'a, SC::Challenge>,
+    pub main: ViewPair<'a, SC::Challenge>,
+    pub perm: ViewPair<'a, SC::Challenge>,
     pub perm_challenges: &'a [SC::Challenge],
+    pub public_values: &'a Vec<Val<SC>>,
     pub is_first_row: SC::Challenge,
     pub is_last_row: SC::Challenge,
     pub is_transition: SC::Challenge,
@@ -41,10 +44,10 @@ where
     type F = Val<SC>;
     type Expr = PackedVal<SC>;
     type Var = PackedVal<SC>;
-    type M = TwoRowMatrixView<'a, PackedVal<SC>>;
+    type M = RowMajorMatrix<PackedVal<SC>>;
 
     fn main(&self) -> Self::M {
-        self.main
+        self.main.clone()
     }
 
     fn is_first_row(&self) -> Self::Expr {
@@ -75,7 +78,8 @@ where
     SC: StarkGenericConfig,
 {
     fn preprocessed(&self) -> Self::M {
-        self.preprocessed
+        // TODO: Avoid clone?
+        self.preprocessed.clone()
     }
 }
 
@@ -101,12 +105,12 @@ impl<'a, SC> PermutationAirBuilder for ProverConstraintFolder<'a, SC>
 where
     SC: StarkGenericConfig,
 {
-    type MP = TwoRowMatrixView<'a, PackedChallenge<SC>>;
+    type MP = RowMajorMatrix<PackedChallenge<SC>>;
 
     type RandomVar = PackedChallenge<SC>;
 
     fn permutation(&self) -> Self::MP {
-        self.perm
+        self.perm.clone()
     }
 
     fn permutation_randomness(&self) -> &[Self::RandomVar] {
@@ -126,7 +130,7 @@ impl<'a, SC: StarkGenericConfig> AirBuilder for VerifierConstraintFolder<'a, SC>
     type F = Val<SC>;
     type Expr = SC::Challenge;
     type Var = SC::Challenge;
-    type M = TwoRowMatrixView<'a, SC::Challenge>;
+    type M = ViewPair<'a, SC::Challenge>;
 
     fn main(&self) -> Self::M {
         self.main
@@ -186,7 +190,7 @@ impl<'a, SC> PermutationAirBuilder for VerifierConstraintFolder<'a, SC>
 where
     SC: StarkGenericConfig,
 {
-    type MP = TwoRowMatrixView<'a, SC::Challenge>;
+    type MP = ViewPair<'a, SC::Challenge>;
 
     type RandomVar = SC::Challenge;
 

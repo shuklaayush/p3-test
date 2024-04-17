@@ -1,7 +1,7 @@
 use core::borrow::Borrow;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::{AbstractField, Field};
-use p3_matrix::MatrixRowSlices;
+use p3_matrix::Matrix;
 
 use super::columns::{XorCols, NUM_XOR_COLS};
 use super::XorChip;
@@ -19,7 +19,8 @@ where
 {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local: &XorCols<AB::Var> = main.row_slice(0).borrow();
+        let local = main.row_slice(0);
+        let local: &XorCols<AB::Var> = (*local).borrow();
 
         let base2 = [1, 2, 4, 8, 16, 32, 64, 128].map(AB::Expr::from_canonical_u32);
 

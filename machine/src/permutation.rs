@@ -2,8 +2,9 @@ use itertools::Itertools;
 use p3_air::{ExtensionBuilder, PairBuilder, PermutationAirBuilder, VirtualPairCol};
 use p3_field::{AbstractField, ExtensionField, Field, Powers};
 use p3_matrix::dense::RowMajorMatrix;
-use p3_matrix::{Matrix, MatrixRowSlices};
+use p3_matrix::Matrix;
 use p3_uni_stark::{StarkGenericConfig, Val};
+use std::borrow::Borrow;
 
 use crate::chip::MachineChip;
 use crate::interaction::InteractionType;
@@ -35,17 +36,22 @@ pub fn generate_permutation_trace<SC: StarkGenericConfig, C: MachineChip<SC>>(
     let mut perm_values = Vec::with_capacity(main.height() * perm_width);
 
     for (n, main_row) in main.rows().enumerate() {
+        let main_row = main_row.collect_vec();
+
         let mut row = vec![SC::Challenge::zero(); perm_width];
         for (m, (interaction, _)) in all_interactions.iter().enumerate() {
             let alpha_m = alphas[interaction.argument_index];
-            let preprocessed_row = if preprocessed.is_some() {
-                preprocessed.as_ref().unwrap().row_slice(n)
-            } else {
-                &[]
-            };
+            let preprocessed_row = preprocessed
+                .as_ref()
+                .map(|preprocessed| {
+                    let row = preprocessed.row_slice(n);
+                    let row: &[_] = (*row).borrow();
+                    row.to_vec()
+                })
+                .unwrap_or_default();
             row[m] = reduce_row(
-                main_row,
-                preprocessed_row,
+                main_row.as_slice(),
+                preprocessed_row.as_slice(),
                 &interaction.fields,
                 alpha_m,
                 betas.clone(),
@@ -61,18 +67,24 @@ pub fn generate_permutation_trace<SC: StarkGenericConfig, C: MachineChip<SC>>(
     // Compute the running sum column
     let mut phi = vec![SC::Challenge::zero(); perm.height()];
     for (n, (main_row, perm_row)) in main.rows().zip(perm.rows()).enumerate() {
+        let main_row = main_row.collect_vec();
+        let perm_row = perm_row.collect_vec();
+
         if n > 0 {
             phi[n] = phi[n - 1];
         }
-        let preprocessed_row = if preprocessed.is_some() {
-            preprocessed.as_ref().unwrap().row_slice(n)
-        } else {
-            &[]
-        };
+        let preprocessed_row = preprocessed
+            .as_ref()
+            .map(|preprocessed| {
+                let row = preprocessed.row_slice(n);
+                let row: &[_] = (*row).borrow();
+                row.to_vec()
+            })
+            .unwrap_or_default();
         for (m, (interaction, interaction_type)) in all_interactions.iter().enumerate() {
             let mult = interaction
                 .count
-                .apply::<Val<SC>, Val<SC>>(preprocessed_row, main_row);
+                .apply::<Val<SC>, Val<SC>>(preprocessed_row.as_slice(), main_row.as_slice());
             match interaction_type {
                 InteractionType::Send => {
                     phi[n] += perm_row[m] * mult;
@@ -100,17 +112,22 @@ where
     let rand_elems = builder.permutation_randomness().to_vec();
 
     let main = builder.main();
-    let main_local: &[AB::Var] = main.row_slice(0);
-    let main_next: &[AB::Var] = main.row_slice(1);
+    let (main_local, main_next) = (main.row_slice(0), main.row_slice(1));
+    let main_local: &[AB::Var] = (*main_local).borrow();
+    let main_next: &[AB::Var] = (*main_next).borrow();
 
     let preprocessed = builder.preprocessed();
     let preprocessed_local = preprocessed.row_slice(0);
     let preprocessed_next = preprocessed.row_slice(1);
+    let preprocessed_local = (*preprocessed_local).borrow();
+    let preprocessed_next = (*preprocessed_next).borrow();
 
     let perm = builder.permutation();
+    let perm_local = perm.row_slice(0);
+    let perm_next = perm.row_slice(1);
+    let perm_local: &[AB::VarEF] = (*perm_local).borrow();
+    let perm_next: &[AB::VarEF] = (*perm_next).borrow();
     let perm_width = perm.width();
-    let perm_local: &[AB::VarEF] = perm.row_slice(0);
-    let perm_next: &[AB::VarEF] = perm.row_slice(1);
 
     let phi_local = perm_local[perm_width - 1];
     let phi_next = perm_next[perm_width - 1];

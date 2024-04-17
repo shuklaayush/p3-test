@@ -39,6 +39,8 @@ pub struct KeccakSpongeCols<T> {
     pub already_absorbed_bytes: T,
 
     /// Whether the current byte is a padding byte.
+    ///
+    /// If this row represents a full input block, this should contain all 0s.
     pub is_padding_byte: [T; KECCAK_RATE_BYTES],
 
     /// The initial rate part of the sponge, at the start of this step.

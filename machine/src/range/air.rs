@@ -1,7 +1,7 @@
 use core::borrow::Borrow;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::Field;
-use p3_matrix::{dense::RowMajorMatrix, MatrixRowSlices};
+use p3_matrix::{dense::RowMajorMatrix, Matrix};
 
 use super::columns::{RangeCols, NUM_RANGE_COLS};
 use super::RangeCheckerChip;
@@ -25,7 +25,8 @@ where
         // TODO
         // let prep = builder.preprocessed();
         let main = builder.main();
-        let local: &RangeCols<AB::Var> = main.row_slice(0).borrow();
+        let local = main.row_slice(0);
+        let local: &RangeCols<AB::Var> = (*local).borrow();
 
         // TODO: This is dummy to make tests pass.
         //       For some reason, permutation constraints fail when this chip has degree 2.

@@ -53,7 +53,7 @@ pub trait Chip<F: Field> {
         use std::iter::once;
 
         use itertools::Itertools;
-        use p3_matrix::{Matrix, MatrixGet};
+        use p3_matrix::Matrix;
 
         let perprocessed_headers = (0..preprocessed_trace.as_ref().map_or(0, |t| t.width()))
             .map(|i| format!("preprocessed[{}]", i))

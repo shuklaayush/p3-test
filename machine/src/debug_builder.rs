@@ -1,17 +1,20 @@
 use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
-    TwoRowMatrixView,
 };
 use p3_field::AbstractField;
+use p3_matrix::dense::RowMajorMatrixView;
+use p3_matrix::stack::VerticalPair;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
 /// An `AirBuilder` which asserts that each constraint is zero, allowing any failed constraints to
 /// be detected early.
 pub struct DebugConstraintBuilder<'a, SC: StarkGenericConfig> {
     pub row_index: usize,
-    pub main: TwoRowMatrixView<'a, Val<SC>>,
-    pub preprocessed: TwoRowMatrixView<'a, Val<SC>>,
-    pub perm: TwoRowMatrixView<'a, SC::Challenge>,
+    pub main: VerticalPair<RowMajorMatrixView<'a, Val<SC>>, RowMajorMatrixView<'a, Val<SC>>>,
+    pub preprocessed:
+        VerticalPair<RowMajorMatrixView<'a, Val<SC>>, RowMajorMatrixView<'a, Val<SC>>>,
+    pub perm:
+        VerticalPair<RowMajorMatrixView<'a, SC::Challenge>, RowMajorMatrixView<'a, SC::Challenge>>,
     pub perm_challenges: &'a [SC::Challenge],
     pub public_values: &'a [Val<SC>],
     pub is_first_row: Val<SC>,
@@ -26,7 +29,7 @@ where
     type F = Val<SC>;
     type Expr = Val<SC>;
     type Var = Val<SC>;
-    type M = TwoRowMatrixView<'a, Val<SC>>;
+    type M = VerticalPair<RowMajorMatrixView<'a, Val<SC>>, RowMajorMatrixView<'a, Val<SC>>>;
 
     fn main(&self) -> Self::M {
         self.main
@@ -116,7 +119,8 @@ impl<'a, SC> PermutationAirBuilder for DebugConstraintBuilder<'a, SC>
 where
     SC: StarkGenericConfig,
 {
-    type MP = TwoRowMatrixView<'a, SC::Challenge>;
+    type MP =
+        VerticalPair<RowMajorMatrixView<'a, SC::Challenge>, RowMajorMatrixView<'a, SC::Challenge>>;
 
     type RandomVar = SC::Challenge;
 

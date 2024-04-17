@@ -1,7 +1,8 @@
 use itertools::Itertools;
-use p3_air::TwoRowMatrixView;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, Field};
+use p3_matrix::dense::RowMajorMatrixView;
+use p3_matrix::stack::VerticalPair;
 use p3_uni_stark::Domain;
 use p3_uni_stark::StarkGenericConfig;
 
@@ -63,19 +64,22 @@ pub fn verify_constraints<SC: StarkGenericConfig, C: MachineChip<SC>>(
             .collect::<Vec<SC::Challenge>>()
     };
 
+    let perm_local = unflatten(&opened_values.permutation_local);
+    let perm_next = unflatten(&opened_values.permutation_next);
+
     let mut folder: VerifierConstraintFolder<'_, SC> = VerifierConstraintFolder {
-        preprocessed: TwoRowMatrixView {
-            local: &opened_values.preprocessed_local,
-            next: &opened_values.preprocessed_next,
-        },
-        main: TwoRowMatrixView {
-            local: &opened_values.trace_local,
-            next: &opened_values.trace_next,
-        },
-        perm: TwoRowMatrixView {
-            local: &unflatten(&opened_values.permutation_local),
-            next: &unflatten(&opened_values.permutation_next),
-        },
+        preprocessed: VerticalPair::new(
+            RowMajorMatrixView::new_row(&opened_values.preprocessed_local),
+            RowMajorMatrixView::new_row(&opened_values.preprocessed_next),
+        ),
+        main: VerticalPair::new(
+            RowMajorMatrixView::new_row(&opened_values.trace_local),
+            RowMajorMatrixView::new_row(&opened_values.trace_next),
+        ),
+        perm: VerticalPair::new(
+            RowMajorMatrixView::new_row(&perm_local),
+            RowMajorMatrixView::new_row(&perm_next),
+        ),
         perm_challenges: permutation_challenges,
         public_values: &vec![],
         is_first_row: sels.is_first_row,

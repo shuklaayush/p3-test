@@ -4,7 +4,7 @@ use p3_field::AbstractField;
 use p3_keccak_air::logic::{andn_gen, xor3_gen, xor_gen};
 use p3_keccak_air::rc_value_bit;
 use p3_keccak_air::{BITS_PER_LIMB, NUM_ROUNDS, U64_LIMBS};
-use p3_matrix::MatrixRowSlices;
+use p3_matrix::Matrix;
 
 use super::columns::{KeccakCols, NUM_KECCAK_COLS};
 use super::round_flags::eval_round_flags;
@@ -21,8 +21,10 @@ impl<AB: AirBuilder> Air<AB> for KeccakPermuteChip {
         eval_round_flags(builder);
 
         let main = builder.main();
-        let local: &KeccakCols<AB::Var> = main.row_slice(0).borrow();
-        let next: &KeccakCols<AB::Var> = main.row_slice(1).borrow();
+        let local = main.row_slice(0);
+        let next = main.row_slice(1);
+        let local: &KeccakCols<AB::Var> = (*local).borrow();
+        let next: &KeccakCols<AB::Var> = (*next).borrow();
 
         builder.assert_eq(local.is_real * local.step_flags[0], local.is_real_input);
 

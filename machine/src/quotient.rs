@@ -1,10 +1,9 @@
-use std::cmp::min;
+use std::{cmp::min, iter};
 
 use itertools::Itertools;
-use p3_air::TwoRowMatrixView;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, PackedValue};
-use p3_matrix::MatrixGet;
+use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_maybe_rayon::prelude::*;
 use p3_uni_stark::{Domain, PackedChallenge, PackedVal, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
@@ -27,7 +26,7 @@ pub fn quotient_values<SC, C, Mat>(
 where
     SC: StarkGenericConfig,
     C: MachineChip<SC>,
-    Mat: MatrixGet<Val<SC>> + Sync,
+    Mat: Matrix<Val<SC>> + Sync,
 {
     let quotient_size = quotient_domain.size();
     let preprocessed_width = preprocessed_trace_on_quotient_domain.width();
@@ -60,38 +59,7 @@ where
             let is_transition = *PackedVal::<SC>::from_slice(&sels.is_transition[i_range.clone()]);
             let inv_zeroifier = *PackedVal::<SC>::from_slice(&sels.inv_zeroifier[i_range.clone()]);
 
-            let preprocessed_local = (0..preprocessed_width)
-                .map(|col| {
-                    PackedVal::<SC>::from_fn(|offset| {
-                        preprocessed_trace_on_quotient_domain.get(wrap(i_start + offset), col)
-                    })
-                })
-                .collect_vec();
-            let preprocessed_next = (0..preprocessed_width)
-                .map(|col| {
-                    PackedVal::<SC>::from_fn(|offset| {
-                        preprocessed_trace_on_quotient_domain
-                            .get(wrap(i_start + next_step + offset), col)
-                    })
-                })
-                .collect_vec();
-
-            let local = (0..main_width)
-                .map(|col| {
-                    PackedVal::<SC>::from_fn(|offset| {
-                        main_trace_on_quotient_domain.get(wrap(i_start + offset), col)
-                    })
-                })
-                .collect_vec();
-
-            let next = (0..main_width)
-                .map(|col| {
-                    PackedVal::<SC>::from_fn(|offset| {
-                        main_trace_on_quotient_domain.get(wrap(i_start + next_step + offset), col)
-                    })
-                })
-                .collect_vec();
-
+            // TODO: Do like others
             let perm_local: Vec<_> = (0..perm_width)
                 .step_by(SC::Challenge::D)
                 .map(|col| {
@@ -117,18 +85,33 @@ where
 
             let accumulator = PackedChallenge::<SC>::zero();
             let mut folder = ProverConstraintFolder {
-                preprocessed: TwoRowMatrixView {
-                    local: &preprocessed_local,
-                    next: &preprocessed_next,
-                },
-                main: TwoRowMatrixView {
-                    local: &local,
-                    next: &next,
-                },
-                perm: TwoRowMatrixView {
-                    local: &perm_local,
-                    next: &perm_next,
-                },
+                preprocessed: RowMajorMatrix::new(
+                    iter::empty()
+                        .chain(preprocessed_trace_on_quotient_domain.vertically_packed_row(i_start))
+                        .chain(
+                            preprocessed_trace_on_quotient_domain
+                                .vertically_packed_row(i_start + next_step),
+                        )
+                        .collect_vec(),
+                    preprocessed_width,
+                ),
+                main: RowMajorMatrix::new(
+                    iter::empty()
+                        .chain(main_trace_on_quotient_domain.vertically_packed_row(i_start))
+                        .chain(
+                            main_trace_on_quotient_domain
+                                .vertically_packed_row(i_start + next_step),
+                        )
+                        .collect_vec(),
+                    main_width,
+                ),
+                perm: RowMajorMatrix::new(
+                    iter::empty()
+                        .chain(perm_local)
+                        .chain(perm_next)
+                        .collect_vec(),
+                    perm_width,
+                ),
                 perm_challenges,
                 public_values: &vec![],
                 cumulative_sum,
