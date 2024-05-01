@@ -12,6 +12,8 @@ mod permutation;
 mod proof;
 mod quotient;
 mod range;
+#[cfg(test)]
+mod test_util;
 mod util;
 mod verify;
 mod xor;
