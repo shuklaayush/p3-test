@@ -28,17 +28,28 @@ impl<AB: AirBuilder> Air<AB> for KeccakPermuteChip {
 
         builder.assert_eq(local.is_real * local.step_flags[0], local.is_real_input);
 
-        // If this is not the final step, the export flag must be off.
+        let first_step = local.step_flags[0];
         let final_step = local.step_flags[NUM_ROUNDS - 1];
         let not_final_step = AB::Expr::one() - final_step;
+
+        // If this is the first step, the input A must match the preimage.
+        for y in 0..5 {
+            for x in 0..5 {
+                for limb in 0..U64_LIMBS {
+                    builder
+                        .when(first_step)
+                        .assert_eq(local.preimage[y][x][limb], local.a[y][x][limb]);
+                }
+            }
+        }
 
         // If this is not the final step, the local and next preimages must match.
         for y in 0..5 {
             for x in 0..5 {
                 for limb in 0..U64_LIMBS {
                     builder
-                        .when_transition()
                         .when(not_final_step.clone())
+                        .when_transition()
                         .assert_eq(local.preimage[y][x][limb], next.preimage[y][x][limb]);
                 }
             }
@@ -154,7 +165,7 @@ impl<AB: AirBuilder> Air<AB> for KeccakPermuteChip {
         for x in 0..5 {
             for y in 0..5 {
                 for limb in 0..U64_LIMBS {
-                    let output = local.a_prime_prime_prime(x, y, limb);
+                    let output = local.a_prime_prime_prime(y, x, limb);
                     let input = next.a[y][x][limb];
                     builder
                         .when_transition()

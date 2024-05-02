@@ -4,21 +4,25 @@ use p3_field::PrimeField64;
 use super::{
     columns::{KECCAK_DIGEST_U16S, KECCAK_RATE_BYTES, KECCAK_RATE_U16S, KECCAK_WIDTH_U16S},
     util::keccakf_u16s,
+    KeccakSpongeOp,
 };
 use crate::keccak_sponge::columns::KeccakSpongeCols;
 
-pub fn generate_trace_rows<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>], inputs: &[Vec<u8>]) {
+pub fn generate_trace_rows<F: PrimeField64>(
+    rows: &mut [KeccakSpongeCols<F>],
+    inputs: &[KeccakSpongeOp],
+) {
     let mut offset = 0;
-    for input in inputs {
-        let len = input.len() / KECCAK_RATE_BYTES + 1;
+    for op in inputs {
+        let len = op.input.len() / KECCAK_RATE_BYTES + 1;
         let input_rows = &mut rows[offset..offset + len];
-        generate_rows_for_input(input_rows, input);
+        generate_rows_for_op(input_rows, op);
         offset += len;
     }
 
     // Pad the trace.
     for input_rows in rows.chunks_mut(1).skip(offset) {
-        generate_rows_for_input(input_rows, vec![].as_slice());
+        generate_rows_for_op(input_rows, &KeccakSpongeOp::default());
     }
 }
 
@@ -26,8 +30,14 @@ pub fn generate_trace_rows<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>], in
 /// Performs a Keccak sponge permutation and fills the STARK's rows
 /// accordingly. The number of rows is the number of input chunks of
 /// size `KECCAK_RATE_BYTES`.
-fn generate_rows_for_input<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>], input: &[u8]) {
+fn generate_rows_for_op<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>], op: &KeccakSpongeOp) {
     let mut sponge_state = [0u16; KECCAK_WIDTH_U16S];
+
+    let KeccakSpongeOp {
+        addr: _,
+        timestamp: _,
+        input,
+    } = op;
 
     let mut input_blocks = input.chunks_exact(KECCAK_RATE_BYTES);
     let mut already_absorbed_bytes = 0;
@@ -35,6 +45,7 @@ fn generate_rows_for_input<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>], in
         // We compute the updated state of the sponge.
         generate_full_input_row(
             row,
+            op,
             already_absorbed_bytes,
             sponge_state,
             block.try_into().unwrap(),
@@ -67,7 +78,7 @@ fn generate_rows_for_input<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>], in
 
     generate_final_row(
         rows.last_mut().unwrap(),
-        input,
+        op,
         already_absorbed_bytes,
         sponge_state,
         input_blocks.remainder(),
@@ -78,6 +89,7 @@ fn generate_rows_for_input<F: PrimeField64>(rows: &mut [KeccakSpongeCols<F>], in
 /// This includes updating the state sponge with a single absorption.
 fn generate_full_input_row<F: PrimeField64>(
     row: &mut KeccakSpongeCols<F>,
+    op: &KeccakSpongeOp,
     already_absorbed_bytes: usize,
     sponge_state: [u16; KECCAK_WIDTH_U16S],
     block: [u8; KECCAK_RATE_BYTES],
@@ -86,18 +98,18 @@ fn generate_full_input_row<F: PrimeField64>(
     row.is_full_input_block = F::one();
     row.block_bytes = block.map(F::from_canonical_u8);
 
-    generate_common_fields(row, already_absorbed_bytes, sponge_state);
+    generate_common_fields(row, op, already_absorbed_bytes, sponge_state);
 }
 
 /// Generates a row containing the last input bytes.
 fn generate_final_row<F: PrimeField64>(
     row: &mut KeccakSpongeCols<F>,
-    input: &[u8],
+    op: &KeccakSpongeOp,
     already_absorbed_bytes: usize,
     sponge_state: [u16; KECCAK_WIDTH_U16S],
     final_inputs: &[u8],
 ) {
-    assert_eq!(already_absorbed_bytes + final_inputs.len(), input.len());
+    assert_eq!(already_absorbed_bytes + final_inputs.len(), op.input.len());
 
     for (block_byte, input_byte) in row.block_bytes.iter_mut().zip(final_inputs) {
         *block_byte = F::from_canonical_u8(*input_byte);
@@ -116,7 +128,7 @@ fn generate_final_row<F: PrimeField64>(
         row.is_padding_byte[i] = F::one();
     }
 
-    generate_common_fields(row, already_absorbed_bytes, sponge_state)
+    generate_common_fields(row, op, already_absorbed_bytes, sponge_state)
 }
 
 /// Generate fields that are common to both full-input-block rows and
@@ -126,9 +138,12 @@ fn generate_final_row<F: PrimeField64>(
 /// - S is replaced by keccakf_u16s(S).
 fn generate_common_fields<F: PrimeField64>(
     row: &mut KeccakSpongeCols<F>,
+    op: &KeccakSpongeOp,
     already_absorbed_bytes: usize,
     mut sponge_state: [u16; KECCAK_WIDTH_U16S],
 ) {
+    row.timestamp = F::from_canonical_u32(op.timestamp);
+    row.base_addr = F::from_canonical_u32(op.addr);
     row.already_absorbed_bytes = F::from_canonical_usize(already_absorbed_bytes);
 
     row.original_rate_u16s = sponge_state[..KECCAK_RATE_U16S]
@@ -195,6 +210,7 @@ fn generate_common_fields<F: PrimeField64>(
         })
 }
 
+// TODO: Do I need this?
 /// Expects input in *column*-major layout
 pub fn generate_range_checks<F: PrimeField64>(_rows: &mut [KeccakSpongeCols<F>]) {
     // for i in 0..BYTE_RANGE_MAX {

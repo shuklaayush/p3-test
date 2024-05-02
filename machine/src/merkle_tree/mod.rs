@@ -21,7 +21,7 @@ impl<SC: StarkGenericConfig> MachineChip<SC> for MerkleTreeChip where Val<SC>: P
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::prove_chip;
+    use crate::test_util::prove_and_verify;
 
     use itertools::Itertools;
     use p3_keccak::KeccakF;
@@ -69,6 +69,6 @@ mod tests {
             siblings: vec![siblings],
         };
 
-        prove_chip(chip)
+        prove_and_verify(&chip)
     }
 }

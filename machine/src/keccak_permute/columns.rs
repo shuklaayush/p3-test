@@ -83,12 +83,12 @@ impl<T: Copy> KeccakCols<T> {
         self.a_prime[b][a][(z + 64 - rot) % 64]
     }
 
-    pub fn a_prime_prime_prime(&self, x: usize, y: usize, limb: usize) -> T {
-        debug_assert!(x < 5);
+    pub fn a_prime_prime_prime(&self, y: usize, x: usize, limb: usize) -> T {
         debug_assert!(y < 5);
+        debug_assert!(x < 5);
         debug_assert!(limb < U64_LIMBS);
 
-        if x == 0 && y == 0 {
+        if y == 0 && x == 0 {
             self.a_prime_prime_prime_0_0_limbs[limb]
         } else {
             self.a_prime_prime[y][x][limb]

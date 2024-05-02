@@ -22,18 +22,19 @@ impl<SC: StarkGenericConfig> MachineChip<SC> for KeccakPermuteChip where Val<SC>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::prove_chip;
+    use crate::test_util::prove_and_verify;
 
     use itertools::Itertools;
     use p3_uni_stark::VerificationError;
     use rand::random;
 
-    const NUM_HASHES: usize = 10;
-
     #[test]
     fn test_keccak_prove() -> Result<(), VerificationError> {
+        const NUM_HASHES: usize = 10;
+
         let inputs = (0..NUM_HASHES).map(|_| random()).collect_vec();
         let chip = KeccakPermuteChip { inputs };
-        prove_chip(chip)
+
+        prove_and_verify(&chip)
     }
 }
