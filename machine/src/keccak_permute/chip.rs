@@ -14,6 +14,7 @@ use crate::keccak_permute::columns::KECCAK_COL_MAP;
 use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 use crate::machine::MachineBus;
 
+// TODO: Add clk to each row to transform multiset check to equality check?
 impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
     #[instrument(name = "generate Keccak trace", skip_all)]
     fn generate_trace(&self) -> RowMajorMatrix<F> {

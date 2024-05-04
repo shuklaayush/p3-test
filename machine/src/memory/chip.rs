@@ -1,9 +1,12 @@
+use p3_air::VirtualPairCol;
 use p3_field::PrimeField64;
 use p3_matrix::dense::RowMajorMatrix;
 use tracing::instrument;
 
 use super::columns::{MemoryCols, NUM_MEMORY_COLS};
 use super::{MemoryChip, OperationKind};
+use crate::machine::MachineBus;
+use crate::memory::columns::MEMORY_COL_MAP;
 use crate::{chip::Chip, interaction::Interaction};
 
 impl<F: PrimeField64> Chip<F> for MemoryChip {
@@ -45,7 +48,16 @@ impl<F: PrimeField64> Chip<F> for MemoryChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
-        vec![]
+        vec![Interaction {
+            fields: vec![
+                VirtualPairCol::single_main(MEMORY_COL_MAP.timestamp),
+                VirtualPairCol::single_main(MEMORY_COL_MAP.addr),
+                VirtualPairCol::single_main(MEMORY_COL_MAP.value),
+                VirtualPairCol::single_main(MEMORY_COL_MAP.is_read),
+            ],
+            count: VirtualPairCol::single_main(MEMORY_COL_MAP.is_real),
+            argument_index: MachineBus::Memory as usize,
+        }]
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {

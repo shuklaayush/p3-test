@@ -127,6 +127,41 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
         );
 
         [
+            (0..KECCAK_RATE_BYTES)
+                .map(|i| {
+                    let is_real = if i == KECCAK_RATE_BYTES - 1 {
+                        VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.is_full_input_block)
+                    } else {
+                        VirtualPairCol::new_main(
+                            vec![
+                                (KECCAK_SPONGE_COL_MAP.is_full_input_block, F::one()),
+                                (
+                                    KECCAK_SPONGE_COL_MAP.is_padding_byte[KECCAK_RATE_BYTES - 1],
+                                    F::one(),
+                                ),
+                                (KECCAK_SPONGE_COL_MAP.is_padding_byte[i], -F::one()),
+                            ],
+                            F::zero(),
+                        )
+                    };
+                    Interaction {
+                        fields: vec![
+                            VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.timestamp),
+                            VirtualPairCol::new_main(
+                                vec![
+                                    (KECCAK_SPONGE_COL_MAP.base_addr, F::one()),
+                                    (KECCAK_SPONGE_COL_MAP.already_absorbed_bytes, F::one()),
+                                ],
+                                F::from_canonical_usize(i),
+                            ),
+                            VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.block_bytes[i]),
+                            VirtualPairCol::constant(F::one()),
+                        ],
+                        count: is_real,
+                        argument_index: MachineBus::Memory as usize,
+                    }
+                })
+                .collect_vec(),
             KECCAK_SPONGE_COL_MAP
                 .xored_rate_u16s
                 .chunks(2)
