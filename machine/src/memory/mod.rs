@@ -26,6 +26,7 @@ pub struct MemoryChip {
 impl<SC: StarkGenericConfig> MachineChip<SC> for MemoryChip where Val<SC>: PrimeField64 {}
 
 #[cfg(test)]
+#[cfg(debug_assertions)]
 mod tests {
     use super::*;
     use crate::test_util::prove_and_verify;

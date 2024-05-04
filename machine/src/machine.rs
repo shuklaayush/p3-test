@@ -364,6 +364,15 @@ impl Machine {
                     .map(|chip| chip.preprocessed_trace())
                     .collect_vec()
             });
+        let preprocessed_widths = maybe_preprocessed_traces
+            .iter()
+            .map(|maybe_trace| {
+                maybe_trace
+                    .as_ref()
+                    .map(|trace| trace.width())
+                    .unwrap_or_default()
+            })
+            .collect_vec();
         let (preprocessed_indices, preprocessed_traces) = maybe_preprocessed_traces
             .clone()
             .into_iter()
@@ -492,7 +501,8 @@ impl Machine {
         let log_quotient_degrees = self
             .chips()
             .iter()
-            .map(|&chip| get_log_quotient_degree::<Val<SC>, _>(chip, 0))
+            .zip(preprocessed_widths)
+            .map(|(&chip, prep_width)| get_log_quotient_degree::<Val<SC>, _>(chip, prep_width, 0))
             .collect_vec();
         let quotient_degrees = log_quotient_degrees.iter().map(|d| 1 << d).collect_vec();
         let quotient_domains = main_domains
@@ -675,6 +685,53 @@ impl Machine {
     where
         Val<SC>: PrimeField64,
     {
+        // TODO: Move to proving, verifiying key
+        let pcs = config.pcs();
+
+        let maybe_preprocessed_traces = tracing::info_span!("generate preprocessed traces")
+            .in_scope(|| {
+                self.chips()
+                    .par_iter()
+                    .map(|chip| chip.preprocessed_trace())
+                    .collect_vec()
+            });
+        let preprocessed_widths = maybe_preprocessed_traces
+            .iter()
+            .map(|maybe_trace| {
+                maybe_trace
+                    .as_ref()
+                    .map(|trace| trace.width())
+                    .unwrap_or_default()
+            })
+            .collect_vec();
+        let (preprocessed_indices, preprocessed_traces) = maybe_preprocessed_traces
+            .into_iter()
+            .fold((vec![], vec![]), |(mut indices, mut traces), trace| {
+                if let Some(trace) = trace {
+                    indices.push(Some(traces.len()));
+                    traces.push(trace);
+                } else {
+                    indices.push(None);
+                }
+                (indices, traces)
+            });
+        let preprocessed_degrees = preprocessed_traces
+            .iter()
+            .map(|trace| trace.height())
+            .collect_vec();
+        let preprocessed_domains = preprocessed_degrees
+            .iter()
+            .map(|&degree| pcs.natural_domain_for_degree(degree))
+            .collect_vec();
+        let (preprocessed_commit, _preprocessed_data) =
+            tracing::info_span!("commit to preprocessed traces").in_scope(|| {
+                pcs.commit(
+                    std::iter::zip(preprocessed_domains.clone(), preprocessed_traces.clone())
+                        .collect_vec(),
+                )
+            });
+        challenger.observe(preprocessed_commit.clone());
+
         let MachineProof {
             commitments,
             opening_proof,
@@ -692,14 +749,14 @@ impl Machine {
         let log_quotient_degrees = self
             .chips()
             .iter()
-            .map(|&chip| get_log_quotient_degree::<Val<SC>, _>(chip, 0))
+            .zip(preprocessed_widths)
+            .map(|(&chip, prep_width)| get_log_quotient_degree::<Val<SC>, _>(chip, prep_width, 0))
             .collect_vec();
         let quotient_degrees = log_quotient_degrees
             .iter()
             .map(|&log_degree| 1 << log_degree)
             .collect_vec();
 
-        let pcs = config.pcs();
         let main_domains = degrees
             .iter()
             .map(|&degree| pcs.natural_domain_for_degree(degree))
@@ -743,41 +800,6 @@ impl Machine {
         if !valid_shape {
             return Err(VerificationError::InvalidProofShape);
         }
-
-        let maybe_preprocessed_traces = tracing::info_span!("generate preprocessed traces")
-            .in_scope(|| {
-                self.chips()
-                    .par_iter()
-                    .map(|chip| chip.preprocessed_trace())
-                    .collect_vec()
-            });
-        let (preprocessed_indices, preprocessed_traces) = maybe_preprocessed_traces
-            .into_iter()
-            .fold((vec![], vec![]), |(mut indices, mut traces), trace| {
-                if let Some(trace) = trace {
-                    indices.push(Some(traces.len()));
-                    traces.push(trace);
-                } else {
-                    indices.push(None);
-                }
-                (indices, traces)
-            });
-        let preprocessed_degrees = preprocessed_traces
-            .iter()
-            .map(|trace| trace.height())
-            .collect_vec();
-        let preprocessed_domains = preprocessed_degrees
-            .iter()
-            .map(|&degree| pcs.natural_domain_for_degree(degree))
-            .collect_vec();
-        let (preprocessed_commit, _preprocessed_data) =
-            tracing::info_span!("commit to preprocessed traces").in_scope(|| {
-                pcs.commit(
-                    std::iter::zip(preprocessed_domains.clone(), preprocessed_traces.clone())
-                        .collect_vec(),
-                )
-            });
-        challenger.observe(preprocessed_commit.clone());
 
         challenger.observe(commitments.main_trace.clone());
         let mut perm_challenges = Vec::new();
@@ -944,7 +966,7 @@ mod tests {
         TruncatedPermutation,
     };
     use p3_uni_stark::StarkConfig;
-    use p3_util::log2_ceil_usize;
+
     use rand::{random, thread_rng, Rng};
     use tracing_forest::{util::LevelFilter, ForestLayer};
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
@@ -1009,8 +1031,7 @@ mod tests {
             mmcs: challenge_mmcs,
         };
         type Pcs = TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
-        const MAX_TABLE_HEIGHT: usize = 1024;
-        let pcs = Pcs::new(log2_ceil_usize(MAX_TABLE_HEIGHT), dft, val_mmcs, fri_config);
+        let pcs = Pcs::new(dft, val_mmcs, fri_config);
 
         type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
         let config = MyConfig::new(pcs);

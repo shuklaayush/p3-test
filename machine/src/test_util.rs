@@ -1,4 +1,4 @@
-use crate::chip::{Chip, MachineChip};
+use crate::chip::MachineChip;
 
 use p3_air::Air;
 use p3_baby_bear::BabyBear;
@@ -14,10 +14,9 @@ use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
 #[cfg(debug_assertions)]
 use p3_uni_stark::DebugConstraintBuilder;
 use p3_uni_stark::{
-    prove, verify, ProverConstraintFolder, StarkConfig,
-    SymbolicAirBuilder, VerificationError, VerifierConstraintFolder,
+    prove, verify, ProverConstraintFolder, StarkConfig, SymbolicAirBuilder, VerificationError,
+    VerifierConstraintFolder,
 };
-use p3_util::log2_ceil_usize;
 
 type Val = BabyBear;
 type Challenge = BinomialExtensionField<Val, 4>;
@@ -49,8 +48,7 @@ pub fn default_config() -> MyConfig {
         proof_of_work_bits: 16,
         mmcs: challenge_mmcs,
     };
-    const MAX_TABLE_HEIGHT: usize = 1024;
-    let pcs = Pcs::new(log2_ceil_usize(MAX_TABLE_HEIGHT), dft, val_mmcs, fri_config);
+    let pcs = Pcs::new(dft, val_mmcs, fri_config);
 
     MyConfig::new(pcs)
 }
@@ -62,6 +60,7 @@ pub fn default_challenger() -> Challenger {
     Challenger::from_hasher(vec![], byte_hash)
 }
 
+#[cfg(debug_assertions)]
 pub(crate) fn prove_and_verify<MC>(chip: &MC) -> Result<(), VerificationError>
 where
     p3_uni_stark::Val<MyConfig>: PrimeField64,
