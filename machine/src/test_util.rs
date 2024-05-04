@@ -2,17 +2,19 @@ use crate::chip::{Chip, MachineChip};
 
 use p3_air::Air;
 use p3_baby_bear::BabyBear;
-use p3_challenger::{FieldChallenger, HashChallenger, SerializingChallenger32};
+use p3_challenger::{HashChallenger, SerializingChallenger32};
 use p3_commit::ExtensionMmcs;
 use p3_dft::Radix2DitParallel;
-use p3_field::{extension::BinomialExtensionField, Field, PrimeField64};
+use p3_field::{extension::BinomialExtensionField, PrimeField64};
 use p3_fri::{FriConfig, TwoAdicFriPcs};
 use p3_keccak::Keccak256Hash;
-use p3_matrix::Matrix;
+
 use p3_merkle_tree::FieldMerkleTreeMmcs;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
+#[cfg(debug_assertions)]
+use p3_uni_stark::DebugConstraintBuilder;
 use p3_uni_stark::{
-    prove, verify, Proof, ProverConstraintFolder, StarkConfig, StarkGenericConfig,
+    prove, verify, ProverConstraintFolder, StarkConfig,
     SymbolicAirBuilder, VerificationError, VerifierConstraintFolder,
 };
 use p3_util::log2_ceil_usize;
@@ -66,7 +68,8 @@ where
     MC: MachineChip<MyConfig>
         + for<'a> Air<ProverConstraintFolder<'a, MyConfig>>
         + for<'a> Air<VerifierConstraintFolder<'a, MyConfig>>
-        + for<'a> Air<SymbolicAirBuilder<p3_uni_stark::Val<MyConfig>>>,
+        + for<'a> Air<SymbolicAirBuilder<p3_uni_stark::Val<MyConfig>>>
+        + for<'a> Air<DebugConstraintBuilder<'a, p3_uni_stark::Val<MyConfig>>>,
 {
     let config = default_config();
 

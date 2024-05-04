@@ -119,7 +119,7 @@ pub fn output_limb(i: usize) -> usize {
     let y = i_u64 / 5;
     let x = i_u64 % 5;
 
-    KECCAK_COL_MAP.a_prime_prime_prime(x, y, limb_index)
+    KECCAK_COL_MAP.a_prime_prime_prime(y, x, limb_index)
 }
 
 pub const NUM_KECCAK_COLS: usize = size_of::<KeccakCols<u8>>();

@@ -26,7 +26,11 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
                 fields: (0..25)
                     .flat_map(|i| {
                         (0..U64_LIMBS)
-                            .map(|limb| KECCAK_COL_MAP.a_prime_prime_prime(i % 5, i / 5, limb))
+                            .map(|limb| {
+                                let y = i / 5;
+                                let x = i % 5;
+                                KECCAK_COL_MAP.a_prime_prime_prime(y, x, limb)
+                            })
                             .collect_vec()
                     })
                     .map(VirtualPairCol::single_main)
@@ -38,7 +42,11 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
                 fields: (0..NUM_U64_HASH_ELEMS)
                     .flat_map(|i| {
                         (0..U64_LIMBS)
-                            .map(|limb| KECCAK_COL_MAP.a_prime_prime_prime(i % 5, i / 5, limb))
+                            .map(|limb| {
+                                let y = i / 5;
+                                let x = i % 5;
+                                KECCAK_COL_MAP.a_prime_prime_prime(y, x, limb)
+                            })
                             .collect_vec()
                     })
                     .map(VirtualPairCol::single_main)

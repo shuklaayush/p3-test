@@ -7,6 +7,7 @@ mod interaction;
 mod keccak_permute;
 mod keccak_sponge;
 mod machine;
+mod memory;
 mod merkle_tree;
 mod permutation;
 mod proof;

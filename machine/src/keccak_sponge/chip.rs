@@ -2,7 +2,7 @@ use itertools::Itertools;
 use p3_air::VirtualPairCol;
 use p3_field::PrimeField64;
 use p3_matrix::dense::RowMajorMatrix;
-use std::iter::once;
+
 use tracing::instrument;
 
 use super::{
@@ -46,34 +46,36 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
             KECCAK_SPONGE_COL_MAP.is_full_input_block,
         ]);
 
-        KECCAK_SPONGE_COL_MAP
-            .block_bytes
-            .chunks(4)
-            .zip(KECCAK_SPONGE_COL_MAP.original_rate_u16s.chunks(2))
-            .map(|(block, rate)| {
-                let vc1 = {
-                    let column_weights = block
-                        .iter()
-                        .enumerate()
-                        .map(|(i, &c)| (c, F::from_canonical_usize(1 << (8 * i))))
-                        .collect_vec();
-                    VirtualPairCol::new_main(column_weights, F::zero())
-                };
-                let vc2 = {
-                    let column_weights = rate
-                        .iter()
-                        .enumerate()
-                        .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
-                        .collect_vec();
-                    VirtualPairCol::new_main(column_weights, F::zero())
-                };
-                Interaction {
-                    fields: vec![vc1, vc2],
-                    count: is_real.clone(),
-                    argument_index: MachineBus::XorInput as usize,
-                }
-            })
-            .chain(once(Interaction {
+        [
+            KECCAK_SPONGE_COL_MAP
+                .block_bytes
+                .chunks(4)
+                .zip(KECCAK_SPONGE_COL_MAP.original_rate_u16s.chunks(2))
+                .map(|(block, rate)| {
+                    let vc1 = {
+                        let column_weights = block
+                            .iter()
+                            .enumerate()
+                            .map(|(i, &c)| (c, F::from_canonical_usize(1 << (8 * i))))
+                            .collect_vec();
+                        VirtualPairCol::new_main(column_weights, F::zero())
+                    };
+                    let vc2 = {
+                        let column_weights = rate
+                            .iter()
+                            .enumerate()
+                            .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
+                            .collect_vec();
+                        VirtualPairCol::new_main(column_weights, F::zero())
+                    };
+                    Interaction {
+                        fields: vec![vc1, vc2],
+                        count: is_real.clone(),
+                        argument_index: MachineBus::XorInput as usize,
+                    }
+                })
+                .collect_vec(),
+            vec![Interaction {
                 fields: KECCAK_SPONGE_COL_MAP
                     .xored_rate_u16s
                     .into_iter()
@@ -82,15 +84,18 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                     .collect(),
                 count: is_real.clone(),
                 argument_index: MachineBus::KeccakPermuteInput as usize,
-            }))
-            .chain((0..KECCAK_RATE_BYTES).map(|i| Interaction {
-                fields: vec![VirtualPairCol::single_main(
-                    KECCAK_SPONGE_COL_MAP.block_bytes[i],
-                )],
-                count: is_real.clone(),
-                argument_index: MachineBus::Range8 as usize,
-            }))
-            .collect_vec()
+            }],
+            (0..KECCAK_RATE_BYTES)
+                .map(|i| Interaction {
+                    fields: vec![VirtualPairCol::single_main(
+                        KECCAK_SPONGE_COL_MAP.block_bytes[i],
+                    )],
+                    count: is_real.clone(),
+                    argument_index: MachineBus::Range8 as usize,
+                })
+                .collect_vec(),
+        ]
+        .concat()
     }
 
     fn receives(&self) -> Vec<Interaction<F>> {
@@ -121,27 +126,30 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                 .map(|c| VirtualPairCol::single_main(c)),
         );
 
-        KECCAK_SPONGE_COL_MAP
-            .xored_rate_u16s
-            .chunks(2)
-            .map(|rate| {
-                let column_weights = rate
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
-                    .collect_vec();
-                Interaction {
-                    fields: vec![VirtualPairCol::new_main(column_weights, F::zero())],
-                    count: is_real.clone(),
-                    argument_index: MachineBus::XorOutput as usize,
-                }
-            })
-            .chain(once(Interaction {
+        [
+            KECCAK_SPONGE_COL_MAP
+                .xored_rate_u16s
+                .chunks(2)
+                .map(|rate| {
+                    let column_weights = rate
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
+                        .collect_vec();
+                    Interaction {
+                        fields: vec![VirtualPairCol::new_main(column_weights, F::zero())],
+                        count: is_real.clone(),
+                        argument_index: MachineBus::XorOutput as usize,
+                    }
+                })
+                .collect_vec(),
+            vec![Interaction {
                 fields,
                 count: is_real.clone(),
                 argument_index: MachineBus::KeccakPermuteOutput as usize,
-            }))
-            .collect_vec()
+            }],
+        ]
+        .concat()
     }
 
     #[cfg(feature = "debug-trace")]
