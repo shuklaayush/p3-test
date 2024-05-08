@@ -40,12 +40,12 @@ pub trait Chip<F: Field> {
     fn main_headers(&self) -> Vec<String>;
 
     #[cfg(feature = "debug-trace")]
-    fn write_traces_to_worksheet<E: Field>(
+    fn write_traces_to_worksheet<Challenge: Field>(
         &self,
         ws: &mut Worksheet,
         preprocessed_trace: &Option<RowMajorMatrix<F>>,
         main_trace: &RowMajorMatrix<F>,
-        perm_trace: &RowMajorMatrix<E>,
+        perm_trace: &Option<RowMajorMatrix<Challenge>>,
     ) -> Result<(), Box<dyn Error>>
     where
         F: PrimeField64,
@@ -88,10 +88,11 @@ pub trait Chip<F: Field> {
             .collect_vec();
         ws.write_row(0, 0, headers)?;
 
-        let max_height = main_trace
-            .height()
-            .max(perm_trace.height())
-            .max(preprocessed_trace.as_ref().map_or(0, |t| t.height()));
+        let preprocessed_height = preprocessed_trace.as_ref().map_or(0, |t| t.height());
+        let main_height = main_trace.height();
+        let perm_height = perm_trace.as_ref().map_or(0, |t| t.height());
+        let max_height = preprocessed_height.max(main_height).max(perm_height);
+
         for i in 0..max_height {
             let mut offset = 0;
             if let Some(preprocessed_trace) = preprocessed_trace {
@@ -104,6 +105,7 @@ pub trait Chip<F: Field> {
                 }
                 offset += preprocessed_trace.width() as u16;
             }
+
             for j in 0..main_trace.width() {
                 ws.write_number(
                     i as u32 + 1,
@@ -112,12 +114,15 @@ pub trait Chip<F: Field> {
                 )?;
             }
             offset += main_trace.width() as u16;
-            for j in 0..perm_trace.width() {
-                ws.write(
-                    i as u32 + 1,
-                    offset + j as u16,
-                    perm_trace.get(i, j).to_string(),
-                )?;
+
+            if let Some(perm_trace) = perm_trace {
+                for j in 0..perm_trace.width() {
+                    ws.write(
+                        i as u32 + 1,
+                        offset + j as u16,
+                        perm_trace.get(i, j).to_string(),
+                    )?;
+                }
             }
         }
 

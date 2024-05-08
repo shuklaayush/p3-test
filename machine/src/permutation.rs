@@ -16,8 +16,11 @@ pub fn generate_permutation_trace<SC: StarkGenericConfig, C: MachineChip<SC>>(
     chip: &C,
     main: &RowMajorMatrix<Val<SC>>,
     random_elements: Vec<SC::Challenge>,
-) -> RowMajorMatrix<SC::Challenge> {
+) -> Option<RowMajorMatrix<SC::Challenge>> {
     let all_interactions = chip.all_interactions();
+    if all_interactions.is_empty() {
+        return None;
+    }
     let alphas = generate_rlc_elements(chip, random_elements[0]);
     let betas = random_elements[1].powers();
 
@@ -100,7 +103,7 @@ pub fn generate_permutation_trace<SC: StarkGenericConfig, C: MachineChip<SC>>(
         *row.last_mut().unwrap() = phi[n];
     }
 
-    perm
+    Some(perm)
 }
 
 pub fn eval_permutation_constraints<C, SC, AB>(chip: &C, builder: &mut AB, cumulative_sum: AB::EF)

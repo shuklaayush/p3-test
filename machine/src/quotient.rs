@@ -14,7 +14,7 @@ use crate::{
 
 pub fn quotient_values<SC, C, Mat>(
     chip: &C,
-    cumulative_sum: SC::Challenge,
+    cumulative_sum: Option<SC::Challenge>,
     trace_domain: Domain<SC>,
     quotient_domain: Domain<SC>,
     preprocessed_trace_on_quotient_domain: Mat,
@@ -114,7 +114,7 @@ where
                 ),
                 perm_challenges,
                 public_values: &vec![],
-                cumulative_sum,
+                cumulative_sum: cumulative_sum.unwrap_or_default(),
                 is_first_row,
                 is_last_row,
                 is_transition,
@@ -122,7 +122,9 @@ where
                 accumulator,
             };
             chip.eval(&mut folder);
-            eval_permutation_constraints::<_, SC, _>(chip, &mut folder, cumulative_sum);
+            if let Some(cumulative_sum) = cumulative_sum {
+                eval_permutation_constraints::<_, SC, _>(chip, &mut folder, cumulative_sum);
+            }
 
             // quotient(x) = constraints(x) / Z_H(x)
             let quotient = folder.accumulator * inv_zeroifier;

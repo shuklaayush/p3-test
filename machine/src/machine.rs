@@ -385,48 +385,45 @@ impl Machine {
 
         // 1. Generate and commit to preprocessed traces
         // TODO: Move to ProvingKey
-        let maybe_preprocessed_traces = tracing::info_span!("generate preprocessed traces")
-            .in_scope(|| {
+        let preprocessed_traces =
+            tracing::info_span!("generate preprocessed traces").in_scope(|| {
                 self.chips()
                     .par_iter()
                     .map(|chip| chip.preprocessed_trace())
                     .collect_vec()
             });
-        let preprocessed_widths = maybe_preprocessed_traces
+        let preprocessed_widths = preprocessed_traces
             .iter()
-            .map(|maybe_trace| {
-                maybe_trace
-                    .as_ref()
-                    .map(|trace| trace.width())
-                    .unwrap_or_default()
-            })
+            .map(|mt| mt.as_ref().map(|trace| trace.width()).unwrap_or_default())
             .collect_vec();
-        let (preprocessed_indices, preprocessed_traces) = maybe_preprocessed_traces
-            .clone()
-            .into_iter()
-            .fold((vec![], vec![]), |(mut indices, mut traces), trace| {
+        let (preprocessed_indices, preprocessed_traces_packed) = preprocessed_traces.iter().fold(
+            (vec![], vec![]),
+            |(mut indices, mut traces), trace| {
                 if let Some(trace) = trace {
                     indices.push(Some(traces.len()));
-                    traces.push(trace);
+                    traces.push(trace.clone());
                 } else {
                     indices.push(None);
                 }
                 (indices, traces)
-            });
+            },
+        );
 
-        let preprocessed_degrees = preprocessed_traces
+        let preprocessed_domains = preprocessed_traces_packed
             .iter()
-            .map(|trace| trace.height())
-            .collect_vec();
-        let preprocessed_domains = preprocessed_degrees
-            .iter()
-            .map(|&degree| pcs.natural_domain_for_degree(degree))
+            .map(|trace| {
+                let degree = trace.height();
+                pcs.natural_domain_for_degree(degree)
+            })
             .collect_vec();
         let (preprocessed_commit, preprocessed_data) =
             tracing::info_span!("commit to preprocessed traces").in_scope(|| {
                 pcs.commit(
-                    std::iter::zip(preprocessed_domains.clone(), preprocessed_traces.clone())
-                        .collect_vec(),
+                    std::iter::zip(
+                        preprocessed_domains.clone(),
+                        preprocessed_traces_packed.clone(),
+                    )
+                    .collect_vec(),
                 )
             });
         challenger.observe(preprocessed_commit.clone());
@@ -480,18 +477,29 @@ impl Machine {
                 })
                 .collect_vec()
         });
+        let (perm_indices, perm_traces_packed) =
+            perm_traces
+                .iter()
+                .fold((vec![], vec![]), |(mut indices, mut traces), trace| {
+                    if let Some(trace) = trace {
+                        indices.push(Some(traces.len()));
+                        traces.push(trace.clone());
+                    } else {
+                        indices.push(None);
+                    }
+                    (indices, traces)
+                });
         // TODO: Assert equal to main trace degrees?
-        let perm_degrees = perm_traces
+        let perm_domains = perm_traces_packed
             .iter()
-            .map(|trace: &RowMajorMatrix<SC::Challenge>| trace.height())
-            .collect_vec();
-        let perm_domains = perm_degrees
-            .iter()
-            .map(|&degree| pcs.natural_domain_for_degree(degree))
+            .map(|trace| {
+                let degree = trace.height();
+                pcs.natural_domain_for_degree(degree)
+            })
             .collect_vec();
         let (perm_commit, perm_data) = tracing::info_span!("commit to permutation traces")
             .in_scope(|| {
-                let flattened_perm_traces = perm_traces
+                let flattened_perm_traces = perm_traces_packed
                     .iter()
                     .map(|trace| trace.flatten_to_base())
                     .collect_vec();
@@ -501,22 +509,37 @@ impl Machine {
         let alpha: SC::Challenge = challenger.sample_ext_element();
         let cumulative_sums = perm_traces
             .iter()
-            .map(|trace| *trace.row_slice(trace.height() - 1).last().unwrap())
+            .map(|mt| {
+                mt.as_ref()
+                    .map(|trace| *trace.row_slice(trace.height() - 1).last().unwrap())
+            })
             .collect_vec();
 
         // 4. Verify constraints
         #[cfg(feature = "debug-trace")]
         let _ = self.write_traces_to_file::<SC>(
             "trace.xlsx",
-            maybe_preprocessed_traces.as_slice(),
+            preprocessed_traces.as_slice(),
             main_traces.as_slice(),
             perm_traces.as_slice(),
         );
         #[cfg(debug_assertions)]
-        for (chip, main_trace, perm_trace) in
-            izip!(self.chips(), main_traces.iter(), perm_traces.iter())
-        {
-            check_constraints::<_, SC>(chip, main_trace, perm_trace, &perm_challenges, &vec![]);
+        for (chip, preprocessed_trace, main_trace, perm_trace, &cumulative_sum) in izip!(
+            self.chips(),
+            preprocessed_traces.iter(),
+            main_traces.iter(),
+            perm_traces.iter(),
+            cumulative_sums.iter()
+        ) {
+            check_constraints::<_, SC>(
+                chip,
+                preprocessed_trace,
+                main_trace,
+                perm_trace,
+                &perm_challenges,
+                cumulative_sum,
+                &[],
+            );
         }
         #[cfg(debug_assertions)]
         check_cumulative_sums(&perm_traces[..]);
@@ -560,9 +583,15 @@ impl Machine {
                 let main_trace_on_quotient_domains = pcs
                     .get_evaluations_on_domain(&main_data, i, quotient_domain)
                     .to_row_major_matrix();
-                let permutation_trace_on_quotient_domains = pcs
-                    .get_evaluations_on_domain(&perm_data, i, quotient_domain)
-                    .to_row_major_matrix();
+                let perm_trace_on_quotient_domains = perm_indices[i]
+                    .map(|index| {
+                        pcs.get_evaluations_on_domain(&perm_data, index, quotient_domain)
+                            .to_row_major_matrix()
+                    })
+                    .unwrap_or(RowMajorMatrix::new_col(vec![
+                        Val::<SC>::zero();
+                        quotient_domain.size()
+                    ]));
                 quotient_values::<SC, _, _>(
                     chip,
                     cumulative_sums[i],
@@ -570,7 +599,7 @@ impl Machine {
                     quotient_domain,
                     preprocessed_trace_on_quotient_domains,
                     main_trace_on_quotient_domains,
-                    permutation_trace_on_quotient_domains,
+                    perm_trace_on_quotient_domains,
                     &packed_perm_challenges,
                     alpha,
                 )
@@ -661,10 +690,10 @@ impl Machine {
             main_openings,
             perm_openings,
             quotient_openings,
-            perm_traces
+            cumulative_sums,
         )
         .map(
-            |(log_degree, preprocessed, main, perm, quotient, perm_trace)| {
+            |(log_degree, preprocessed, main, perm, quotient, cumulative_sum)| {
                 let [preprocessed_local, preprocessed_next] = preprocessed
                     .map(|preprocessed| preprocessed.try_into().expect("Should have 2 openings"))
                     .unwrap_or_default();
@@ -683,14 +712,10 @@ impl Machine {
                     permutation_next: perm_next,
                     quotient_chunks,
                 };
-                let cumulative_sum = *perm_trace
-                    .row_slice(perm_trace.height() - 1)
-                    .last()
-                    .unwrap();
                 ChipProof {
                     degree_bits: log_degree,
                     opened_values,
-                    cumulative_sum,
+                    cumulative_sum: cumulative_sum.unwrap_or_default(),
                 }
             },
         )
@@ -955,7 +980,7 @@ impl Machine {
         path: &str,
         preprocessed_traces: &[Option<RowMajorMatrix<Val<SC>>>],
         main_traces: &[RowMajorMatrix<Val<SC>>],
-        perm_traces: &[RowMajorMatrix<SC::Challenge>],
+        perm_traces: &[Option<RowMajorMatrix<SC::Challenge>>],
     ) -> Result<(), Box<dyn Error>>
     where
         Val<SC>: PrimeField64,
