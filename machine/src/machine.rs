@@ -320,29 +320,34 @@ impl Machine {
                 .and_modify(|c| *c += 1)
                 .or_insert(1);
         }
-        // for (op, op_next) in memory_ops.iter().tuples() {
-        //     let diff = if op_next.addr == op.addr {
-        //         op_next.timestamp - op.timestamp
-        //     } else {
-        //         op_next.addr - op.addr - 1
-        //     };
-        //     let diff_limb_lo = diff % (1 << 8);
-        //     let diff_limb_md = (diff >> 8) % (1 << 8);
-        //     let diff_limb_hi = (diff >> 16) % (1 << 8);
+        for (i, op) in memory_ops.iter().enumerate() {
+            let diff = if i > 0 {
+                let op_prev = &memory_ops[i - 1];
+                if op.addr == op_prev.addr {
+                    op.timestamp - op_prev.timestamp
+                } else {
+                    op.addr - op_prev.addr - 1
+                }
+            } else {
+                0
+            };
+            let diff_limb_lo = diff % (1 << 8);
+            let diff_limb_md = (diff >> 8) % (1 << 8);
+            let diff_limb_hi = (diff >> 16) % (1 << 8);
 
-        //     range_counts
-        //         .entry(diff_limb_lo)
-        //         .and_modify(|c| *c += 1)
-        //         .or_insert(1);
-        //     range_counts
-        //         .entry(diff_limb_md)
-        //         .and_modify(|c| *c += 1)
-        //         .or_insert(1);
-        //     range_counts
-        //         .entry(diff_limb_hi)
-        //         .and_modify(|c| *c += 1)
-        //         .or_insert(1);
-        // }
+            range_counts
+                .entry(diff_limb_lo)
+                .and_modify(|c| *c += 1)
+                .or_insert(1);
+            range_counts
+                .entry(diff_limb_md)
+                .and_modify(|c| *c += 1)
+                .or_insert(1);
+            range_counts
+                .entry(diff_limb_hi)
+                .and_modify(|c| *c += 1)
+                .or_insert(1);
+        }
 
         let range_chip = RangeCheckerChip {
             count: range_counts,
