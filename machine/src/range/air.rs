@@ -19,11 +19,9 @@ impl<F: Field, const MAX: u32> BaseAir<F> for RangeCheckerChip<MAX> {
 
 impl<AB, const MAX: u32> Air<AB> for RangeCheckerChip<MAX>
 where
-    AB: AirBuilder, // + PairBuilder,
+    AB: AirBuilder,
 {
     fn eval(&self, builder: &mut AB) {
-        // TODO
-        // let prep = builder.preprocessed();
         let main = builder.main();
         let local = main.row_slice(0);
         let local: &RangeCols<AB::Var> = (*local).borrow();

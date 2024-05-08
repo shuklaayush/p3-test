@@ -23,24 +23,30 @@ impl<F: PrimeField64> Chip<F> for MemoryChip {
         assert_eq!(rows.len(), num_rows);
 
         for (i, (row, op)) in rows.iter_mut().zip(self.operations.iter()).enumerate() {
-            row.is_real = F::one();
-
             row.addr = F::from_canonical_u32(op.addr);
             row.timestamp = F::from_canonical_u32(op.timestamp);
             row.value = F::from_canonical_u8(op.value);
 
-            if let OperationKind::Read = op.kind {
-                row.is_read = F::one();
+            match op.kind {
+                OperationKind::Read => {
+                    row.is_read = F::one();
+                }
+                OperationKind::Write => {
+                    row.is_write = F::one();
+                }
             }
 
-            if i + 1 < self.operations.len() {
-                let op_next = &self.operations[i + 1];
-                if op.addr == op_next.addr {
-                    row.addr_equal = F::one();
-                    row.diff = F::from_canonical_u32(op_next.timestamp - op.timestamp);
+            if i > 0 {
+                let op_prev = &self.operations[i - 1];
+                let diff = if op.addr == op_prev.addr {
+                    row.addr_unchanged = F::one();
+                    op.timestamp - op_prev.timestamp
                 } else {
-                    row.diff = F::from_canonical_u32(op_next.addr - op.addr - 1);
-                }
+                    op.addr - op_prev.addr - 1
+                };
+                row.diff_limb_lo = F::from_canonical_u32(diff % (1 << 8));
+                row.diff_limb_md = F::from_canonical_u32((diff >> 8) % (1 << 8));
+                row.diff_limb_hi = F::from_canonical_u32((diff >> 16) % (1 << 8));
             }
         }
 
@@ -48,20 +54,54 @@ impl<F: PrimeField64> Chip<F> for MemoryChip {
     }
 
     fn sends(&self) -> Vec<Interaction<F>> {
+        vec![
+            // TODO: Combine with is_write?
+            Interaction {
+                fields: vec![
+                    VirtualPairCol::single_main(MEMORY_COL_MAP.timestamp),
+                    VirtualPairCol::single_main(MEMORY_COL_MAP.addr),
+                    VirtualPairCol::single_main(MEMORY_COL_MAP.value),
+                ],
+                count: VirtualPairCol::single_main(MEMORY_COL_MAP.is_read),
+                argument_index: MachineBus::Memory as usize,
+            },
+            // Interaction {
+            //     fields: vec![VirtualPairCol::single_main(MEMORY_COL_MAP.diff_limb_lo)],
+            //     count: VirtualPairCol::sum_main(vec![
+            //         MEMORY_COL_MAP.is_read,
+            //         MEMORY_COL_MAP.is_write,
+            //     ]),
+            //     argument_index: MachineBus::Range8 as usize,
+            // },
+            // Interaction {
+            //     fields: vec![VirtualPairCol::single_main(MEMORY_COL_MAP.diff_limb_md)],
+            //     count: VirtualPairCol::sum_main(vec![
+            //         MEMORY_COL_MAP.is_read,
+            //         MEMORY_COL_MAP.is_write,
+            //     ]),
+            //     argument_index: MachineBus::Range8 as usize,
+            // },
+            // Interaction {
+            //     fields: vec![VirtualPairCol::single_main(MEMORY_COL_MAP.diff_limb_hi)],
+            //     count: VirtualPairCol::sum_main(vec![
+            //         MEMORY_COL_MAP.is_read,
+            //         MEMORY_COL_MAP.is_write,
+            //     ]),
+            //     argument_index: MachineBus::Range8 as usize,
+            // },
+        ]
+    }
+
+    fn receives(&self) -> Vec<Interaction<F>> {
         vec![Interaction {
             fields: vec![
                 VirtualPairCol::single_main(MEMORY_COL_MAP.timestamp),
                 VirtualPairCol::single_main(MEMORY_COL_MAP.addr),
                 VirtualPairCol::single_main(MEMORY_COL_MAP.value),
-                VirtualPairCol::single_main(MEMORY_COL_MAP.is_read),
             ],
-            count: VirtualPairCol::single_main(MEMORY_COL_MAP.is_real),
+            count: VirtualPairCol::single_main(MEMORY_COL_MAP.is_write),
             argument_index: MachineBus::Memory as usize,
         }]
-    }
-
-    fn receives(&self) -> Vec<Interaction<F>> {
-        vec![]
     }
 
     #[cfg(feature = "debug-trace")]

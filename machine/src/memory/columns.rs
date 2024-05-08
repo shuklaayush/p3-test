@@ -9,8 +9,6 @@ use p3_test_derive::Headers;
 #[derive(AlignedBorrow)]
 #[cfg_attr(feature = "debug-trace", derive(Headers))]
 pub struct MemoryCols<T> {
-    pub is_real: T,
-
     pub addr: T,
 
     pub timestamp: T,
@@ -19,10 +17,16 @@ pub struct MemoryCols<T> {
 
     pub is_read: T,
 
-    pub addr_equal: T,
+    pub is_write: T,
+
+    // TODO: Do I need a column for this?
+    pub addr_unchanged: T,
 
     /// Either addr' - addr - 1 (if address changed), or timestamp' - timestamp (if address is not changed)
-    pub diff: T,
+    // No -1 in timestamp because can read and write in same cycle
+    pub diff_limb_lo: T,
+    pub diff_limb_md: T,
+    pub diff_limb_hi: T,
 }
 
 impl<T: Copy> MemoryCols<T> {}

@@ -7,11 +7,13 @@ use p3_uni_stark::{StarkGenericConfig, Val};
 
 use crate::chip::MachineChip;
 
+#[derive(Clone)]
 pub enum OperationKind {
     Read,
     Write,
 }
 
+#[derive(Clone)]
 pub struct MemoryOp {
     pub addr: u32,
     pub timestamp: u32,

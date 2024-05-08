@@ -243,7 +243,7 @@ impl Machine {
         let merkle_tree_chip = MerkleTreeChip {
             leaves: vec![leaf],
             leaf_indices: vec![leaf_index],
-            siblings: vec![siblings.try_into().unwrap()],
+            siblings: vec![siblings],
         };
 
         let keccak_sponge_chip = KeccakSpongeChip {
@@ -266,7 +266,7 @@ impl Machine {
             })
             .collect_vec();
         let memory_chip = MemoryChip {
-            operations: memory_ops,
+            operations: memory_ops.clone(),
         };
 
         let preimage_len = preimage_bytes.len();
@@ -320,6 +320,29 @@ impl Machine {
                 .and_modify(|c| *c += 1)
                 .or_insert(1);
         }
+        // for (op, op_next) in memory_ops.iter().tuples() {
+        //     let diff = if op_next.addr == op.addr {
+        //         op_next.timestamp - op.timestamp
+        //     } else {
+        //         op_next.addr - op.addr - 1
+        //     };
+        //     let diff_limb_lo = diff % (1 << 8);
+        //     let diff_limb_md = (diff >> 8) % (1 << 8);
+        //     let diff_limb_hi = (diff >> 16) % (1 << 8);
+
+        //     range_counts
+        //         .entry(diff_limb_lo)
+        //         .and_modify(|c| *c += 1)
+        //         .or_insert(1);
+        //     range_counts
+        //         .entry(diff_limb_md)
+        //         .and_modify(|c| *c += 1)
+        //         .or_insert(1);
+        //     range_counts
+        //         .entry(diff_limb_hi)
+        //         .and_modify(|c| *c += 1)
+        //         .or_insert(1);
+        // }
 
         let range_chip = RangeCheckerChip {
             count: range_counts,

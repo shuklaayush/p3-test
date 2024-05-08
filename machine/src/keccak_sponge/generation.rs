@@ -209,30 +209,3 @@ fn generate_common_fields<F: PrimeField64>(
             assert_eq!(elt as u64, s, "not equal");
         })
 }
-
-// TODO: Do I need this?
-/// Expects input in *column*-major layout
-pub fn generate_range_checks<F: PrimeField64>(_rows: &mut [KeccakSpongeCols<F>]) {
-    // for i in 0..BYTE_RANGE_MAX {
-    //     rows[i].range_counter = F::from_canonical_usize(i);
-    // }
-    // for i in BYTE_RANGE_MAX..rows.len() {
-    //     rows[i].range_counter = F::from_canonical_usize(BYTE_RANGE_MAX - 1);
-    // }
-
-    // // For each column c in cols, generate the range-check
-    // // permutations and put them in the corresponding range-check
-    // // columns rc_c and rc_c+1.
-    // for j in 0..KECCAK_RATE_BYTES {
-    //     for i in 0..rows.len() {
-    //         let x = rows[i].block_bytes[j].as_canonical_u64() as usize;
-    //         assert!(
-    //             x < BYTE_RANGE_MAX,
-    //             "column value {} exceeds the max range value {}",
-    //             x,
-    //             BYTE_RANGE_MAX
-    //         );
-    //         rows[x].rc_frequencies += F::one();
-    //     }
-    // }
-}

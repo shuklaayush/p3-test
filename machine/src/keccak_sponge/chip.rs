@@ -7,7 +7,7 @@ use tracing::instrument;
 
 use super::{
     columns::{KeccakSpongeCols, KECCAK_RATE_BYTES, NUM_KECCAK_SPONGE_COLS},
-    generation::{generate_range_checks, generate_trace_rows},
+    generation::generate_trace_rows,
     KeccakSpongeChip,
 };
 use crate::{
@@ -35,7 +35,6 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
         assert_eq!(rows.len(), num_rows);
 
         generate_trace_rows(rows, self.inputs.as_slice());
-        generate_range_checks(rows);
 
         trace
     }
@@ -155,7 +154,6 @@ impl<F: PrimeField64> Chip<F> for KeccakSpongeChip {
                                 F::from_canonical_usize(i),
                             ),
                             VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.block_bytes[i]),
-                            VirtualPairCol::constant(F::one()),
                         ],
                         count: is_real,
                         argument_index: MachineBus::Memory as usize,
