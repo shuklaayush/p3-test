@@ -15,7 +15,7 @@ use crate::proof::OpenedValues;
 pub fn verify_constraints<SC: StarkGenericConfig, C: MachineChip<SC>>(
     chip: &C,
     opened_values: &OpenedValues<SC::Challenge>,
-    cumulative_sum: SC::Challenge,
+    cumulative_sum: Option<SC::Challenge>,
     main_domain: Domain<SC>,
     qc_domains: &[Domain<SC>],
     zeta: SC::Challenge,
@@ -64,17 +64,30 @@ pub fn verify_constraints<SC: StarkGenericConfig, C: MachineChip<SC>>(
             .collect::<Vec<SC::Challenge>>()
     };
 
-    let perm_local = unflatten(&opened_values.permutation_local);
-    let perm_next = unflatten(&opened_values.permutation_next);
+    let (preprocessed_local, preprocessed_next) =
+        if let Some(opened_values) = &opened_values.preprocessed {
+            (opened_values.local.clone(), opened_values.next.clone())
+        } else {
+            (vec![], vec![])
+        };
+
+    let (perm_local, perm_next) = if let Some(opened_values) = &opened_values.permutation {
+        (
+            unflatten(&opened_values.local),
+            unflatten(&opened_values.next),
+        )
+    } else {
+        (vec![], vec![])
+    };
 
     let mut folder: VerifierConstraintFolder<'_, SC> = VerifierConstraintFolder {
         preprocessed: VerticalPair::new(
-            RowMajorMatrixView::new_row(&opened_values.preprocessed_local),
-            RowMajorMatrixView::new_row(&opened_values.preprocessed_next),
+            RowMajorMatrixView::new_row(&preprocessed_local),
+            RowMajorMatrixView::new_row(&preprocessed_next),
         ),
         main: VerticalPair::new(
-            RowMajorMatrixView::new_row(&opened_values.trace_local),
-            RowMajorMatrixView::new_row(&opened_values.trace_next),
+            RowMajorMatrixView::new_row(&opened_values.main.local),
+            RowMajorMatrixView::new_row(&opened_values.main.next),
         ),
         perm: VerticalPair::new(
             RowMajorMatrixView::new_row(&perm_local),
@@ -89,7 +102,9 @@ pub fn verify_constraints<SC: StarkGenericConfig, C: MachineChip<SC>>(
         accumulator: SC::Challenge::zero(),
     };
     chip.eval(&mut folder);
-    eval_permutation_constraints::<_, SC, _>(chip, &mut folder, cumulative_sum);
+    if let Some(cumulative_sum) = cumulative_sum {
+        eval_permutation_constraints::<_, SC, _>(chip, &mut folder, cumulative_sum);
+    }
 
     let folded_constraints = folder.accumulator;
     // Finally, check that

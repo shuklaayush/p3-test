@@ -21,16 +21,19 @@ pub struct Commitments<Com> {
 pub struct ChipProof<Challenge> {
     pub degree_bits: usize,
     pub opened_values: OpenedValues<Challenge>,
-    pub cumulative_sum: Challenge,
+    pub cumulative_sum: Option<Challenge>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct OpenedValues<Challenge> {
-    pub preprocessed_local: Vec<Challenge>,
-    pub preprocessed_next: Vec<Challenge>,
-    pub trace_local: Vec<Challenge>,
-    pub trace_next: Vec<Challenge>,
-    pub permutation_local: Vec<Challenge>,
-    pub permutation_next: Vec<Challenge>,
+    pub preprocessed: Option<AdjacentOpenedValues<Challenge>>,
+    pub main: AdjacentOpenedValues<Challenge>,
+    pub permutation: Option<AdjacentOpenedValues<Challenge>>,
     pub quotient_chunks: Vec<Vec<Challenge>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AdjacentOpenedValues<Challenge> {
+    pub local: Vec<Challenge>,
+    pub next: Vec<Challenge>,
 }

@@ -26,7 +26,7 @@ use crate::{
     memory::{MemoryChip, MemoryOp, OperationKind},
     merkle_tree::MerkleTreeChip,
     permutation::generate_permutation_trace,
-    proof::{ChipProof, Commitments, MachineProof, OpenedValues},
+    proof::{AdjacentOpenedValues, ChipProof, Commitments, MachineProof, OpenedValues},
     quotient::quotient_values,
     range::RangeCheckerChip,
     verify::verify_constraints,
@@ -503,7 +503,9 @@ impl Machine {
                     .iter()
                     .map(|trace| trace.flatten_to_base())
                     .collect_vec();
-                pcs.commit(std::iter::zip(perm_domains, flattened_perm_traces).collect_vec())
+                pcs.commit(
+                    std::iter::zip(perm_domains.clone(), flattened_perm_traces).collect_vec(),
+                )
             });
         challenger.observe(perm_commit.clone());
         let alpha: SC::Challenge = challenger.sample_ext_element();
@@ -646,6 +648,10 @@ impl Machine {
             .iter()
             .map(|domain| vec![zeta, domain.next_point(zeta).unwrap()])
             .collect_vec();
+        let perm_opening_points = perm_domains
+            .iter()
+            .map(|domain| vec![zeta, domain.next_point(zeta).unwrap()])
+            .collect_vec();
         let main_opening_points = main_domains
             .iter()
             .map(|domain| vec![zeta, domain.next_point(zeta).unwrap()])
@@ -659,8 +665,8 @@ impl Machine {
         let (opening_values, opening_proof) = pcs.open(
             vec![
                 (&preprocessed_data, preprocessed_opening_points),
-                (&main_data, main_opening_points.clone()),
-                (&perm_data, main_opening_points),
+                (&main_data, main_opening_points),
+                (&perm_data, perm_opening_points),
                 (&quotient_data, quotient_opening_points),
             ],
             challenger,
@@ -672,6 +678,10 @@ impl Machine {
         let preprocessed_openings = preprocessed_indices
             .iter()
             .map(|index| index.map(|index| preprocessed_openings[index].clone()))
+            .collect_vec();
+        let perm_openings = perm_indices
+            .iter()
+            .map(|index| index.map(|index| perm_openings[index].clone()))
             .collect_vec();
         // Unflatten quotient openings
         let quotient_openings = quotient_degrees
@@ -694,28 +704,38 @@ impl Machine {
         )
         .map(
             |(log_degree, preprocessed, main, perm, quotient, cumulative_sum)| {
-                let [preprocessed_local, preprocessed_next] = preprocessed
-                    .map(|preprocessed| preprocessed.try_into().expect("Should have 2 openings"))
-                    .unwrap_or_default();
+                let preprocessed = preprocessed.map(|openings| {
+                    assert_eq!(openings.len(), 2, "Should have 2 openings");
+                    AdjacentOpenedValues {
+                        local: openings[0].clone(),
+                        next: openings[1].clone(),
+                    }
+                });
                 let [main_local, main_next] = main.try_into().expect("Should have 2 openings");
-                let [perm_local, perm_next] = perm.try_into().expect("Should have 2 openings");
+                let perm = perm.map(|openings| {
+                    assert_eq!(openings.len(), 2, "Should have 2 openings");
+                    AdjacentOpenedValues {
+                        local: openings[0].clone(),
+                        next: openings[1].clone(),
+                    }
+                });
                 let quotient_chunks = quotient
                     .into_iter()
                     .map(|mut chunk| chunk.remove(0))
                     .collect_vec();
                 let opened_values = OpenedValues {
-                    preprocessed_local,
-                    preprocessed_next,
-                    trace_local: main_local,
-                    trace_next: main_next,
-                    permutation_local: perm_local,
-                    permutation_next: perm_next,
+                    preprocessed,
+                    main: AdjacentOpenedValues {
+                        local: main_local,
+                        next: main_next,
+                    },
+                    permutation: perm,
                     quotient_chunks,
                 };
                 ChipProof {
                     degree_bits: log_degree,
                     opened_values,
-                    cumulative_sum: cumulative_sum.unwrap_or_default(),
+                    cumulative_sum,
                 }
             },
         )
@@ -741,46 +761,33 @@ impl Machine {
         // TODO: Move to proving, verifiying key
         let pcs = config.pcs();
 
-        let maybe_preprocessed_traces = tracing::info_span!("generate preprocessed traces")
-            .in_scope(|| {
+        let preprocessed_traces =
+            tracing::info_span!("generate preprocessed traces").in_scope(|| {
                 self.chips()
                     .par_iter()
                     .map(|chip| chip.preprocessed_trace())
                     .collect_vec()
             });
-        let preprocessed_widths = maybe_preprocessed_traces
+        let preprocessed_widths = preprocessed_traces
             .iter()
-            .map(|maybe_trace| {
-                maybe_trace
-                    .as_ref()
-                    .map(|trace| trace.width())
-                    .unwrap_or_default()
+            .map(|mt| mt.as_ref().map(|trace| trace.width()).unwrap_or_default())
+            .collect_vec();
+        let preprocessed_traces_packed = preprocessed_traces.into_iter().flatten().collect_vec();
+        let preprocessed_domains = preprocessed_traces_packed
+            .iter()
+            .map(|trace| {
+                let degree = trace.height();
+                pcs.natural_domain_for_degree(degree)
             })
-            .collect_vec();
-        let (preprocessed_indices, preprocessed_traces) = maybe_preprocessed_traces
-            .into_iter()
-            .fold((vec![], vec![]), |(mut indices, mut traces), trace| {
-                if let Some(trace) = trace {
-                    indices.push(Some(traces.len()));
-                    traces.push(trace);
-                } else {
-                    indices.push(None);
-                }
-                (indices, traces)
-            });
-        let preprocessed_degrees = preprocessed_traces
-            .iter()
-            .map(|trace| trace.height())
-            .collect_vec();
-        let preprocessed_domains = preprocessed_degrees
-            .iter()
-            .map(|&degree| pcs.natural_domain_for_degree(degree))
             .collect_vec();
         let (preprocessed_commit, _preprocessed_data) =
             tracing::info_span!("commit to preprocessed traces").in_scope(|| {
                 pcs.commit(
-                    std::iter::zip(preprocessed_domains.clone(), preprocessed_traces.clone())
-                        .collect_vec(),
+                    std::iter::zip(
+                        preprocessed_domains.clone(),
+                        preprocessed_traces_packed.clone(),
+                    )
+                    .collect_vec(),
                 )
             });
         challenger.observe(preprocessed_commit.clone());
@@ -843,8 +850,8 @@ impl Machine {
                 .zip(air_widths.iter())
                 .zip(quotient_degrees.iter())
                 .all(|((chip_proof, &air_width), &quotient_degree)| {
-                    chip_proof.opened_values.trace_local.len() == air_width
-                        && chip_proof.opened_values.trace_next.len() == air_width
+                    chip_proof.opened_values.main.local.len() == air_width
+                        && chip_proof.opened_values.main.next.len() == air_width
                         && chip_proof.opened_values.quotient_chunks.len() == quotient_degree
                         && chip_proof.opened_values.quotient_chunks.iter().all(|qc| {
                             qc.len() == <SC::Challenge as AbstractExtensionField<Val<SC>>>::D
@@ -864,23 +871,16 @@ impl Machine {
         challenger.observe(commitments.quotient_chunks.clone());
 
         let zeta: SC::Challenge = challenger.sample_ext_element();
-        let preprocessed_domains_and_openings = preprocessed_domains
+        let preprocessed_domains_and_openings = chip_proofs
             .iter()
-            .zip(
-                chip_proofs
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, chip_proof)| preprocessed_indices[i].map(|_| chip_proof)),
-            )
-            .map(|(&domain, proof)| {
+            .flat_map(|proof| proof.opened_values.preprocessed.as_ref())
+            .zip(preprocessed_domains.iter())
+            .map(|(opening, &domain)| {
                 (
                     domain,
                     vec![
-                        (zeta, proof.opened_values.preprocessed_local.clone()),
-                        (
-                            domain.next_point(zeta).unwrap(),
-                            proof.opened_values.preprocessed_next.clone(),
-                        ),
+                        (zeta, opening.local.clone()),
+                        (domain.next_point(zeta).unwrap(), opening.next.clone()),
                     ],
                 )
             })
@@ -892,30 +892,29 @@ impl Machine {
                 (
                     domain,
                     vec![
-                        (zeta, proof.opened_values.trace_local.clone()),
+                        (zeta, proof.opened_values.main.local.clone()),
                         (
                             domain.next_point(zeta).unwrap(),
-                            proof.opened_values.trace_next.clone(),
+                            proof.opened_values.main.next.clone(),
                         ),
                     ],
                 )
             })
             .collect_vec();
 
-        let perm_domains_and_openings = main_domains
+        let perm_domains_and_openings = chip_proofs
             .iter()
-            .zip(chip_proofs.iter())
-            .map(|(&domain, proof)| {
-                (
-                    domain,
-                    vec![
-                        (zeta, proof.opened_values.permutation_local.clone()),
-                        (
-                            domain.next_point(zeta).unwrap(),
-                            proof.opened_values.permutation_next.clone(),
-                        ),
-                    ],
-                )
+            .zip(main_domains.iter())
+            .flat_map(|(proof, &domain)| {
+                proof.opened_values.permutation.as_ref().map(|opening| {
+                    (
+                        domain,
+                        vec![
+                            (zeta, opening.local.clone()),
+                            (domain.next_point(zeta).unwrap(), opening.next.clone()),
+                        ],
+                    )
+                })
             })
             .collect_vec();
         let quotient_chunks_domains_and_openings = quotient_chunks_domains
@@ -965,7 +964,7 @@ impl Machine {
         let sum: SC::Challenge = proof
             .chip_proofs
             .iter()
-            .map(|chip_proof| chip_proof.cumulative_sum)
+            .flat_map(|chip_proof| chip_proof.cumulative_sum)
             .sum();
         if sum != SC::Challenge::zero() {
             return Err(VerificationError::NonZeroCumulativeSum);
