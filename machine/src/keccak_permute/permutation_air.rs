@@ -1,27 +1,18 @@
 use itertools::Itertools;
-use p3_air::VirtualPairCol;
-use p3_field::PrimeField64;
+use p3_air::{PairBuilder, VirtualPairCol};
 use p3_keccak_air::U64_LIMBS;
-use p3_matrix::dense::RowMajorMatrix;
-use tracing::instrument;
 
-use super::columns::KeccakCols;
-use super::generation::generate_trace_rows;
 use super::KeccakPermuteChip;
-use crate::chip::Chip;
-use crate::interaction::Interaction;
 use crate::keccak_permute::columns::KECCAK_COL_MAP;
 use crate::keccak_permute::NUM_U64_HASH_ELEMS;
-use crate::machine::MachineBus;
+use crate::rap::interaction::Interaction;
+use crate::rap::permutation_air::{PermutationAir, PermutationAirBuilderWithCumulativeSum};
 
 // TODO: Add clk to each row to transform multiset check to equality check?
-impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
-    #[instrument(name = "generate Keccak trace", skip_all)]
-    fn generate_trace(&self) -> RowMajorMatrix<F> {
-        generate_trace_rows(&self.inputs)
-    }
-
-    fn sends(&self) -> Vec<Interaction<F>> {
+impl<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder> PermutationAir<AB>
+    for KeccakPermuteChip
+{
+    fn sends(&self) -> Vec<Interaction<AB::Expr>> {
         vec![
             Interaction {
                 fields: (0..25)
@@ -37,7 +28,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
                     .map(VirtualPairCol::single_main)
                     .collect(),
                 count: VirtualPairCol::single_main(KECCAK_COL_MAP.is_real_output),
-                argument_index: MachineBus::KeccakPermuteOutput as usize,
+                argument_index: self.bus_keccak_permute_output,
             },
             Interaction {
                 fields: (0..NUM_U64_HASH_ELEMS)
@@ -53,12 +44,12 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
                     .map(VirtualPairCol::single_main)
                     .collect(),
                 count: VirtualPairCol::single_main(KECCAK_COL_MAP.is_real_digest),
-                argument_index: MachineBus::KeccakPermuteDigest as usize,
+                argument_index: self.bus_keccak_permute_digest_output,
             },
         ]
     }
 
-    fn receives(&self) -> Vec<Interaction<F>> {
+    fn receives(&self) -> Vec<Interaction<AB::Expr>> {
         vec![Interaction {
             fields: KECCAK_COL_MAP
                 .preimage
@@ -68,12 +59,7 @@ impl<F: PrimeField64> Chip<F> for KeccakPermuteChip {
                 .map(VirtualPairCol::single_main)
                 .collect(),
             count: VirtualPairCol::single_main(KECCAK_COL_MAP.is_real_input),
-            argument_index: MachineBus::KeccakPermuteInput as usize,
+            argument_index: self.bus_keccak_permute_input,
         }]
-    }
-
-    #[cfg(feature = "debug-trace")]
-    fn main_headers(&self) -> Vec<String> {
-        KeccakCols::<F>::headers()
     }
 }

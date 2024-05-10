@@ -127,6 +127,17 @@ impl<F: PrimeField64> Chip<F> for ChipType {
         }
     }
 
+    fn has_interactions(&self) -> bool {
+        match self {
+            ChipType::KeccakPermute(chip) => <KeccakPermuteChip as Chip<F>>::has_interactions(chip),
+            ChipType::KeccakSponge(chip) => <KeccakSpongeChip as Chip<F>>::has_interactions(chip),
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as Chip<F>>::has_interactions(chip),
+            ChipType::Range8(chip) => <RangeCheckerChip<256> as Chip<F>>::has_interactions(chip),
+            ChipType::Xor(chip) => <XorChip as Chip<F>>::has_interactions(chip),
+            ChipType::Memory(chip) => <MemoryChip as Chip<F>>::has_interactions(chip),
+        }
+    }
+
     fn all_interactions(&self) -> Vec<(Interaction<F>, InteractionType)> {
         match self {
             ChipType::KeccakPermute(chip) => chip.all_interactions(),
@@ -555,7 +566,14 @@ impl Machine {
             .chips()
             .iter()
             .zip(preprocessed_widths)
-            .map(|(&chip, prep_width)| get_log_quotient_degree::<Val<SC>, _>(chip, prep_width, 0))
+            .map(|(&chip, prep_width)| {
+                let min_degree = if <ChipType as Chip<Val<SC>>>::has_interactions(chip) {
+                    1
+                } else {
+                    0
+                };
+                get_log_quotient_degree::<Val<SC>, _>(chip, prep_width, 0).max(1)
+            })
             .collect_vec();
         let quotient_degrees = log_quotient_degrees.iter().map(|d| 1 << d).collect_vec();
         let quotient_domains = main_domains
@@ -810,7 +828,9 @@ impl Machine {
             .chips()
             .iter()
             .zip(preprocessed_widths)
-            .map(|(&chip, prep_width)| get_log_quotient_degree::<Val<SC>, _>(chip, prep_width, 0))
+            .map(|(&chip, prep_width)| {
+                get_log_quotient_degree::<Val<SC>, _>(chip, prep_width, 0).max(1)
+            })
             .collect_vec();
         let quotient_degrees = log_quotient_degrees
             .iter()

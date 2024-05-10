@@ -1,5 +1,3 @@
-use crate::chip::MachineChip;
-
 use p3_air::Air;
 use p3_baby_bear::BabyBear;
 use p3_challenger::{HashChallenger, SerializingChallenger32};
@@ -8,7 +6,6 @@ use p3_dft::Radix2DitParallel;
 use p3_field::{extension::BinomialExtensionField, PrimeField64};
 use p3_fri::{FriConfig, TwoAdicFriPcs};
 use p3_keccak::Keccak256Hash;
-
 use p3_merkle_tree::FieldMerkleTreeMmcs;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
 #[cfg(debug_assertions)]
@@ -17,6 +14,8 @@ use p3_uni_stark::{
     prove, verify, ProverConstraintFolder, StarkConfig, SymbolicAirBuilder, VerificationError,
     VerifierConstraintFolder,
 };
+
+use crate::chip::Chip;
 
 type Val = BabyBear;
 type Challenge = BinomialExtensionField<Val, 4>;
@@ -60,23 +59,22 @@ pub fn default_challenger() -> Challenger {
     Challenger::from_hasher(vec![], byte_hash)
 }
 
-#[cfg(debug_assertions)]
-pub(crate) fn prove_and_verify<MC>(chip: &MC) -> Result<(), VerificationError>
-where
-    p3_uni_stark::Val<MyConfig>: PrimeField64,
-    MC: MachineChip<MyConfig>
-        + for<'a> Air<ProverConstraintFolder<'a, MyConfig>>
-        + for<'a> Air<VerifierConstraintFolder<'a, MyConfig>>
-        + for<'a> Air<SymbolicAirBuilder<p3_uni_stark::Val<MyConfig>>>
-        + for<'a> Air<DebugConstraintBuilder<'a, p3_uni_stark::Val<MyConfig>>>,
-{
-    let config = default_config();
+// #[cfg(debug_assertions)]
+// pub(crate) fn prove_and_verify<C>(chip: &C) -> Result<(), VerificationError>
+// where
+//     p3_uni_stark::Val<MyConfig>: PrimeField64,
+//     C: for<'a> Air<ProverConstraintFolder<'a, MyConfig>>
+//         + for<'a> Air<VerifierConstraintFolder<'a, MyConfig>>
+//         + for<'a> Air<SymbolicAirBuilder<p3_uni_stark::Val<MyConfig>>>
+//         + for<'a> Air<DebugConstraintBuilder<'a, p3_uni_stark::Val<MyConfig>>>,
+// {
+//     let config = default_config();
 
-    let trace = chip.generate_trace();
+//     let trace = chip.generate_trace();
 
-    let mut challenger = default_challenger();
-    let proof = prove(&config, chip, &mut challenger, trace, &vec![]);
+//     let mut challenger = default_challenger();
+//     let proof = prove(&config, chip, &mut challenger, trace, &vec![]);
 
-    let mut challenger = default_challenger();
-    verify(&config, chip, &mut challenger, &proof, &vec![])
-}
+//     let mut challenger = default_challenger();
+//     verify(&config, chip, &mut challenger, &proof, &vec![])
+// }

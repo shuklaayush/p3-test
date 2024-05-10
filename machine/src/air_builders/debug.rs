@@ -6,17 +6,19 @@ use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
+use super::ViewPair;
+use crate::rap::permutation_air::PermutationAirBuilderWithCumulativeSum;
+
 /// An `AirBuilder` which asserts that each constraint is zero, allowing any failed constraints to
 /// be detected early.
 pub struct DebugConstraintBuilder<'a, SC: StarkGenericConfig> {
     pub row_index: usize,
-    pub main: VerticalPair<RowMajorMatrixView<'a, Val<SC>>, RowMajorMatrixView<'a, Val<SC>>>,
-    pub preprocessed:
-        VerticalPair<RowMajorMatrixView<'a, Val<SC>>, RowMajorMatrixView<'a, Val<SC>>>,
-    pub perm:
-        VerticalPair<RowMajorMatrixView<'a, SC::Challenge>, RowMajorMatrixView<'a, SC::Challenge>>,
+    pub preprocessed: ViewPair<'a, Val<SC>>,
+    pub main: ViewPair<'a, Val<SC>>,
+    pub permutation: ViewPair<'a, SC::Challenge>,
     pub perm_challenges: &'a [SC::Challenge],
     pub public_values: &'a [Val<SC>],
+    pub cumulative_sum: SC::Challenge,
     pub is_first_row: Val<SC>,
     pub is_last_row: Val<SC>,
     pub is_transition: Val<SC>,
@@ -125,7 +127,7 @@ where
     type RandomVar = SC::Challenge;
 
     fn permutation(&self) -> Self::MP {
-        self.perm
+        self.permutation
     }
 
     fn permutation_randomness(&self) -> &[Self::EF] {
@@ -141,5 +143,14 @@ where
 
     fn public_values(&self) -> &[Self::F] {
         self.public_values
+    }
+}
+
+impl<'a, SC> PermutationAirBuilderWithCumulativeSum for DebugConstraintBuilder<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn cumulative_sum(&self) -> Self::RandomVar {
+        self.cumulative_sum
     }
 }

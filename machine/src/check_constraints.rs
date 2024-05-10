@@ -5,7 +5,6 @@ use p3_matrix::Matrix;
 use p3_maybe_rayon::prelude::IntoParallelIterator;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
-use crate::chip::MachineChip;
 use crate::debug_builder::DebugConstraintBuilder;
 use crate::permutation::eval_permutation_constraints;
 

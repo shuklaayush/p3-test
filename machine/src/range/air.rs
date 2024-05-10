@@ -22,14 +22,14 @@ where
     AB: AirBuilder,
 {
     fn eval(&self, builder: &mut AB) {
-        let main = builder.main();
-        let local = main.row_slice(0);
-        let local: &RangeCols<AB::Var> = (*local).borrow();
+        // let main = builder.main();
+        // let local = main.row_slice(0);
+        // let local: &RangeCols<AB::Var> = (*local).borrow();
 
-        // TODO: This is dummy to make tests pass.
-        //       For some reason, permutation constraints fail when this chip has degree 2.
-        builder
-            .when(local.mult)
-            .assert_eq(local.mult * local.mult, local.mult * local.mult);
+        // // TODO: This is dummy to make tests pass.
+        // //       For some reason, permutation constraints fail when this chip has degree 2.
+        // builder
+        //     .when(local.mult)
+        //     .assert_eq(local.mult * local.mult, local.mult * local.mult);
     }
 }
