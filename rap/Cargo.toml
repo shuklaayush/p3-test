@@ -1,0 +1,9 @@
+[package]
+name = "p3-rap"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+p3-air = { workspace = true }
+p3-field = { workspace = true }
+p3-matrix = { workspace = true }

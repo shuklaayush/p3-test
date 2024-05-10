@@ -1,5 +1,5 @@
 [workspace]
-members = ["machine", "derive"]
+members = ["machine", "derive", "rap"]
 resolver = "2"
 
 [workspace.dependencies]

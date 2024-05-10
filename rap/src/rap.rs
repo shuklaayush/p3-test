@@ -1,9 +1,6 @@
-pub mod interaction;
-pub mod permutation_air;
-
 use p3_air::{Air, PairBuilder};
 
-use self::permutation_air::{PermutationAir, PermutationAirBuilderWithCumulativeSum};
+use super::permutation_air::{PermutationAir, PermutationAirBuilderWithCumulativeSum};
 
 pub trait Rap<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder>:
     Air<AB> + PermutationAir<AB>

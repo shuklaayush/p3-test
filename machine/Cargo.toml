@@ -25,6 +25,7 @@ p3-util = { workspace = true }
 
 itertools = "0.12.1"
 rand = "0.8.5"
+rust_xlsxwriter = { version = "0.64.1", optional = true }
 serde = { version = "1.0", default-features = false, features = [
     "derive",
     "alloc",
@@ -35,7 +36,7 @@ tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }
 tiny-keccak = "2.0.2"
 
 p3-test-derive = { path = "../derive" }
-rust_xlsxwriter = { version = "0.64.1", optional = true }
+p3-rap = { path = "../rap" }
 
 [features]
 default = ["debug-trace"]

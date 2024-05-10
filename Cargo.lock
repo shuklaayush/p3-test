@@ -408,6 +408,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "p3-rap"
+version = "0.1.0"
+dependencies = [
+ "p3-air",
+ "p3-field",
+ "p3-matrix",
+]
+
+[[package]]
 name = "p3-symmetric"
 version = "0.1.0"
 dependencies = [
@@ -445,6 +454,7 @@ dependencies = [
  "p3-mds",
  "p3-merkle-tree",
  "p3-poseidon2",
+ "p3-rap",
  "p3-symmetric",
  "p3-test-derive",
  "p3-uni-stark",

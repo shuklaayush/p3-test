@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use p3_air::VirtualPairCol;
 use p3_field::AbstractField;
 

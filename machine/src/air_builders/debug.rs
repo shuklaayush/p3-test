@@ -4,10 +4,10 @@ use p3_air::{
 use p3_field::AbstractField;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
+use p3_rap::PermutationAirBuilderWithCumulativeSum;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
 use super::ViewPair;
-use crate::rap::permutation_air::PermutationAirBuilderWithCumulativeSum;
 
 /// An `AirBuilder` which asserts that each constraint is zero, allowing any failed constraints to
 /// be detected early.

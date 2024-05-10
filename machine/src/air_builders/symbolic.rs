@@ -3,11 +3,10 @@ use p3_air::{
 };
 use p3_field::Field;
 use p3_matrix::dense::RowMajorMatrix;
+use p3_rap::{PermutationAirBuilderWithCumulativeSum, Rap};
 use p3_uni_stark::{Entry, SymbolicExpression, SymbolicVariable};
 use p3_util::log2_ceil_usize;
 use tracing::instrument;
-
-use crate::rap::{permutation_air::PermutationAirBuilderWithCumulativeSum, Rap};
 
 const NUM_PERM_CHALLENGES: usize = 2;
 const NUM_PERM_EXPOSED_VALUES: usize = 1;

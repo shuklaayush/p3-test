@@ -7,12 +7,11 @@ mod round_flags;
 use p3_air::PairBuilder;
 use p3_field::PrimeField32;
 use p3_matrix::dense::RowMajorMatrix;
+use p3_rap::{PermutationAirBuilderWithCumulativeSum, Rap};
 use tracing::instrument;
 
 use self::{columns::KeccakCols, generation::generate_trace_rows};
 use crate::chip::Chip;
-use crate::rap::permutation_air::PermutationAirBuilderWithCumulativeSum;
-use crate::rap::Rap;
 
 pub const NUM_U64_HASH_ELEMS: usize = 4;
 

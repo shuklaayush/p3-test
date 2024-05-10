@@ -3,7 +3,6 @@ mod air_builders;
 mod chip;
 mod error;
 mod keccak_permute;
-mod rap;
 // mod keccak_sponge;
 // mod machine;
 // mod memory;

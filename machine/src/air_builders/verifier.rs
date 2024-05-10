@@ -2,9 +2,8 @@ use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
 use p3_field::AbstractField;
+use p3_rap::PermutationAirBuilderWithCumulativeSum;
 use p3_uni_stark::{StarkGenericConfig, Val};
-
-use crate::rap::permutation_air::PermutationAirBuilderWithCumulativeSum;
 
 use super::ViewPair;
 

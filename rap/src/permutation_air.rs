@@ -1,8 +1,10 @@
-use itertools::Itertools;
-use p3_air::{BaseAir, ExtensionBuilder, PairBuilder, PermutationAirBuilder, VirtualPairCol};
+use alloc::vec;
+use alloc::vec::Vec;
+use core::borrow::Borrow;
+
+use p3_air::{ExtensionBuilder, PairBuilder, PermutationAirBuilder, VirtualPairCol};
 use p3_field::{AbstractExtensionField, AbstractField, Powers};
 use p3_matrix::Matrix;
-use std::borrow::Borrow;
 
 use super::interaction::{Interaction, InteractionType};
 
@@ -27,7 +29,7 @@ pub fn generate_rlc_elements<F: AbstractField, EF: AbstractExtensionField<F>>(
                 .unwrap_or(0)
                 + 1,
         )
-        .collect_vec()
+        .collect::<Vec<_>>()
 }
 
 pub fn reduce_row<Expr, Var, ExprEF>(
@@ -68,7 +70,7 @@ pub trait PermutationAir<AB: PermutationAirBuilderWithCumulativeSum + PairBuilde
                     .into_iter()
                     .map(|i| (i, InteractionType::Receive)),
             )
-            .collect_vec()
+            .collect::<Vec<_>>()
     }
 
     fn permutation_width(&self) -> usize {

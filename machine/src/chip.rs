@@ -10,9 +10,9 @@ use rust_xlsxwriter::Worksheet;
 #[cfg(feature = "debug-trace")]
 use std::error::Error;
 
-use crate::rap::interaction::{Interaction, InteractionType};
-use crate::rap::permutation_air::{generate_rlc_elements, reduce_row};
 use crate::util::batch_multiplicative_inverse_allowing_zero;
+use p3_rap::{generate_rlc_elements, reduce_row};
+use p3_rap::{Interaction, InteractionType};
 
 pub trait Chip<F: Field> {
     fn generate_trace(&self) -> RowMajorMatrix<F>;
