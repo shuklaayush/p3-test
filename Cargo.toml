@@ -1,5 +1,5 @@
 [workspace]
-members = ["machine", "derive", "rap"]
+members = ["machine", "derive", "interaction", "stark"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -21,6 +21,12 @@ p3-poseidon2 = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "f
 p3-symmetric = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
 p3-uni-stark = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
 p3-util = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
+
+serde = { version = "1.0", default-features = false, features = [
+    "derive",
+    "alloc",
+] }
+tracing = { version = "0.1.37" }
 
 # [patch."https://github.com/Plonky3/Plonky3"]
 [patch."https://github.com/shuklaayush/Plonky3"]

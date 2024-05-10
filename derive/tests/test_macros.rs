@@ -1,4 +1,4 @@
-use p3_test_derive::Headers;
+use p3_derive::Headers;
 
 #[test]
 fn test_simple() {

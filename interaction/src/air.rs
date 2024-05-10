@@ -14,7 +14,9 @@ pub trait PermutationAirBuilderWithCumulativeSum: PermutationAirBuilder {
     fn cumulative_sum(&self) -> Self::RandomVar;
 }
 
-pub trait Rap<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder>: Air<AB> {
+pub trait InteractionAir<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder>:
+    Air<AB>
+{
     fn sends(&self) -> Vec<Interaction<AB::Expr>> {
         vec![]
     }

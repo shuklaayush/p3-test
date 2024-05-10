@@ -258,6 +258,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "p3-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "p3-dft"
 version = "0.1.0"
 dependencies = [
@@ -316,6 +325,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "p3-interaction"
+version = "0.1.0"
+dependencies = [
+ "p3-air",
+ "p3-field",
+ "p3-matrix",
+]
+
+[[package]]
 name = "p3-interpolation"
 version = "0.1.0"
 dependencies = [
@@ -342,6 +360,41 @@ dependencies = [
  "p3-maybe-rayon 0.1.0",
  "p3-util 0.1.0",
  "tracing",
+]
+
+[[package]]
+name = "p3-machine"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "p3-air",
+ "p3-baby-bear",
+ "p3-challenger",
+ "p3-commit",
+ "p3-derive",
+ "p3-dft",
+ "p3-field",
+ "p3-fri",
+ "p3-goldilocks",
+ "p3-interaction",
+ "p3-keccak",
+ "p3-keccak-air",
+ "p3-matrix",
+ "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-mds",
+ "p3-merkle-tree",
+ "p3-poseidon2",
+ "p3-stark",
+ "p3-symmetric",
+ "p3-uni-stark",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "rand",
+ "rust_xlsxwriter",
+ "serde",
+ "tiny-keccak",
+ "tracing",
+ "tracing-forest",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -408,12 +461,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "p3-rap"
+name = "p3-stark"
 version = "0.1.0"
 dependencies = [
  "p3-air",
+ "p3-derive",
  "p3-field",
+ "p3-interaction",
  "p3-matrix",
+ "p3-uni-stark",
+ "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "rust_xlsxwriter",
+ "serde",
+ "tracing",
 ]
 
 [[package]]
@@ -423,49 +483,6 @@ dependencies = [
  "itertools",
  "p3-field",
  "serde",
-]
-
-[[package]]
-name = "p3-test-derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "p3-test-machine"
-version = "0.1.0"
-dependencies = [
- "itertools",
- "p3-air",
- "p3-baby-bear",
- "p3-challenger",
- "p3-commit",
- "p3-dft",
- "p3-field",
- "p3-fri",
- "p3-goldilocks",
- "p3-keccak",
- "p3-keccak-air",
- "p3-matrix",
- "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
- "p3-mds",
- "p3-merkle-tree",
- "p3-poseidon2",
- "p3-rap",
- "p3-symmetric",
- "p3-test-derive",
- "p3-uni-stark",
- "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
- "rand",
- "rust_xlsxwriter",
- "serde",
- "tiny-keccak",
- "tracing",
- "tracing-forest",
- "tracing-subscriber",
 ]
 
 [[package]]
