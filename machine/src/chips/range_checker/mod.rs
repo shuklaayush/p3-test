@@ -14,6 +14,7 @@ use self::columns::{RangeCols, NUM_RANGE_COLS};
 #[derive(Default)]
 pub struct RangeCheckerChip<const MAX: u32> {
     pub count: BTreeMap<u32, u32>,
+
     pub bus_range_8: usize,
 }
 
@@ -43,28 +44,31 @@ impl<const MAX: u32, F: PrimeField32> Stark<F> for RangeCheckerChip<MAX> {
     }
 }
 
-// #[cfg(test)]
-// #[cfg(debug_assertions)]
-// mod tests {
-//     use super::*;
-//     use crate::test_util::prove_and_verify;
+#[cfg(test)]
+#[cfg(debug_assertions)]
+mod tests {
+    use super::*;
+    use crate::test_util::prove_and_verify;
 
-//     use p3_uni_stark::VerificationError;
-//     use rand::random;
+    use p3_uni_stark::VerificationError;
+    use rand::random;
 
-//     #[test]
-//     fn test_range_prove() -> Result<(), VerificationError> {
-//         const NUM: usize = 400;
+    #[test]
+    fn test_range_prove() -> Result<(), VerificationError> {
+        const NUM: usize = 400;
 
-//         let mut count = BTreeMap::new();
-//         for _ in 0..NUM {
-//             count
-//                 .entry(random::<u8>() as u32)
-//                 .and_modify(|c| *c += 1)
-//                 .or_insert(1);
-//         }
-//         let chip = RangeCheckerChip::<256> { count };
+        let mut count = BTreeMap::new();
+        for _ in 0..NUM {
+            count
+                .entry(random::<u8>() as u32)
+                .and_modify(|c| *c += 1)
+                .or_insert(1);
+        }
+        let chip = RangeCheckerChip::<256> {
+            count,
+            ..Default::default()
+        };
 
-//         prove_and_verify(&chip)
-//     }
-// }
+        prove_and_verify(&chip, vec![])
+    }
+}

@@ -22,8 +22,10 @@ pub struct KeccakSpongeOp {
     pub input: Vec<u8>,
 }
 
+#[derive(Default)]
 pub struct KeccakSpongeChip {
     pub inputs: Vec<KeccakSpongeOp>,
+
     pub bus_xor_input: usize,
     pub bus_keccak_permute_input: usize,
     pub bus_range_8: usize,
@@ -62,28 +64,31 @@ impl<F: PrimeField32> Stark<F> for KeccakSpongeChip {
     }
 }
 
-// #[cfg(test)]
-// #[cfg(debug_assertions)]
-// mod tests {
-//     use super::*;
-//     use crate::test_util::prove_and_verify;
+#[cfg(test)]
+#[cfg(debug_assertions)]
+mod tests {
+    use super::*;
+    use crate::test_util::prove_and_verify;
 
-//     use itertools::Itertools;
-//     use p3_uni_stark::VerificationError;
-//     use rand::random;
+    use itertools::Itertools;
+    use p3_uni_stark::VerificationError;
+    use rand::random;
 
-//     #[test]
-//     fn test_keccak_sponge_prove() -> Result<(), VerificationError> {
-//         const NUM_BYTES: usize = 400;
+    #[test]
+    fn test_keccak_sponge_prove() -> Result<(), VerificationError> {
+        const NUM_BYTES: usize = 400;
 
-//         let op = KeccakSpongeOp {
-//             timestamp: 0,
-//             addr: 0,
-//             input: (0..NUM_BYTES).map(|_| random()).collect_vec(),
-//         };
-//         let inputs = vec![op];
-//         let chip = KeccakSpongeChip { inputs };
+        let op = KeccakSpongeOp {
+            timestamp: 0,
+            addr: 0,
+            input: (0..NUM_BYTES).map(|_| random()).collect_vec(),
+        };
+        let inputs = vec![op];
+        let chip = KeccakSpongeChip {
+            inputs,
+            ..Default::default()
+        };
 
-//         prove_and_verify(&chip)
-//     }
-// }
+        prove_and_verify(&chip, vec![])
+    }
+}

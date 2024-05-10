@@ -23,8 +23,10 @@ pub struct MemoryOp {
     pub kind: OperationKind,
 }
 
+#[derive(Default)]
 pub struct MemoryChip {
     pub operations: Vec<MemoryOp>,
+
     pub bus_memory: usize,
     pub bus_range_8: usize,
 }
@@ -79,34 +81,35 @@ impl<F: PrimeField32> Stark<F> for MemoryChip {
     }
 }
 
-// #[cfg(test)]
-// #[cfg(debug_assertions)]
-// mod tests {
-//     use super::*;
-//     use crate::test_util::prove_and_verify;
+#[cfg(test)]
+#[cfg(debug_assertions)]
+mod tests {
+    use super::*;
+    use crate::test_util::prove_and_verify;
 
-//     use itertools::Itertools;
-//     use p3_uni_stark::VerificationError;
-//     use rand::random;
+    use itertools::Itertools;
+    use p3_uni_stark::VerificationError;
+    use rand::random;
 
-//     #[test]
-//     fn test_memory_prove() -> Result<(), VerificationError> {
-//         const NUM_BYTES: usize = 400;
+    #[test]
+    fn test_memory_prove() -> Result<(), VerificationError> {
+        const NUM_BYTES: usize = 400;
 
-//         let bytes = (0..NUM_BYTES).map(|_| random()).collect_vec();
-//         let chip = MemoryChip {
-//             operations: bytes
-//                 .into_iter()
-//                 .enumerate()
-//                 .map(|(i, b)| MemoryOp {
-//                     addr: i as u32,
-//                     timestamp: i as u32,
-//                     value: b,
-//                     kind: OperationKind::Read,
-//                 })
-//                 .collect_vec(),
-//         };
+        let bytes = (0..NUM_BYTES).map(|_| random()).collect_vec();
+        let chip = MemoryChip {
+            operations: bytes
+                .into_iter()
+                .enumerate()
+                .map(|(i, b)| MemoryOp {
+                    addr: i as u32,
+                    timestamp: i as u32,
+                    value: b,
+                    kind: OperationKind::Read,
+                })
+                .collect_vec(),
+            ..Default::default()
+        };
 
-//         prove_and_verify(&chip)
-//     }
-// }
+        prove_and_verify(&chip, vec![])
+    }
+}

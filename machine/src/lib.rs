@@ -1,5 +1,6 @@
 mod chip;
 mod chips;
+mod config;
 mod error;
 // mod machine;
 mod proof;

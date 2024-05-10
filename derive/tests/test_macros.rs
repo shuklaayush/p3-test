@@ -71,6 +71,7 @@ fn test_array_variable_length() {
 
     assert_eq!(A::headers(), vec!["a[0]"]);
 }
+
 #[test]
 fn test_nested_array_variable_length() {
     const N: usize = 1;

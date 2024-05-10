@@ -16,6 +16,7 @@ pub const NUM_U64_HASH_ELEMS: usize = 4;
 /// Assumes the field size is at least 16 bits.
 pub struct KeccakPermuteChip {
     pub inputs: Vec<([u64; 25], bool)>,
+
     pub bus_keccak_permute_input: usize,
     pub bus_keccak_permute_output: usize,
     pub bus_keccak_permute_digest_output: usize,
@@ -33,28 +34,28 @@ impl<F: PrimeField32> Stark<F> for KeccakPermuteChip {
     }
 }
 
-// #[cfg(test)]
-// #[cfg(debug_assertions)]
-// mod tests {
-//     use super::*;
-//     use crate::test_util::prove_and_verify;
+#[cfg(test)]
+#[cfg(debug_assertions)]
+mod tests {
+    use super::*;
+    use crate::test_util::prove_and_verify;
 
-//     use itertools::Itertools;
-//     use p3_uni_stark::VerificationError;
-//     use rand::random;
+    use itertools::Itertools;
+    use p3_uni_stark::VerificationError;
+    use rand::random;
 
-//     #[test]
-//     fn test_keccak_prove() -> Result<(), VerificationError> {
-//         const NUM_HASHES: usize = 10;
+    #[test]
+    fn test_keccak_prove() -> Result<(), VerificationError> {
+        const NUM_HASHES: usize = 10;
 
-//         let inputs = (0..NUM_HASHES).map(|_| random()).collect_vec();
-//         let chip = KeccakPermuteChip {
-//             inputs,
-//             bus_keccak_permute_input: 0,
-//             bus_keccak_permute_output: 0,
-//             bus_keccak_permute_digest_output: 0,
-//         };
+        let inputs = (0..NUM_HASHES).map(|_| random()).collect_vec();
+        let chip = KeccakPermuteChip {
+            inputs,
+            bus_keccak_permute_input: 0,
+            bus_keccak_permute_output: 0,
+            bus_keccak_permute_digest_output: 0,
+        };
 
-//         prove_and_verify(&chip)
-//     }
-// }
+        prove_and_verify(&chip, vec![])
+    }
+}
