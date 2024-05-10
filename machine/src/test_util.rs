@@ -1,21 +1,14 @@
-use p3_air::Air;
 use p3_baby_bear::BabyBear;
 use p3_challenger::{HashChallenger, SerializingChallenger32};
 use p3_commit::ExtensionMmcs;
 use p3_dft::Radix2DitParallel;
-use p3_field::{extension::BinomialExtensionField, PrimeField64};
+use p3_field::extension::BinomialExtensionField;
 use p3_fri::{FriConfig, TwoAdicFriPcs};
 use p3_keccak::Keccak256Hash;
 use p3_merkle_tree::FieldMerkleTreeMmcs;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
-#[cfg(debug_assertions)]
-use p3_uni_stark::DebugConstraintBuilder;
-use p3_uni_stark::{
-    prove, verify, ProverConstraintFolder, StarkConfig, SymbolicAirBuilder, VerificationError,
-    VerifierConstraintFolder,
-};
+use p3_uni_stark::StarkConfig;
 
-use crate::chip::Chip;
 
 type Val = BabyBear;
 type Challenge = BinomialExtensionField<Val, 4>;

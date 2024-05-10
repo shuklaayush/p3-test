@@ -4,10 +4,12 @@
 
 extern crate alloc;
 
+mod generation;
 mod interaction;
-mod permutation_air;
 mod rap;
+mod util;
 
+pub use generation::*;
 pub use interaction::*;
-pub use permutation_air::*;
 pub use rap::*;
+pub use util::*;

@@ -1,7 +1,5 @@
-use itertools::Itertools;
 use p3_field::{ExtensionField, Field};
-use p3_matrix::{dense::RowMajorMatrix, Matrix};
-use std::borrow::Borrow;
+use p3_matrix::dense::RowMajorMatrix;
 
 #[cfg(feature = "debug-trace")]
 use p3_field::PrimeField32;
@@ -10,9 +8,8 @@ use rust_xlsxwriter::Worksheet;
 #[cfg(feature = "debug-trace")]
 use std::error::Error;
 
-use crate::util::batch_multiplicative_inverse_allowing_zero;
-use p3_rap::{generate_rlc_elements, reduce_row};
-use p3_rap::{Interaction, InteractionType};
+use p3_rap::generate_permutation_trace;
+use p3_rap::Interaction;
 
 pub trait Chip<F: Field> {
     fn generate_trace(&self) -> RowMajorMatrix<F>;
@@ -21,7 +18,7 @@ pub trait Chip<F: Field> {
     fn main_headers(&self) -> Vec<String>;
 }
 
-pub trait PermutationChip<F: Field, EF: ExtensionField<F>> {
+pub trait RapChip<F: Field, EF: ExtensionField<F>>: Chip<F> {
     /// Generate the permutation trace for a chip with the provided machine.
     /// This is called only after `generate_trace` has been called on all chips.
     fn generate_permutation_trace(
@@ -32,100 +29,9 @@ pub trait PermutationChip<F: Field, EF: ExtensionField<F>> {
         receives: &[Interaction<F>],
         random_elements: Vec<EF>,
     ) -> Option<RowMajorMatrix<EF>> {
-        let interactions = sends
-            .into_iter()
-            .map(|i| (i, InteractionType::Send))
-            .chain(receives.into_iter().map(|i| (i, InteractionType::Receive)))
-            .collect_vec();
-        if interactions.is_empty() {
-            return None;
-        }
-
-        let alphas = generate_rlc_elements(sends, receives, random_elements[0]);
-        let betas = random_elements[1].powers();
-
-        // Compute the reciprocal columns
-        //
-        // Row: | q_1 | q_2 | q_3 | ... | q_n | \phi |
-        // * q_i = \frac{1}{\alpha^i + \sum_j \beta^j * f_{i,j}}
-        // * f_{i,j} is the jth main trace column for the ith interaction
-        // * \phi is the running sum
-        //
-        // Note: We can optimize this by combining several reciprocal columns into one (the
-        // number is subject to a target constraint degree).
-        let perm_width = interactions.len() + 1;
-        let mut perm_values = Vec::with_capacity(main.height() * perm_width);
-
-        for (n, main_row) in main.rows().enumerate() {
-            let main_row = main_row.collect_vec();
-
-            let mut row = vec![EF::zero(); perm_width];
-            for (m, (interaction, _)) in interactions.iter().enumerate() {
-                let alpha_m = alphas[interaction.argument_index];
-                let preprocessed_row = preprocessed
-                    .as_ref()
-                    .map(|preprocessed| {
-                        let row = preprocessed.row_slice(n);
-                        let row: &[_] = (*row).borrow();
-                        row.to_vec()
-                    })
-                    .unwrap_or_default();
-                row[m] = reduce_row(
-                    main_row.as_slice(),
-                    preprocessed_row.as_slice(),
-                    &interaction.fields,
-                    alpha_m,
-                    betas.clone(),
-                );
-            }
-            perm_values.extend(row);
-        }
-        // TODO: Switch to batch_multiplicative_inverse (not allowing zero)?
-        // Zero should be vanishingly unlikely if properly randomized?
-        let perm_values = batch_multiplicative_inverse_allowing_zero(perm_values);
-        let mut perm = RowMajorMatrix::new(perm_values, perm_width);
-
-        // Compute the running sum column
-        let mut phi = vec![EF::zero(); perm.height()];
-        for (n, (main_row, perm_row)) in main.rows().zip(perm.rows()).enumerate() {
-            let main_row = main_row.collect_vec();
-            let perm_row = perm_row.collect_vec();
-
-            if n > 0 {
-                phi[n] = phi[n - 1];
-            }
-            let preprocessed_row = preprocessed
-                .as_ref()
-                .map(|preprocessed| {
-                    let row = preprocessed.row_slice(n);
-                    let row: &[_] = (*row).borrow();
-                    row.to_vec()
-                })
-                .unwrap_or_default();
-            for (m, (interaction, interaction_type)) in interactions.iter().enumerate() {
-                let mult = interaction
-                    .count
-                    .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
-                match interaction_type {
-                    InteractionType::Send => {
-                        phi[n] += perm_row[m] * mult;
-                    }
-                    InteractionType::Receive => {
-                        phi[n] -= perm_row[m] * mult;
-                    }
-                }
-            }
-        }
-
-        for (n, row) in perm.as_view_mut().rows_mut().enumerate() {
-            *row.last_mut().unwrap() = phi[n];
-        }
-
-        Some(perm)
+        generate_permutation_trace(preprocessed, main, sends, receives, random_elements)
     }
-}
 
-pub trait RapChip<F: Field, EF: ExtensionField<F>>: Chip<F> + PermutationChip<F, EF> {
     #[cfg(feature = "debug-trace")]
     fn write_traces_to_worksheet(
         &self,

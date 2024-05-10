@@ -1,16 +1,13 @@
 use itertools::Itertools;
 use p3_air::{PairBuilder, VirtualPairCol};
 use p3_keccak_air::U64_LIMBS;
-use p3_rap::{Interaction, PermutationAir, PermutationAirBuilderWithCumulativeSum};
+use p3_rap::{Interaction, PermutationAirBuilderWithCumulativeSum, Rap};
 
 use super::KeccakPermuteChip;
 use crate::keccak_permute::columns::KECCAK_COL_MAP;
 use crate::keccak_permute::NUM_U64_HASH_ELEMS;
 
-// TODO: Add clk to each row to transform multiset check to equality check?
-impl<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder> PermutationAir<AB>
-    for KeccakPermuteChip
-{
+impl<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder> Rap<AB> for KeccakPermuteChip {
     fn sends(&self) -> Vec<Interaction<AB::Expr>> {
         vec![
             Interaction {

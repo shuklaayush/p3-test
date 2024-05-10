@@ -12,6 +12,5 @@ mod keccak_permute;
 // mod range;
 #[cfg(test)]
 mod test_util;
-mod util;
 // mod verify;
 // mod xor;

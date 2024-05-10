@@ -1,13 +1,11 @@
 mod air;
 mod columns;
 mod generation;
-mod permutation_air;
+mod rap;
 mod round_flags;
 
-use p3_air::PairBuilder;
 use p3_field::PrimeField32;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_rap::{PermutationAirBuilderWithCumulativeSum, Rap};
 use tracing::instrument;
 
 use self::{columns::KeccakCols, generation::generate_trace_rows};
@@ -22,8 +20,6 @@ pub struct KeccakPermuteChip {
     pub bus_keccak_permute_output: usize,
     pub bus_keccak_permute_digest_output: usize,
 }
-
-impl<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder> Rap<AB> for KeccakPermuteChip {}
 
 impl<F: PrimeField32> Chip<F> for KeccakPermuteChip {
     #[instrument(name = "generate Keccak trace", skip_all)]
