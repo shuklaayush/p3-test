@@ -1,5 +1,5 @@
 [package]
-name = "p3-test-machine"
+name = "p3-machine"
 version = "0.1.0"
 edition = "2021"
 
@@ -23,20 +23,19 @@ p3-symmetric = { workspace = true }
 p3-uni-stark = { workspace = true }
 p3-util = { workspace = true }
 
+serde = { workspace = true }
+tracing = { workspace = true }
+
+p3-derive = { path = "../derive" }
+p3-interaction = { path = "../interaction" }
+p3-stark = { path = "../stark" }
+
 itertools = "0.12.1"
 rand = "0.8.5"
 rust_xlsxwriter = { version = "0.64.1", optional = true }
-serde = { version = "1.0", default-features = false, features = [
-    "derive",
-    "alloc",
-] }
-tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
 tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }
 tiny-keccak = "2.0.2"
-
-p3-test-derive = { path = "../derive" }
-p3-rap = { path = "../rap" }
 
 [features]
 default = ["debug-trace"]

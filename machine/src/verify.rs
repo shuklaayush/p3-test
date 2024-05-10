@@ -101,10 +101,7 @@ pub fn verify_constraints<SC: StarkGenericConfig, C: MachineChip<SC>>(
         alpha,
         accumulator: SC::Challenge::zero(),
     };
-    chip.eval(&mut folder);
-    if let Some(cumulative_sum) = cumulative_sum {
-        eval_permutation_constraints::<_, SC, _>(chip, &mut folder, cumulative_sum);
-    }
+    chip.eval_all(&mut folder);
 
     let folded_constraints = folder.accumulator;
     // Finally, check that
