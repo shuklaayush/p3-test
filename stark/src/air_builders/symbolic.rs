@@ -2,7 +2,7 @@ use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
 use p3_field::Field;
-use p3_interaction::{InteractionAir, PermutationAirBuilderWithCumulativeSum};
+use p3_interaction::{InteractionAir, InteractionAirBuilder};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{Entry, SymbolicExpression, SymbolicVariable};
 use p3_util::log2_ceil_usize;
@@ -192,7 +192,7 @@ impl<F: Field> PermutationAirBuilder for SymbolicAirBuilder<F> {
     }
 }
 
-impl<F: Field> PermutationAirBuilderWithCumulativeSum for SymbolicAirBuilder<F> {
+impl<F: Field> InteractionAirBuilder for SymbolicAirBuilder<F> {
     fn cumulative_sum(&self) -> Self::VarEF {
         self.cumulative_sum
     }

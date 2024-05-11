@@ -1,7 +1,9 @@
 use itertools::Itertools;
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{ExtensionField, Field};
-use p3_interaction::{generate_permutation_trace, InteractionAir, NUM_PERM_CHALLENGES};
+use p3_interaction::{
+    generate_permutation_trace, InteractionAir, InteractionAirBuilder, NUM_PERM_CHALLENGES,
+};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Com, Domain, StarkGenericConfig, Val};
 
@@ -89,8 +91,7 @@ where
     // }
 }
 
-pub type MachineTrace<'a, Domain: PolynomialSpace, EF: ExtensionField<Domain::Val>> =
-    Vec<ChipTrace<'a, Domain, EF>>;
+pub type MachineTrace<'a, Domain, EF> = Vec<ChipTrace<'a, Domain, EF>>;
 
 pub trait MachineTraceBuilder<'a> {
     fn new(chips: &'a [&ChipType]) -> Self;
@@ -106,11 +107,13 @@ where
     }
 }
 
-pub trait MachineTraceLoader<'a, Domain>
+pub trait MachineTraceLoader<'a, Domain, SC>
 where
     Domain: PolynomialSpace,
+    SC: StarkGenericConfig,
+    SC::Challenge: ExtensionField<Domain::Val>,
 {
-    fn load_preprocessed<SC, P>(
+    fn load_preprocessed<P>(
         self,
         pcs: &P,
         traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
@@ -119,27 +122,29 @@ where
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>;
 
-    fn load_main<SC, P>(self, pcs: &P, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self
+    fn load_main<P>(self, pcs: &P, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self
     where
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>;
 
-    fn generate_permutation<SC, P>(
+    fn generate_permutation<P, AB>(
         self,
         pcs: &P,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     ) -> Self
     where
+        AB: InteractionAirBuilder<Expr = Domain::Val>,
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>;
 }
 
-impl<'a, Domain, EF> MachineTraceLoader<'a, Domain> for MachineTrace<'a, Domain, EF>
+impl<'a, Domain, SC> MachineTraceLoader<'a, Domain, SC> for MachineTrace<'a, Domain, SC::Challenge>
 where
     Domain: PolynomialSpace,
-    EF: ExtensionField<Domain::Val>,
+    SC: StarkGenericConfig,
+    SC::Challenge: ExtensionField<Domain::Val>,
 {
-    fn load_preprocessed<SC, P>(
+    fn load_preprocessed<P>(
         mut self,
         pcs: &P,
         traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
@@ -155,7 +160,7 @@ where
         self
     }
 
-    fn load_main<SC, P>(mut self, pcs: &P, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self
+    fn load_main<P>(mut self, pcs: &P, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self
     where
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>,
@@ -167,27 +172,28 @@ where
         self
     }
 
-    fn generate_permutation<SC, P>(
+    fn generate_permutation<P, AB>(
         mut self,
         pcs: &P,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     ) -> Self
     where
+        AB: InteractionAirBuilder<Expr = Domain::Val>,
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>,
     {
         let traces = self
-            .into_iter()
+            .iter()
             .map(|trace| {
                 generate_permutation_trace(
-                    &trace.preprocessed.map(|mt| mt.matrix),
-                    &trace.main.map(|mt| mt.matrix),
-                    &trace.chip.all_interactions(),
+                    &trace.preprocessed.as_ref().map(|mt| mt.matrix.as_view()),
+                    &trace.main.as_ref().map(|mt| mt.matrix.as_view()),
+                    <ChipType as InteractionAir<AB>>::all_interactions(trace.chip).as_slice(),
                     perm_challenges,
                 )
             })
             .collect_vec();
-        let traces = load_traces::<SC, EF>(pcs, traces);
+        let traces = load_traces::<SC, _>(pcs, traces);
         for (chip_trace, permutation) in self.iter_mut().zip_eq(traces) {
             chip_trace.permutation = permutation;
         }

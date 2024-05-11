@@ -1,8 +1,8 @@
 use p3_field::{ExtensionField, Field};
-use p3_interaction::{Interaction, InteractionAir, PermutationAirBuilderWithCumulativeSum};
+use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder};
 use p3_stark::{InteractionStark, Stark};
 
-use p3_air::{Air, AirBuilder, BaseAir, PairBuilder};
+use p3_air::{Air, AirBuilder, BaseAir};
 use p3_matrix::dense::RowMajorMatrix;
 use std::fmt::{self, Display, Formatter};
 
@@ -86,7 +86,7 @@ impl<AB: AirBuilder> Air<AB> for ChipType {
     }
 }
 
-impl<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder> InteractionAir<AB> for ChipType {
+impl<AB: InteractionAirBuilder> InteractionAir<AB> for ChipType {
     fn sends(&self) -> Vec<Interaction<AB::Expr>> {
         match self {
             ChipType::KeccakPermute(chip) => <KeccakPermuteChip as InteractionAir<AB>>::sends(chip),

@@ -1,13 +1,11 @@
 use itertools::Itertools;
-use p3_air::{PairBuilder, VirtualPairCol};
-use p3_interaction::{Interaction, InteractionAir, PermutationAirBuilderWithCumulativeSum};
+use p3_air::VirtualPairCol;
+use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder};
 use p3_keccak_air::U64_LIMBS;
 
 use super::{columns::KECCAK_COL_MAP, KeccakPermuteChip, NUM_U64_HASH_ELEMS};
 
-impl<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder> InteractionAir<AB>
-    for KeccakPermuteChip
-{
+impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakPermuteChip {
     fn sends(&self) -> Vec<Interaction<AB::Expr>> {
         vec![
             Interaction {

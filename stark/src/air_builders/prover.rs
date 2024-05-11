@@ -2,7 +2,7 @@ use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
 use p3_field::AbstractField;
-use p3_interaction::PermutationAirBuilderWithCumulativeSum;
+use p3_interaction::InteractionAirBuilder;
 use p3_uni_stark::{PackedChallenge, PackedVal, StarkGenericConfig, Val};
 
 use super::ViewPair;
@@ -110,9 +110,7 @@ impl<'a, SC: StarkGenericConfig> AirBuilderWithPublicValues for ProverConstraint
     }
 }
 
-impl<'a, SC: StarkGenericConfig> PermutationAirBuilderWithCumulativeSum
-    for ProverConstraintFolder<'a, SC>
-{
+impl<'a, SC: StarkGenericConfig> InteractionAirBuilder for ProverConstraintFolder<'a, SC> {
     fn cumulative_sum(&self) -> Self::RandomVar {
         self.cumulative_sum
     }

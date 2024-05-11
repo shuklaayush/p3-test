@@ -1,9 +1,9 @@
-use p3_air::{PairBuilder, VirtualPairCol};
-use p3_interaction::{Interaction, InteractionAir, PermutationAirBuilderWithCumulativeSum};
+use p3_air::VirtualPairCol;
+use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder};
 
 use super::{columns::MEMORY_COL_MAP, MemoryChip};
 
-impl<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder> InteractionAir<AB> for MemoryChip {
+impl<AB: InteractionAirBuilder> InteractionAir<AB> for MemoryChip {
     fn sends(&self) -> Vec<Interaction<AB::Expr>> {
         vec![
             // TODO: Combine with is_write?

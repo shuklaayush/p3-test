@@ -2,7 +2,7 @@ use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
 use p3_field::{ExtensionField, Field};
-use p3_interaction::{PermutationAirBuilderWithCumulativeSum, NUM_PERM_CHALLENGES};
+use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 
@@ -133,7 +133,7 @@ impl<'a, F: Field, EF: ExtensionField<F>> AirBuilderWithPublicValues
     }
 }
 
-impl<'a, F: Field, EF: ExtensionField<F>> PermutationAirBuilderWithCumulativeSum
+impl<'a, F: Field, EF: ExtensionField<F>> InteractionAirBuilder
     for DebugConstraintBuilder<'a, F, EF>
 {
     fn cumulative_sum(&self) -> Self::RandomVar {

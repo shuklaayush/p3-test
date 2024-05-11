@@ -3,13 +3,13 @@ extern crate alloc;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use p3_air::{PairBuilder, VirtualPairCol};
+use p3_air::VirtualPairCol;
 use p3_field::AbstractField;
-use p3_interaction::{Interaction, InteractionAir, PermutationAirBuilderWithCumulativeSum};
+use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder};
 
 use super::{columns::XOR_COL_MAP, XorChip};
 
-impl<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder> InteractionAir<AB> for XorChip {
+impl<AB: InteractionAirBuilder> InteractionAir<AB> for XorChip {
     fn sends(&self) -> Vec<Interaction<AB::Expr>> {
         let column_weights = XOR_COL_MAP
             .output

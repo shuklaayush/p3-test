@@ -5,6 +5,7 @@ use p3_matrix::dense::RowMajorMatrix;
 
 #[cfg(feature = "debug-trace")]
 use p3_field::PrimeField32;
+use p3_matrix::dense::RowMajorMatrixView;
 #[cfg(feature = "debug-trace")]
 use rust_xlsxwriter::Worksheet;
 #[cfg(feature = "debug-trace")]
@@ -23,8 +24,8 @@ pub trait Stark<F: Field> {
 pub trait InteractionStark<F: Field, EF: ExtensionField<F>>: Stark<F> {
     fn generate_permutation_trace(
         &self,
-        preprocessed: &Option<RowMajorMatrix<F>>,
-        main: &Option<RowMajorMatrix<F>>,
+        preprocessed: &Option<RowMajorMatrixView<F>>,
+        main: &Option<RowMajorMatrixView<F>>,
         interactions: &[(Interaction<F>, InteractionType)],
         random_elements: [EF; NUM_PERM_CHALLENGES],
     ) -> Option<RowMajorMatrix<EF>> {

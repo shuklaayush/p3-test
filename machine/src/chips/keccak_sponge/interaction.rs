@@ -1,16 +1,14 @@
 use itertools::Itertools;
-use p3_air::{PairBuilder, VirtualPairCol};
+use p3_air::VirtualPairCol;
 use p3_field::AbstractField;
-use p3_interaction::{Interaction, InteractionAir, PermutationAirBuilderWithCumulativeSum};
+use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder};
 
 use super::{
     columns::{KECCAK_RATE_BYTES, KECCAK_SPONGE_COL_MAP},
     KeccakSpongeChip,
 };
 
-impl<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder> InteractionAir<AB>
-    for KeccakSpongeChip
-{
+impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakSpongeChip {
     fn sends(&self) -> Vec<Interaction<AB::Expr>> {
         let is_real = VirtualPairCol::sum_main(vec![
             KECCAK_SPONGE_COL_MAP.is_padding_byte[KECCAK_RATE_BYTES - 1],

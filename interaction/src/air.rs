@@ -10,13 +10,11 @@ use crate::{generate_rlc_elements, reduce_row};
 
 use super::interaction::{Interaction, InteractionType};
 
-pub trait PermutationAirBuilderWithCumulativeSum: PermutationAirBuilder {
+pub trait InteractionAirBuilder: PermutationAirBuilder + PairBuilder {
     fn cumulative_sum(&self) -> Self::RandomVar;
 }
 
-pub trait InteractionAir<AB: PermutationAirBuilderWithCumulativeSum + PairBuilder>:
-    Air<AB>
-{
+pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> {
     fn sends(&self) -> Vec<Interaction<AB::Expr>> {
         vec![]
     }

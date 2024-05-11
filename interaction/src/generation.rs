@@ -3,7 +3,10 @@ use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use p3_field::{ExtensionField, Field};
-use p3_matrix::{dense::RowMajorMatrix, Matrix};
+use p3_matrix::{
+    dense::{RowMajorMatrix, RowMajorMatrixView},
+    Matrix,
+};
 
 use super::interaction::{Interaction, InteractionType};
 use crate::{batch_multiplicative_inverse_allowing_zero, generate_rlc_elements, reduce_row};
@@ -11,8 +14,8 @@ use crate::{batch_multiplicative_inverse_allowing_zero, generate_rlc_elements, r
 pub const NUM_PERM_CHALLENGES: usize = 2;
 
 pub fn generate_permutation_trace<F: Field, EF: ExtensionField<F>>(
-    preprocessed: &Option<RowMajorMatrix<F>>,
-    main: &Option<RowMajorMatrix<F>>,
+    preprocessed: &Option<RowMajorMatrixView<F>>,
+    main: &Option<RowMajorMatrixView<F>>,
     interactions: &[(Interaction<F>, InteractionType)],
     random_elements: [EF; NUM_PERM_CHALLENGES],
 ) -> Option<RowMajorMatrix<EF>> {
