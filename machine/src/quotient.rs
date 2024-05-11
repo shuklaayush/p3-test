@@ -55,6 +55,7 @@ where
             let is_transition = *PackedVal::<SC>::from_slice(&sels.is_transition[i_range.clone()]);
             let inv_zeroifier = *PackedVal::<SC>::from_slice(&sels.inv_zeroifier[i_range.clone()]);
 
+            // TODO: Any way to do it without collect?
             let preprocessed_local = preprocessed_trace_on_quotient_domain
                 .vertically_packed_row(i_start)
                 .collect_vec();

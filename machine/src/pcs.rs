@@ -3,9 +3,13 @@ use p3_commit::Pcs;
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Com, StarkGenericConfig, Val};
 
-use crate::{proof::ProverData, trace::ChipTrace};
+use crate::trace::ChipTrace;
 
-pub trait Commiter<SC: StarkGenericConfig> {
+pub trait Commiter<P, SC>
+where
+    P: Pcs<SC::Challenge, SC::Challenger>,
+    SC: StarkGenericConfig<Pcs = P>,
+{
     fn load_traces(
         &self,
         traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
@@ -14,12 +18,12 @@ pub trait Commiter<SC: StarkGenericConfig> {
     fn commit_traces(
         &self,
         traces: Vec<Option<ChipTrace<SC>>>,
-    ) -> (Option<Com<SC>>, Option<ProverData<SC>>);
+    ) -> (Option<Com<SC>>, Option<P::ProverData>);
 }
 
-impl<P, SC> Commiter<SC> for P
+impl<P, SC> Commiter<P, SC> for P
 where
-    P: Pcs<SC::Challenge, SC::Challenger, ProverData = ProverData<SC>>,
+    P: Pcs<SC::Challenge, SC::Challenger>,
     SC: StarkGenericConfig<Pcs = P>,
 {
     fn load_traces(
@@ -56,7 +60,7 @@ where
     fn commit_traces(
         &self,
         traces: Vec<Option<ChipTrace<SC>>>,
-    ) -> (Option<Com<SC>>, Option<ProverData<SC>>) {
+    ) -> (Option<Com<SC>>, Option<P::ProverData>) {
         let domains_and_traces = traces
             .into_iter()
             .flat_map(|mt| mt.map(|trace| (trace.domain, trace.matrix)))
