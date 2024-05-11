@@ -133,7 +133,7 @@ impl Machine {
         let trace =
             tracing::info_span!("load main traces").in_scope(|| trace.load_main(pcs, main_traces));
         let (main_commit, main_data) =
-            tracing::info_span!("commit to main traces").in_scope(|| trace.commit_main(pcs));
+            tracing::info_span!("commit to main traces").in_scope(|| trace.commit_main::<SC>(pcs));
         if let Some(main_commit) = main_commit {
             challenger.observe(main_commit.clone());
         }
@@ -167,15 +167,10 @@ impl Machine {
                     .collect_vec()
             });
         let trace = tracing::info_span!("load permutation traces")
-            .in_scope(|| trace.load_traces(pcs, permutation_traces));
+            .in_scope(|| trace.load_permutation(pcs, permutation_traces));
         let (permutation_commit, permutation_data) =
-            tracing::info_span!("commit to permutation traces").in_scope(|| {
-                let flattened: Vec<_> = permutation_traces
-                    .iter()
-                    .map(|mt| mt.map(|trace| trace.flatten_to_base()))
-                    .collect();
-                pcs.commit_traces::<SC>(flattened)
-            });
+            tracing::info_span!("commit to permutation traces")
+                .in_scope(|| trace.commit_permutation::<SC>(pcs));
         if let Some(permutation_commit) = permutation_commit {
             challenger.observe(permutation_commit.clone());
         }

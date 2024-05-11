@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{ExtensionField, Field};
+use p3_interaction::{generate_permutation_trace, InteractionAir, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Com, Domain, StarkGenericConfig, Val};
 
@@ -35,26 +36,24 @@ where
 }
 
 #[derive(Clone)]
-pub struct ChipTrace<'a, F, EF, Domain>
+pub struct ChipTrace<'a, Domain, EF>
 where
-    F: Field,
-    EF: ExtensionField<F>,
     Domain: PolynomialSpace,
+    EF: ExtensionField<Domain::Val>,
 {
     pub chip: &'a ChipType,
 
-    pub preprocessed: Option<Trace<F, Domain>>,
-    pub main: Option<Trace<F, Domain>>,
+    pub preprocessed: Option<Trace<Domain::Val, Domain>>,
+    pub main: Option<Trace<Domain::Val, Domain>>,
     pub permutation: Option<Trace<EF, Domain>>,
 
     pub quotient_chunks: Option<Trace<EF, Domain>>,
 }
 
-impl<'a, F, EF, Domain> ChipTrace<'a, F, EF, Domain>
+impl<'a, Domain, EF> ChipTrace<'a, Domain, EF>
 where
-    F: Field,
-    EF: ExtensionField<F>,
     Domain: PolynomialSpace,
+    EF: ExtensionField<Domain::Val>,
 {
     pub fn new(chip: &'a ChipType) -> Self {
         Self {
@@ -90,52 +89,61 @@ where
     // }
 }
 
-pub type MachineTrace<'a, F, EF, Domain> = Vec<ChipTrace<'a, F, EF, Domain>>;
+pub type MachineTrace<'a, Domain: PolynomialSpace, EF: ExtensionField<Domain::Val>> =
+    Vec<ChipTrace<'a, Domain, EF>>;
 
 pub trait MachineTraceBuilder<'a> {
     fn new(chips: &'a [&ChipType]) -> Self;
 }
 
-impl<'a, F, EF, Domain> MachineTraceBuilder<'a> for MachineTrace<'a, F, EF, Domain>
+impl<'a, Domain, EF> MachineTraceBuilder<'a> for MachineTrace<'a, Domain, EF>
 where
-    F: Field,
-    EF: ExtensionField<F>,
     Domain: PolynomialSpace,
+    EF: ExtensionField<Domain::Val>,
 {
     fn new(chips: &'a [&ChipType]) -> Self {
         chips.iter().map(|chip| ChipTrace::new(chip)).collect_vec()
     }
 }
 
-pub trait MachineTraceLoader<'a, F, EF, Domain>
+pub trait MachineTraceLoader<'a, Domain>
 where
-    F: Field,
-    EF: ExtensionField<F>,
     Domain: PolynomialSpace,
 {
-    fn load_preprocessed<SC, P>(self, pcs: &P, traces: Vec<Option<RowMajorMatrix<F>>>) -> Self
+    fn load_preprocessed<SC, P>(
+        self,
+        pcs: &P,
+        traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
+    ) -> Self
     where
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>;
 
-    fn load_main<SC, P>(self, pcs: &P, traces: Vec<Option<RowMajorMatrix<F>>>) -> Self
+    fn load_main<SC, P>(self, pcs: &P, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self
     where
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>;
 
-    fn load_permutation<SC, P>(self, pcs: &P, traces: Vec<Option<RowMajorMatrix<EF>>>) -> Self
+    fn generate_permutation<SC, P>(
+        self,
+        pcs: &P,
+        perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
+    ) -> Self
     where
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>;
 }
 
-impl<'a, F, EF, Domain> MachineTraceLoader<'a, F, EF, Domain> for MachineTrace<'a, F, EF, Domain>
+impl<'a, Domain, EF> MachineTraceLoader<'a, Domain> for MachineTrace<'a, Domain, EF>
 where
-    F: Field,
-    EF: ExtensionField<F>,
     Domain: PolynomialSpace,
+    EF: ExtensionField<Domain::Val>,
 {
-    fn load_preprocessed<SC, P>(mut self, pcs: &P, traces: Vec<Option<RowMajorMatrix<F>>>) -> Self
+    fn load_preprocessed<SC, P>(
+        mut self,
+        pcs: &P,
+        traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
+    ) -> Self
     where
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>,
@@ -147,7 +155,7 @@ where
         self
     }
 
-    fn load_main<SC, P>(mut self, pcs: &P, traces: Vec<Option<RowMajorMatrix<F>>>) -> Self
+    fn load_main<SC, P>(mut self, pcs: &P, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self
     where
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>,
@@ -159,12 +167,27 @@ where
         self
     }
 
-    fn load_permutation<SC, P>(mut self, pcs: &P, traces: Vec<Option<RowMajorMatrix<EF>>>) -> Self
+    fn generate_permutation<SC, P>(
+        mut self,
+        pcs: &P,
+        perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
+    ) -> Self
     where
         P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
         SC: StarkGenericConfig<Pcs = P>,
     {
-        let traces = load_traces::<SC, _>(pcs, traces);
+        let traces = self
+            .into_iter()
+            .map(|trace| {
+                generate_permutation_trace(
+                    &trace.preprocessed.map(|mt| mt.matrix),
+                    &trace.main.map(|mt| mt.matrix),
+                    &trace.chip.all_interactions(),
+                    perm_challenges,
+                )
+            })
+            .collect_vec();
+        let traces = load_traces::<SC, EF>(pcs, traces);
         for (chip_trace, permutation) in self.iter_mut().zip_eq(traces) {
             chip_trace.permutation = permutation;
         }
@@ -172,11 +195,10 @@ where
     }
 }
 
-pub trait MachineTraceCommiter<'a, F, EF, Domain>
+pub trait MachineTraceCommiter<'a, Domain, EF>
 where
-    F: Field,
-    EF: ExtensionField<F>,
-    Domain: PolynomialSpace<Val = F>,
+    Domain: PolynomialSpace,
+    EF: ExtensionField<Domain::Val>,
 {
     fn commit_preprocessed<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
     where
@@ -194,11 +216,10 @@ where
         SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>;
 }
 
-impl<'a, F, EF, Domain> MachineTraceCommiter<'a, F, EF, Domain> for MachineTrace<'a, F, EF, Domain>
+impl<'a, Domain, EF> MachineTraceCommiter<'a, Domain, EF> for MachineTrace<'a, Domain, EF>
 where
-    F: Field,
-    EF: ExtensionField<F>,
-    Domain: PolynomialSpace<Val = F>,
+    Domain: PolynomialSpace,
+    EF: ExtensionField<Domain::Val>,
 {
     fn commit_preprocessed<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
     where

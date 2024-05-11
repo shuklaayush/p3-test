@@ -24,7 +24,7 @@ pub trait InteractionStark<F: Field, EF: ExtensionField<F>>: Stark<F> {
     fn generate_permutation_trace(
         &self,
         preprocessed: &Option<RowMajorMatrix<F>>,
-        main: &RowMajorMatrix<F>,
+        main: &Option<RowMajorMatrix<F>>,
         interactions: &[(Interaction<F>, InteractionType)],
         random_elements: [EF; NUM_PERM_CHALLENGES],
     ) -> Option<RowMajorMatrix<EF>> {
