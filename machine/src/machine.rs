@@ -21,7 +21,7 @@ use crate::{
     pcs::Commiter,
     proof::{MachineProof, ProverData, ProvingKey, VerifierData, VerifyingKey},
     quotient::quotient_values,
-    trace::{MachineTrace, MachineTraceBuilder, MachineTraceLoader},
+    trace::{MachineTrace, MachineTraceBuilder, MachineTraceCommiter, MachineTraceLoader},
     verify::verify_constraints,
 };
 
@@ -123,17 +123,17 @@ impl Machine {
         let trace: MachineTrace<_, _, _> = MachineTraceBuilder::new(self.chips().as_slice());
 
         // 1. Observe preprocessed commitment
-        let preprocessed_traces = tracing::info_span!("load preprocessed traces")
+        let trace = tracing::info_span!("load preprocessed traces")
             .in_scope(|| trace.load_preprocessed(pcs, pk.preprocessed_traces));
         if let Some(preprocessed) = pk.preprocessed_data {
             challenger.observe(preprocessed.commitment);
         }
 
         // 2. Generate and commit to main trace
-        let main_traces =
+        let trace =
             tracing::info_span!("load main traces").in_scope(|| trace.load_main(pcs, main_traces));
-        let (main_commit, main_data) = tracing::info_span!("commit to main traces")
-            .in_scope(|| pcs.commit_traces::<SC>(main_traces));
+        let (main_commit, main_data) =
+            tracing::info_span!("commit to main traces").in_scope(|| trace.commit_main(pcs));
         if let Some(main_commit) = main_commit {
             challenger.observe(main_commit.clone());
         }
@@ -166,8 +166,8 @@ impl Machine {
                     })
                     .collect_vec()
             });
-        let permutation_traces = tracing::info_span!("load permutation traces")
-            .in_scope(|| pcs.load_traces(permutation_traces));
+        let trace = tracing::info_span!("load permutation traces")
+            .in_scope(|| trace.load_traces(pcs, permutation_traces));
         let (permutation_commit, permutation_data) =
             tracing::info_span!("commit to permutation traces").in_scope(|| {
                 let flattened: Vec<_> = permutation_traces
