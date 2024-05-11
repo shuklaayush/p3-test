@@ -1,9 +1,9 @@
 use itertools::{izip, Itertools};
-use p3_air::{AirBuilder, BaseAir};
+use p3_air::BaseAir;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
-use p3_interaction::NUM_PERM_CHALLENGES;
+use p3_interaction::{generate_permutation_trace, InteractionAir, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_stark::{
@@ -12,8 +12,8 @@ use p3_stark::{
 use p3_uni_stark::{PackedChallenge, StarkGenericConfig, Val};
 use tracing::instrument;
 
-#[cfg(feature = "debug-trace")]
-use std::error::Error;
+// #[cfg(feature = "debug-trace")]
+// use std::error::Error;
 
 use crate::{
     chip::ChipType,
@@ -57,46 +57,48 @@ pub enum MachineBus {
 }
 
 impl Machine {
-    fn setup<SC: StarkGenericConfig>(
-        &self,
-        config: &SC,
-        challenger: &mut SC::Challenger,
-    ) -> (ProvingKey<SC>, VerifyingKey<SC>) {
+    fn setup<SC>(&self, config: &SC) -> (ProvingKey<SC>, VerifyingKey<SC>)
+    where
+        SC: StarkGenericConfig,
+    {
         let pcs = config.pcs();
         let chips = self.chips();
 
-        let traces = chips.iter().map(|chip| chip.preprocessed_trace());
-        let traces = pcs.load_traces(traces);
+        let traces = chips.iter().map(|chip| chip.preprocessed_trace()).collect();
+        let traces = pcs.load_traces::<_, SC>(traces);
 
-        let (pdata, vdata) = if let Some((data, commit)) = pcs.commit_traces(traces.as_slice()) {
-            let packed_degrees = traces.iter().flat_map(|trace| trace.degree);
-            let vdata = VerifierData {
-                commitment: commit,
-                degrees: packed_degrees,
+        let (pdata, vdata) =
+            if let (Some(commit), Some(data)) = pcs.commit_traces::<SC>(traces.clone()) {
+                let packed_degrees = traces
+                    .iter()
+                    .flat_map(|mt| mt.as_ref().map(|trace| trace.domain.size()))
+                    .collect::<Vec<usize>>();
+                let vdata = VerifierData {
+                    commitment: commit.clone(),
+                    degrees: packed_degrees,
+                };
+                let pdata = ProverData {
+                    data,
+                    commitment: commit,
+                };
+                (Some(pdata), Some(vdata))
+            } else {
+                (None, None)
             };
-            let pdata = ProverData {
-                data,
-                commitment: commit,
-            };
-            (Some(pdata), Some(vdata))
-        } else {
-            (None, None)
-        };
 
         let vk = VerifyingKey {
-            preprocessed: vdata,
+            preprocessed_data: vdata,
         };
         let pk = ProvingKey {
-            preprocessed: pdata,
-            traces,
+            preprocessed_data: pdata,
+            preprocessed_traces: traces,
         };
 
         (pk, vk)
     }
 
-    // TODO: Move main trace generation outside
     #[instrument(skip_all)]
-    fn prove<SC: StarkGenericConfig>(
+    fn prove<SC>(
         &self,
         config: &SC,
         pk: &ProvingKey<SC>,
@@ -104,36 +106,60 @@ impl Machine {
         challenger: &mut SC::Challenger,
     ) -> MachineProof<SC>
     where
+        SC: StarkGenericConfig + Clone,
         Val<SC>: PrimeField32,
         <<SC as StarkGenericConfig>::Pcs as Pcs<
             <SC as StarkGenericConfig>::Challenge,
             <SC as StarkGenericConfig>::Challenger,
-        >>::Domain: Send,
+        >>::Domain: Send + Sync,
     {
+        // TODO: Use fixed size array instead of Vecs
         let chips = self.chips();
         assert_eq!(main_traces.len(), chips.len(), "Length mismatch");
 
         let pcs = config.pcs();
 
         // 1. Observe preprocessed commitment
-        if let Some(preprocessed) = pk.preprocessed {
+        if let Some(preprocessed) = pk.preprocessed_data {
             challenger.observe(preprocessed.commitment);
         }
-        let preprocessed_traces =
-            tracing::info_span!("load preprocessed traces").in_scope(|| pcs.load_traces(pk.traces));
 
         // 2. Generate and commit to main trace
         let main_traces =
             tracing::info_span!("load main traces").in_scope(|| pcs.load_traces(main_traces));
         let (main_commit, main_data) = tracing::info_span!("commit to main traces")
-            .in_scope(|| pcs.commit_traces(main_traces.as_slice()));
+            .in_scope(|| pcs.commit_traces::<SC>(main_traces));
         if let Some(main_commit) = main_commit {
             challenger.observe(main_commit.clone());
         }
 
-        // 3. Generate and commit to permutation trace
-        let mut perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] =
-            (0..NUM_PERM_CHALLENGES).map(|_| challenger.sample_ext_element::<SC::Challenge>());
+        // 3. Calculate trace domains = max(preprocessed, main)
+        let trace_domains = pk
+            .preprocessed_traces
+            .iter()
+            .zip_eq(main_traces.iter())
+            .map(|traces| match traces {
+                (Some(preprocessed_trace), Some(main_trace)) => {
+                    let preprocessed_domain = preprocessed_trace.domain;
+                    let main_domain = main_trace.domain;
+                    if main_domain.size() > preprocessed_domain.size() {
+                        Some(main_domain)
+                    } else {
+                        Some(preprocessed_domain)
+                    }
+                }
+                (Some(preprocessed_trace), None) => Some(preprocessed_trace.domain),
+                (None, Some(main_trace)) => Some(main_trace.domain),
+                (None, None) => None,
+            })
+            .collect_vec();
+
+        // 4. Generate and commit to permutation trace
+        let mut perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
+            .map(|_| challenger.sample_ext_element::<SC::Challenge>())
+            .collect_vec()
+            .try_into()
+            .unwrap();
         let packed_perm_challenges = perm_challenges
             .iter()
             .map(|c| PackedChallenge::<SC>::from_f(*c))
@@ -141,15 +167,16 @@ impl Machine {
 
         let permutation_traces =
             tracing::info_span!("generate permutation traces").in_scope(|| {
+                // TODO: Only if main trace is present?
                 chips
                     .into_par_iter()
-                    .zip_eq(preprocessed_traces.iter())
+                    .zip_eq(pk.preprocessed_traces.iter())
                     .zip_eq(main_traces.iter())
-                    .map(|(chip, (preprocessed_trace, main_trace))| {
-                        chip.generate_permutation_trace::<SC, _>(
-                            &preprocessed_trace.trace,
-                            &main_trace.trace,
-                            chip.all_interactions(),
+                    .map(|((chip, preprocessed_trace), main_trace)| {
+                        generate_permutation_trace(
+                            &preprocessed_trace.map(|mt| mt.matrix),
+                            &main_trace.unwrap().matrix,
+                            &chip.all_interactions(),
                             perm_challenges,
                         )
                     })
@@ -157,11 +184,15 @@ impl Machine {
             });
         let permutation_traces = tracing::info_span!("load permutation traces")
             .in_scope(|| pcs.load_traces(permutation_traces));
-
         let (permutation_commit, permutation_data) =
-            tracing::info_span!("commit to permutation traces")
-                .in_scope(|| pcs.commit_traces(permutation_traces.as_slice()));
-        if let Some(perm_commit) = permutation_commit {
+            tracing::info_span!("commit to permutation traces").in_scope(|| {
+                let flattened: Vec<_> = permutation_traces
+                    .iter()
+                    .map(|mt| mt.map(|trace| trace.flatten_to_base()))
+                    .collect();
+                pcs.commit_traces::<SC>(flattened)
+            });
+        if let Some(permutation_commit) = permutation_commit {
             challenger.observe(permutation_commit.clone());
         }
         let alpha: SC::Challenge = challenger.sample_ext_element();
@@ -170,7 +201,7 @@ impl Machine {
             .iter()
             .map(|mt| {
                 mt.as_ref().map(|trace| {
-                    let matrix = trace;
+                    let matrix = trace.matrix;
                     *matrix.row_slice(matrix.height() - 1).last().unwrap()
                 })
             })
@@ -211,50 +242,49 @@ impl Machine {
                 1 << d
             })
             .collect_vec();
-        let quotient_domains = main_traces
+        let quotient_domains = trace_domains
             .iter()
             .zip_eq(quotient_degrees.iter())
-            .map(|(trace, quotient_degree)| {
-                let domain = trace.domain;
-                domain.create_disjoint_domain(domain.size() * quotient_degree)
+            .flat_map(|(domain, quotient_degree)| {
+                domain.map(|domain| domain.create_disjoint_domain(domain.size() * quotient_degree))
             })
             .collect_vec();
 
         let quotient_values = quotient_domains
             .clone()
             .into_par_iter()
-            .zip_eq(preprocessed_traces.par_iter())
+            .zip_eq(pk.preprocessed_traces.par_iter())
             .zip_eq(main_traces.par_iter())
             .zip_eq(permutation_traces.par_iter())
             .zip_eq(chips.par_iter())
-            .enumerate()
             .map(
                 |(
-                    i,
-                    (
-                        quotient_domain,
-                        (preprocessed_trace, (main_trace, (permutation_trace, &chip))),
-                    ),
+                    (((quotient_domain, preprocessed_trace), main_trace), permutation_trace),
+                    &chip,
                 )| {
                     let preprocessed_trace_on_quotient_domains =
-                        if let Some(preprocessed_data) = pk.preprocessed {
+                        if let Some(preprocessed_data) = pk.preprocessed_data {
                             let index = preprocessed_trace
                                 .expect("Index shouldn't be None")
                                 .opening_index;
-                            pcs.get_evaluations_on_domain(preprocessed_data, index, quotient_domain)
-                                .to_row_major_matrix()
+                            pcs.get_evaluations_on_domain(
+                                &preprocessed_data.data,
+                                index,
+                                quotient_domain,
+                            )
+                            .to_row_major_matrix()
                         } else {
                             RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
                         };
                     let main_trace_on_quotient_domains = pcs
-                        .get_evaluations_on_domain(&main_data, i, quotient_domain)
+                        .get_evaluations_on_domain(&main_data, main_trace.index, quotient_domain)
                         .to_row_major_matrix();
                     let perm_trace_on_quotient_domains =
                         if let Some(permutation_data) = permutation_data {
                             let index = permutation_trace
                                 .expect("Index shouldn't be None")
                                 .opening_index;
-                            pcs.get_evaluations_on_domain(permutation_data, index, quotient_domain)
+                            pcs.get_evaluations_on_domain(&permutation_data, index, quotient_domain)
                                 .to_row_major_matrix()
                         } else {
                             RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
@@ -312,7 +342,7 @@ impl Machine {
         let zeta: SC::Challenge = challenger.sample_ext_element();
 
         let mut rounds = vec![];
-        if let Some(preprocessed_data) = pk.preprocessed {
+        if let Some(preprocessed_data) = pk.preprocessed_data {
             let preprocessed_domains = pk
                 .degrees
                 .flat_map(|md| md.map(|degree| pcs.natural_domain_for_degree(degree)));
@@ -365,26 +395,28 @@ impl Machine {
             .collect_vec();
 
         let permutation_openings = if let Some(_) = permutation_data {
-            opening_values.pop()
+            let openings = opening_values.pop().expect("Opening should be present");
+            permutation_traces
+                .iter()
+                .map(|mt| mt.map(|trace| openings[trace.opening_index].clone()))
+                .collect_vec()
         } else {
-            None
+            // TODO: Better way
+            permutation_traces.iter().map(|mt| None).collect_vec()
         };
-        let permutation_openings = permutation_traces
-            .iter()
-            .map(|mt| mt.map(|trace| permutation_openings[trace.opening_index].clone()))
-            .collect_vec();
 
         let main_openings = opening_values.pop();
 
-        let preprocessed_openings = if let Some(_) = pk.preprocessed {
-            opening_values.pop()
+        let preprocessed_openings = if let Some(_) = pk.preprocessed_data {
+            let openings = opening_values.pop().expect("Opening should be present");
+            pk.preprocessed_traces
+                .iter()
+                .map(|mt| mt.map(|trace| openings[trace.opening_index].clone()))
+                .collect_vec()
         } else {
-            None
+            // TODO: Better way
+            pk.preprocessed_traces.iter().map(|mt| None).collect_vec()
         };
-        let preprocessed_openings = preprocessed_traces
-            .iter()
-            .map(|mt| mt.map(|trace| preprocessed_openings[trace.opening_index].clone()))
-            .collect_vec();
 
         let chip_proofs = izip!(
             main_traces,
@@ -454,7 +486,7 @@ impl Machine {
         let pcs = config.pcs();
         let chips = self.chips();
 
-        if let Some(preprocessed) = vk.preprocessed {
+        if let Some(preprocessed) = vk.preprocessed_data {
             challenger.observe(preprocessed.commitment.clone());
         }
 
@@ -514,10 +546,13 @@ impl Machine {
             return Err(VerificationError::InvalidProofShape);
         }
 
-        challenger.observe(commitments.main_trace.clone());
-        let mut perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] =
-            (0..NUM_PERM_CHALLENGES).map(|_| challenger.sample_ext_element::<SC::Challenge>());
-        challenger.observe(commitments.perm_trace.clone());
+        challenger.observe(commitments.main.clone());
+        let mut perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
+            .map(|_| challenger.sample_ext_element::<SC::Challenge>())
+            .collect_vec()
+            .try_into()
+            .unwrap();
+        challenger.observe(commitments.permutation.clone());
         let alpha = challenger.sample_ext_element::<SC::Challenge>();
         challenger.observe(commitments.quotient_chunks.clone());
 
@@ -574,7 +609,7 @@ impl Machine {
                 })
             })
             .collect_vec();
-        rounds.push((commitments.perm_trace.clone(), perm_domains_and_openings));
+        rounds.push((commitments.permutation.clone(), perm_domains_and_openings));
 
         let quotient_chunks_domains_and_openings = quotient_chunks_domains
             .iter()
@@ -624,33 +659,33 @@ impl Machine {
         Ok(())
     }
 
-    #[cfg(feature = "debug-trace")]
-    fn write_traces_to_file<SC: StarkGenericConfig>(
-        &self,
-        path: &str,
-        preprocessed_traces: &[Option<RowMajorMatrix<Val<SC>>>],
-        main_traces: &[RowMajorMatrix<Val<SC>>],
-        perm_traces: &[Option<RowMajorMatrix<SC::Challenge>>],
-    ) -> Result<(), Box<dyn Error>>
-    where
-        Val<SC>: PrimeField32,
-    {
-        use rust_xlsxwriter::Workbook;
+    // #[cfg(feature = "debug-trace")]
+    // fn write_traces_to_file<SC: StarkGenericConfig>(
+    //     &self,
+    //     path: &str,
+    //     preprocessed_traces: &[Option<RowMajorMatrix<Val<SC>>>],
+    //     main_traces: &[RowMajorMatrix<Val<SC>>],
+    //     perm_traces: &[Option<RowMajorMatrix<SC::Challenge>>],
+    // ) -> Result<(), Box<dyn Error>>
+    // where
+    //     Val<SC>: PrimeField32,
+    // {
+    //     use rust_xlsxwriter::Workbook;
 
-        let chips = self.chips();
-        let mut workbook = Workbook::new();
-        for (chip, preprocessed_trace, main_trace, perm_trace) in
-            izip!(chips, preprocessed_traces, main_traces, perm_traces)
-        {
-            let worksheet = workbook.add_worksheet();
-            worksheet.set_name(format!("{}", chip))?;
-            chip.write_traces_to_worksheet(worksheet, preprocessed_trace, main_trace, perm_trace)?;
-        }
+    //     let chips = self.chips();
+    //     let mut workbook = Workbook::new();
+    //     for (chip, preprocessed_trace, main_trace, perm_trace) in
+    //         izip!(chips, preprocessed_traces, main_traces, perm_traces)
+    //     {
+    //         let worksheet = workbook.add_worksheet();
+    //         worksheet.set_name(format!("{}", chip))?;
+    //         chip.write_traces_to_worksheet(worksheet, preprocessed_trace, main_trace, perm_trace)?;
+    //     }
 
-        workbook.save(path)?;
+    //     workbook.save(path)?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 }
 
 // #[cfg(test)]

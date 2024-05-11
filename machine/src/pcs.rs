@@ -1,35 +1,39 @@
-use itertools::Itertools;
 use p3_commit::Pcs;
+use p3_field::Field;
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
-use p3_uni_stark::{Com, StarkGenericConfig, Val};
+use p3_uni_stark::{Com, Domain, StarkGenericConfig, Val};
 
-use crate::trace::ChipTrace;
+use crate::{proof::PcsProverData, trace::ChipTrace};
 
-pub trait Commiter<P, SC>
-where
-    P: Pcs<SC::Challenge, SC::Challenger>,
-    SC: StarkGenericConfig<Pcs = P>,
-{
-    fn load_traces(
+pub trait Commiter<P> {
+    fn load_traces<F, SC>(
         &self,
-        traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
-    ) -> Vec<Option<ChipTrace<SC>>>;
+        traces: Vec<Option<RowMajorMatrix<F>>>,
+    ) -> Vec<Option<ChipTrace<F, Domain<SC>>>>
+    where
+        F: Field,
+        P: Pcs<SC::Challenge, SC::Challenger>,
+        SC: StarkGenericConfig<Pcs = P>;
 
-    fn commit_traces(
+    fn commit_traces<SC>(
         &self,
-        traces: Vec<Option<ChipTrace<SC>>>,
-    ) -> (Option<Com<SC>>, Option<P::ProverData>);
+        traces: Vec<Option<ChipTrace<Val<SC>, Domain<SC>>>>,
+    ) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
+    where
+        P: Pcs<SC::Challenge, SC::Challenger>,
+        SC: StarkGenericConfig<Pcs = P>;
 }
 
-impl<P, SC> Commiter<P, SC> for P
-where
-    P: Pcs<SC::Challenge, SC::Challenger>,
-    SC: StarkGenericConfig<Pcs = P>,
-{
-    fn load_traces(
+impl<P> Commiter<P> for P {
+    fn load_traces<F, SC>(
         &self,
-        traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
-    ) -> Vec<Option<ChipTrace<SC>>> {
+        traces: Vec<Option<RowMajorMatrix<F>>>,
+    ) -> Vec<Option<ChipTrace<F, Domain<SC>>>>
+    where
+        F: Field,
+        P: Pcs<SC::Challenge, SC::Challenger>,
+        SC: StarkGenericConfig<Pcs = P>,
+    {
         traces
             .into_iter()
             .scan(0usize, |count, mt| {
@@ -57,14 +61,18 @@ where
             .collect()
     }
 
-    fn commit_traces(
+    fn commit_traces<SC>(
         &self,
-        traces: Vec<Option<ChipTrace<SC>>>,
-    ) -> (Option<Com<SC>>, Option<P::ProverData>) {
-        let domains_and_traces = traces
+        traces: Vec<Option<ChipTrace<Val<SC>, Domain<SC>>>>,
+    ) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
+    where
+        P: Pcs<SC::Challenge, SC::Challenger>,
+        SC: StarkGenericConfig<Pcs = P>,
+    {
+        let domains_and_traces: Vec<_> = traces
             .into_iter()
             .flat_map(|mt| mt.map(|trace| (trace.domain, trace.matrix)))
-            .collect_vec();
+            .collect();
         if !domains_and_traces.is_empty() {
             let (commit, data) = self.commit(domains_and_traces);
             (Some(commit), Some(data))
