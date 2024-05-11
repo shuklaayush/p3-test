@@ -2,7 +2,7 @@ mod chip;
 mod chips;
 mod config;
 mod error;
-mod machine;
+// mod machine;
 mod pcs;
 mod proof;
 mod quotient;

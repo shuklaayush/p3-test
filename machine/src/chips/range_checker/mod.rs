@@ -11,7 +11,7 @@ use p3_stark::Stark;
 
 use self::columns::{RangeCols, NUM_RANGE_COLS};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RangeCheckerChip<const MAX: u32> {
     pub count: BTreeMap<u32, u32>,
 

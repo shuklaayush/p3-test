@@ -21,6 +21,7 @@ use crate::{
     pcs::Commiter,
     proof::{MachineProof, ProverData, ProvingKey, VerifierData, VerifyingKey},
     quotient::quotient_values,
+    trace::{MachineTrace, MachineTraceBuilder, MachineTraceLoader},
     verify::verify_constraints,
 };
 
@@ -64,15 +65,16 @@ impl Machine {
         let pcs = config.pcs();
         let chips = self.chips();
 
-        let traces = chips.iter().map(|chip| chip.preprocessed_trace()).collect();
-        let traces = pcs.load_traces::<_, SC>(traces);
+        let traces: Vec<_> = chips.iter().map(|chip| chip.preprocessed_trace()).collect();
+
+        let chip_traces = pcs.load_traces::<_, SC>(traces.clone());
+        let packed_degrees = chip_traces
+            .iter()
+            .flat_map(|mt| mt.as_ref().map(|trace| trace.domain.size()))
+            .collect::<Vec<usize>>();
 
         let (pdata, vdata) =
-            if let (Some(commit), Some(data)) = pcs.commit_traces::<SC>(traces.clone()) {
-                let packed_degrees = traces
-                    .iter()
-                    .flat_map(|mt| mt.as_ref().map(|trace| trace.domain.size()))
-                    .collect::<Vec<usize>>();
+            if let (Some(commit), Some(data)) = pcs.commit_traces::<SC>(chip_traces) {
                 let vdata = VerifierData {
                     commitment: commit.clone(),
                     degrees: packed_degrees,
@@ -118,43 +120,25 @@ impl Machine {
         assert_eq!(main_traces.len(), chips.len(), "Length mismatch");
 
         let pcs = config.pcs();
+        let trace: MachineTrace<_, _, _> = MachineTraceBuilder::new(self.chips().as_slice());
 
         // 1. Observe preprocessed commitment
+        let preprocessed_traces = tracing::info_span!("load preprocessed traces")
+            .in_scope(|| trace.load_preprocessed(pcs, pk.preprocessed_traces));
         if let Some(preprocessed) = pk.preprocessed_data {
             challenger.observe(preprocessed.commitment);
         }
 
         // 2. Generate and commit to main trace
         let main_traces =
-            tracing::info_span!("load main traces").in_scope(|| pcs.load_traces(main_traces));
+            tracing::info_span!("load main traces").in_scope(|| trace.load_main(pcs, main_traces));
         let (main_commit, main_data) = tracing::info_span!("commit to main traces")
             .in_scope(|| pcs.commit_traces::<SC>(main_traces));
         if let Some(main_commit) = main_commit {
             challenger.observe(main_commit.clone());
         }
 
-        // 3. Calculate trace domains = max(preprocessed, main)
-        let trace_domains = pk
-            .preprocessed_traces
-            .iter()
-            .zip_eq(main_traces.iter())
-            .map(|traces| match traces {
-                (Some(preprocessed_trace), Some(main_trace)) => {
-                    let preprocessed_domain = preprocessed_trace.domain;
-                    let main_domain = main_trace.domain;
-                    if main_domain.size() > preprocessed_domain.size() {
-                        Some(main_domain)
-                    } else {
-                        Some(preprocessed_domain)
-                    }
-                }
-                (Some(preprocessed_trace), None) => Some(preprocessed_trace.domain),
-                (None, Some(main_trace)) => Some(main_trace.domain),
-                (None, None) => None,
-            })
-            .collect_vec();
-
-        // 4. Generate and commit to permutation trace
+        // 3. Generate and commit to permutation trace
         let mut perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
             .map(|_| challenger.sample_ext_element::<SC::Challenge>())
             .collect_vec()
@@ -245,7 +229,7 @@ impl Machine {
         let quotient_domains = trace_domains
             .iter()
             .zip_eq(quotient_degrees.iter())
-            .flat_map(|(domain, quotient_degree)| {
+            .map(|(domain, quotient_degree)| {
                 domain.map(|domain| domain.create_disjoint_domain(domain.size() * quotient_degree))
             })
             .collect_vec();
@@ -262,25 +246,39 @@ impl Machine {
                     (((quotient_domain, preprocessed_trace), main_trace), permutation_trace),
                     &chip,
                 )| {
-                    let preprocessed_trace_on_quotient_domains =
-                        if let Some(preprocessed_data) = pk.preprocessed_data {
-                            let index = preprocessed_trace
-                                .expect("Index shouldn't be None")
-                                .opening_index;
-                            pcs.get_evaluations_on_domain(
-                                &preprocessed_data.data,
-                                index,
-                                quotient_domain,
-                            )
-                            .to_row_major_matrix()
-                        } else {
-                            RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
+                    quotient_domain.map(|quotient_domain| {
+                        let preprocessed_trace_on_quotient_domains =
+                            if let Some(preprocessed_data) = pk.preprocessed_data {
+                                let index = preprocessed_trace
+                                    .expect("Index shouldn't be None")
+                                    .opening_index;
+                                pcs.get_evaluations_on_domain(
+                                    &preprocessed_data.data,
+                                    index,
+                                    quotient_domain,
+                                )
+                                .to_row_major_matrix()
+                            } else {
+                                RowMajorMatrix::new_col(vec![
+                                    Val::<SC>::zero();
+                                    quotient_domain.size()
+                                ])
+                            };
+                        let main_trace_on_quotient_domains = {
+                            let index = main_trace.expect("Index shouldn't be None").opening_index;
+                            if let Some(main_data) = main_data {
+                                pcs.get_evaluations_on_domain(&main_data, index, quotient_domain)
+                                    .to_row_major_matrix()
+                            } else {
+                                RowMajorMatrix::new_col(vec![
+                                    Val::<SC>::zero();
+                                    quotient_domain.size()
+                                ])
+                            }
                         };
-                    let main_trace_on_quotient_domains = pcs
-                        .get_evaluations_on_domain(&main_data, main_trace.index, quotient_domain)
-                        .to_row_major_matrix();
-                    let perm_trace_on_quotient_domains =
-                        if let Some(permutation_data) = permutation_data {
+                        let perm_trace_on_quotient_domains = if let Some(permutation_data) =
+                            permutation_data
+                        {
                             let index = permutation_trace
                                 .expect("Index shouldn't be None")
                                 .opening_index;
@@ -289,17 +287,18 @@ impl Machine {
                         } else {
                             RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
                         };
-                    quotient_values::<SC, _, _>(
-                        chip,
-                        main_traces.domain,
-                        quotient_domain,
-                        preprocessed_trace_on_quotient_domains,
-                        main_trace_on_quotient_domains,
-                        perm_trace_on_quotient_domains,
-                        &packed_perm_challenges,
-                        alpha,
-                        cumulative_sums[i],
-                    )
+                        quotient_values::<SC, _, _>(
+                            chip,
+                            main_traces.domain,
+                            quotient_domain,
+                            preprocessed_trace_on_quotient_domains,
+                            main_trace_on_quotient_domains,
+                            perm_trace_on_quotient_domains,
+                            &packed_perm_challenges,
+                            alpha,
+                            cumulative_sums[i],
+                        )
+                    })
                 },
             )
             .collect_vec();

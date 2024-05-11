@@ -14,6 +14,7 @@ use self::columns::{XorCols, NUM_XOR_COLS};
 
 // TODO: Just proof of concept, should be implemented as lookup.
 //       Can be extended to a general CPU chip.
+#[derive(Clone)]
 pub struct XorChip {
     pub operations: Vec<([u8; 4], [u8; 4])>,
     pub bus_xor_input: usize,

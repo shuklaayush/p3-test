@@ -15,14 +15,14 @@ use self::generation::generate_trace_rows;
 /// Strict upper bound for the individual bytes range-check.
 const BYTE_RANGE_MAX: usize = 1usize << 8;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct KeccakSpongeOp {
     pub timestamp: u32,
     pub addr: u32,
     pub input: Vec<u8>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct KeccakSpongeChip {
     pub inputs: Vec<KeccakSpongeOp>,
 

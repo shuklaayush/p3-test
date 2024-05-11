@@ -1,10 +1,9 @@
 use p3_commit::Pcs;
+use p3_matrix::dense::RowMajorMatrix;
 use p3_stark::{ChipProof, Commitments};
-use p3_uni_stark::{Com, Domain, PcsProof, StarkGenericConfig, Val};
+use p3_uni_stark::{Com, PcsProof, StarkGenericConfig, Val};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-
-use crate::trace::ChipTrace;
 
 pub type PcsProverData<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
     <SC as StarkGenericConfig>::Challenge,
@@ -31,7 +30,7 @@ pub struct VerifierData<SC: StarkGenericConfig> {
 
 pub struct ProvingKey<SC: StarkGenericConfig> {
     pub preprocessed_data: Option<ProverData<SC>>,
-    pub preprocessed_traces: Vec<Option<ChipTrace<Val<SC>, Domain<SC>>>>,
+    pub preprocessed_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
 }
 
 pub struct VerifyingKey<SC: StarkGenericConfig> {

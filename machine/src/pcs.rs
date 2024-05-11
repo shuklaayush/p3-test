@@ -3,13 +3,13 @@ use p3_field::Field;
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Com, Domain, StarkGenericConfig, Val};
 
-use crate::{proof::PcsProverData, trace::ChipTrace};
+use crate::{proof::PcsProverData, trace::Trace};
 
 pub trait Commiter<P> {
     fn load_traces<F, SC>(
         &self,
         traces: Vec<Option<RowMajorMatrix<F>>>,
-    ) -> Vec<Option<ChipTrace<F, Domain<SC>>>>
+    ) -> Vec<Option<Trace<F, Domain<SC>>>>
     where
         F: Field,
         P: Pcs<SC::Challenge, SC::Challenger>,
@@ -17,7 +17,7 @@ pub trait Commiter<P> {
 
     fn commit_traces<SC>(
         &self,
-        traces: Vec<Option<ChipTrace<Val<SC>, Domain<SC>>>>,
+        traces: Vec<Option<Trace<Val<SC>, Domain<SC>>>>,
     ) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
     where
         P: Pcs<SC::Challenge, SC::Challenger>,
@@ -28,7 +28,7 @@ impl<P> Commiter<P> for P {
     fn load_traces<F, SC>(
         &self,
         traces: Vec<Option<RowMajorMatrix<F>>>,
-    ) -> Vec<Option<ChipTrace<F, Domain<SC>>>>
+    ) -> Vec<Option<Trace<F, Domain<SC>>>>
     where
         F: Field,
         P: Pcs<SC::Challenge, SC::Challenger>,
@@ -45,7 +45,7 @@ impl<P> Commiter<P> for P {
                             let index = *count;
                             *count += 1;
 
-                            Some(ChipTrace {
+                            Some(Trace {
                                 matrix: trace,
                                 domain,
                                 opening_index: index,
@@ -63,7 +63,7 @@ impl<P> Commiter<P> for P {
 
     fn commit_traces<SC>(
         &self,
-        traces: Vec<Option<ChipTrace<Val<SC>, Domain<SC>>>>,
+        traces: Vec<Option<Trace<Val<SC>, Domain<SC>>>>,
     ) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
     where
         P: Pcs<SC::Challenge, SC::Challenger>,

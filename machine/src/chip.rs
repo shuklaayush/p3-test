@@ -19,6 +19,7 @@ pub trait Chip<F: Field, EF: ExtensionField<F>>: Stark<F> + InteractionStark<F, 
 //     + for<'a> InteractionAir<VerifierConstraintFolder<'a, SC>>
 //     + for<'a> InteractionAir<DebugConstraintBuilder<'a, SC>>
 
+#[derive(Clone)]
 pub enum ChipType {
     KeccakPermute(KeccakPermuteChip),
     KeccakSponge(KeccakSpongeChip),

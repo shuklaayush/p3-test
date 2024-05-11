@@ -14,6 +14,7 @@ use self::{columns::KeccakCols, generation::generate_trace_rows};
 pub const NUM_U64_HASH_ELEMS: usize = 4;
 
 /// Assumes the field size is at least 16 bits.
+#[derive(Clone)]
 pub struct KeccakPermuteChip {
     pub inputs: Vec<([u64; 25], bool)>,
 

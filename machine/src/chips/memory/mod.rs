@@ -23,7 +23,7 @@ pub struct MemoryOp {
     pub kind: OperationKind,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct MemoryChip {
     pub operations: Vec<MemoryOp>,
 
