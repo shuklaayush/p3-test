@@ -120,7 +120,7 @@ impl Machine {
         assert_eq!(main_traces.len(), chips.len(), "Length mismatch");
 
         let pcs = config.pcs();
-        let trace: MachineTrace<_, _, _> = MachineTraceBuilder::new(self.chips().as_slice());
+        let trace: MachineTrace<_, _> = MachineTraceBuilder::new(self.chips().as_slice());
 
         // 1. Observe preprocessed commitment
         let trace = tracing::info_span!("load preprocessed traces")
@@ -138,7 +138,7 @@ impl Machine {
             challenger.observe(main_commit.clone());
         }
 
-        // 3. Generate and commit to permutation trace
+        // 3. Sample permutation challenges
         let mut perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
             .map(|_| challenger.sample_ext_element::<SC::Challenge>())
             .collect_vec()
@@ -149,25 +149,9 @@ impl Machine {
             .map(|c| PackedChallenge::<SC>::from_f(*c))
             .collect_vec();
 
-        let permutation_traces =
-            tracing::info_span!("generate permutation traces").in_scope(|| {
-                // TODO: Only if main trace is present?
-                chips
-                    .into_par_iter()
-                    .zip_eq(pk.preprocessed_traces.iter())
-                    .zip_eq(main_traces.iter())
-                    .map(|((chip, preprocessed_trace), main_trace)| {
-                        generate_permutation_trace(
-                            &preprocessed_trace.map(|mt| mt.matrix),
-                            &main_trace.unwrap().matrix,
-                            &chip.all_interactions(),
-                            perm_challenges,
-                        )
-                    })
-                    .collect_vec()
-            });
-        let trace = tracing::info_span!("load permutation traces")
-            .in_scope(|| trace.load_permutation(pcs, permutation_traces));
+        // 4. Generate and commit to permutation trace
+        let permutation_traces = tracing::info_span!("generate permutation traces")
+            .in_scope(|| trace.generate_permutation(pcs, perm_challenges));
         let (permutation_commit, permutation_data) =
             tracing::info_span!("commit to permutation traces")
                 .in_scope(|| trace.commit_permutation::<SC>(pcs));

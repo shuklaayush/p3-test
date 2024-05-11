@@ -49,6 +49,8 @@ where
     pub main: Option<Trace<Domain::Val, Domain>>,
     pub permutation: Option<Trace<EF, Domain>>,
 
+    pub cumulative_sum: Option<EF>,
+
     pub quotient_chunks: Option<Trace<EF, Domain>>,
 }
 
@@ -64,6 +66,7 @@ where
             main: None,
             permutation: None,
             quotient_chunks: None,
+            cumulative_sum: None,
         }
     }
 
@@ -185,17 +188,33 @@ where
         let traces = self
             .iter()
             .map(|trace| {
-                generate_permutation_trace(
+                let matrix = generate_permutation_trace(
                     &trace.preprocessed.as_ref().map(|mt| mt.matrix.as_view()),
                     &trace.main.as_ref().map(|mt| mt.matrix.as_view()),
                     <ChipType as InteractionAir<AB>>::all_interactions(trace.chip).as_slice(),
                     perm_challenges,
-                )
+                );
+                matrix
+            })
+            .collect_vec();
+        let cumulative_sums = traces
+            .iter()
+            .map(|mt| {
+                mt.as_ref().map(|trace| {
+                    let row = trace.row_slice(trace.height() - 1);
+                    let cumulative_sum = row.last().unwrap();
+                    *cumulative_sum
+                })
             })
             .collect_vec();
         let traces = load_traces::<SC, _>(pcs, traces);
-        for (chip_trace, permutation) in self.iter_mut().zip_eq(traces) {
+        for ((chip_trace, permutation), cumulative_sum) in self
+            .iter_mut()
+            .zip_eq(traces.into_iter())
+            .zip_eq(cumulative_sums.into_iter())
+        {
             chip_trace.permutation = permutation;
+            chip_trace.cumulative_sum = cumulative_sum;
         }
         self
     }
