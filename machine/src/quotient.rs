@@ -1,40 +1,36 @@
-use std::{cmp::min, iter};
+use std::cmp::min;
 
 use itertools::Itertools;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, PackedValue};
-use p3_matrix::{dense::RowMajorMatrix, Matrix};
+use p3_interaction::InteractionAir;
+use p3_matrix::{dense::RowMajorMatrixView, stack::VerticalPair, Matrix};
 use p3_maybe_rayon::prelude::*;
+use p3_stark::prover::ProverConstraintFolder;
 use p3_uni_stark::{Domain, PackedChallenge, PackedVal, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
 
-use crate::{
-    chip::MachineChip, folder::ProverConstraintFolder, permutation::eval_permutation_constraints,
-};
-
-pub fn quotient_values<SC, C, Mat>(
-    chip: &C,
-    cumulative_sum: Option<SC::Challenge>,
-    trace_domain: Domain<SC>,
+pub fn quotient_values<SC, A, Mat>(
+    air: &A,
+    main_domain: Domain<SC>,
     quotient_domain: Domain<SC>,
     preprocessed_trace_on_quotient_domain: Mat,
     main_trace_on_quotient_domain: Mat,
     perm_trace_on_quotient_domain: Mat,
     perm_challenges: &[PackedChallenge<SC>],
     alpha: SC::Challenge,
+    cumulative_sum: SC::Challenge,
 ) -> Vec<SC::Challenge>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    A: for<'a> InteractionAir<ProverConstraintFolder<'a, SC>>,
     Mat: Matrix<Val<SC>> + Sync,
 {
     let quotient_size = quotient_domain.size();
-    let preprocessed_width = preprocessed_trace_on_quotient_domain.width();
-    let main_width = main_trace_on_quotient_domain.width();
     let perm_width = perm_trace_on_quotient_domain.width();
-    let mut sels = trace_domain.selectors_on_coset(quotient_domain);
+    let mut sels = main_domain.selectors_on_coset(quotient_domain);
 
-    let qdb = log2_strict_usize(quotient_domain.size()) - log2_strict_usize(trace_domain.size());
+    let qdb = log2_strict_usize(quotient_domain.size()) - log2_strict_usize(main_domain.size());
     let next_step = 1 << qdb;
 
     // assert!(quotient_size >= PackedVal::<SC>::WIDTH);
@@ -59,7 +55,21 @@ where
             let is_transition = *PackedVal::<SC>::from_slice(&sels.is_transition[i_range.clone()]);
             let inv_zeroifier = *PackedVal::<SC>::from_slice(&sels.inv_zeroifier[i_range.clone()]);
 
-            // TODO: Do like others
+            let preprocessed_local = preprocessed_trace_on_quotient_domain
+                .vertically_packed_row(i_start)
+                .collect_vec();
+            let preprocessed_next = preprocessed_trace_on_quotient_domain
+                .vertically_packed_row(i_start + next_step)
+                .collect_vec();
+
+            let main_local = main_trace_on_quotient_domain
+                .vertically_packed_row(i_start)
+                .collect_vec();
+            let main_next = main_trace_on_quotient_domain
+                .vertically_packed_row(i_start + next_step)
+                .collect_vec();
+
+            // TODO: Use vertically_packed
             let perm_local = (0..perm_width)
                 .step_by(SC::Challenge::D)
                 .map(|col| {
@@ -70,7 +80,6 @@ where
                     })
                 })
                 .collect_vec();
-
             let perm_next = (0..perm_width)
                 .step_by(SC::Challenge::D)
                 .map(|col| {
@@ -85,43 +94,31 @@ where
 
             let accumulator = PackedChallenge::<SC>::zero();
             let mut folder = ProverConstraintFolder {
-                preprocessed: RowMajorMatrix::new(
-                    iter::empty()
-                        .chain(preprocessed_trace_on_quotient_domain.vertically_packed_row(i_start))
-                        .chain(
-                            preprocessed_trace_on_quotient_domain
-                                .vertically_packed_row(i_start + next_step),
-                        )
-                        .collect_vec(),
-                    preprocessed_width,
+                preprocessed: VerticalPair::new(
+                    RowMajorMatrixView::new_row(&preprocessed_local),
+                    RowMajorMatrixView::new_row(&preprocessed_next),
                 ),
-                main: RowMajorMatrix::new(
-                    iter::empty()
-                        .chain(main_trace_on_quotient_domain.vertically_packed_row(i_start))
-                        .chain(
-                            main_trace_on_quotient_domain
-                                .vertically_packed_row(i_start + next_step),
-                        )
-                        .collect_vec(),
-                    main_width,
+                main: VerticalPair::new(
+                    RowMajorMatrixView::new_row(&main_local),
+                    RowMajorMatrixView::new_row(&main_next),
                 ),
-                perm: RowMajorMatrix::new(
-                    iter::empty()
-                        .chain(perm_local)
-                        .chain(perm_next)
-                        .collect_vec(),
-                    perm_width / SC::Challenge::D,
+                perm: VerticalPair::new(
+                    RowMajorMatrixView::new_row(&perm_local),
+                    RowMajorMatrixView::new_row(&perm_next),
                 ),
                 perm_challenges,
                 public_values: &vec![],
-                cumulative_sum: cumulative_sum.unwrap_or_default(),
+                // TODO: Check this
+                cumulative_sum: PackedChallenge::<SC>::from_base_fn(|i| {
+                    PackedVal::<SC>::from(cumulative_sum.as_base_slice()[i])
+                }),
                 is_first_row,
                 is_last_row,
                 is_transition,
                 alpha,
                 accumulator,
             };
-            chip.eval_all(&mut folder);
+            air.eval_all(&mut folder);
 
             // quotient(x) = constraints(x) / Z_H(x)
             let quotient = folder.accumulator * inv_zeroifier;

@@ -10,7 +10,6 @@ use crate::air_builders::debug::DebugConstraintBuilder;
 /// Check that all constraints vanish on the subgroup.
 pub fn check_constraints<F, EF, A>(
     air: &A,
-    preprocessed: &Option<RowMajorMatrix<F>>,
     main: &RowMajorMatrix<F>,
     perm: &Option<RowMajorMatrix<EF>>,
     perm_challenges: &[EF],
@@ -21,6 +20,8 @@ pub fn check_constraints<F, EF, A>(
     EF: ExtensionField<F>,
     A: for<'a> InteractionAir<DebugConstraintBuilder<'a, F, EF>>,
 {
+    let preprocessed = air.preprocessed_trace();
+
     let height = main.height();
     if let Some(perm) = perm {
         assert_eq!(perm.height(), height);

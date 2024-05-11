@@ -8,23 +8,19 @@ use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use super::interaction::{Interaction, InteractionType};
 use crate::{batch_multiplicative_inverse_allowing_zero, generate_rlc_elements, reduce_row};
 
+pub const NUM_PERM_CHALLENGES: usize = 2;
+
 pub fn generate_permutation_trace<F: Field, EF: ExtensionField<F>>(
     preprocessed: &Option<RowMajorMatrix<F>>,
     main: &RowMajorMatrix<F>,
-    sends: &[Interaction<F>],
-    receives: &[Interaction<F>],
-    random_elements: Vec<EF>,
+    interactions: &[(Interaction<F>, InteractionType)],
+    random_elements: [EF; NUM_PERM_CHALLENGES],
 ) -> Option<RowMajorMatrix<EF>> {
-    let interactions: Vec<_> = sends
-        .iter()
-        .map(|i| (i, InteractionType::Send))
-        .chain(receives.iter().map(|i| (i, InteractionType::Receive)))
-        .collect();
     if interactions.is_empty() {
         return None;
     }
 
-    let alphas = generate_rlc_elements(sends, receives, random_elements[0]);
+    let alphas = generate_rlc_elements(interactions, random_elements[0]);
     let betas = random_elements[1].powers();
 
     // Compute the reciprocal columns

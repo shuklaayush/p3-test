@@ -79,8 +79,7 @@ pub trait InteractionAir<AB: PermutationAirBuilderWithCumulativeSum + PairBuilde
         let phi_local = perm_local[perm_width - 1];
         let phi_next = perm_next[perm_width - 1];
 
-        let alphas: Vec<AB::ExprEF> =
-            generate_rlc_elements(&self.sends(), &self.receives(), rand_elems[0].into());
+        let alphas: Vec<AB::ExprEF> = generate_rlc_elements(&interactions, rand_elems[0].into());
         let betas = rand_elems[1].into().powers();
 
         let lhs = phi_next.into() - phi_local.into();

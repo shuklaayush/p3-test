@@ -3,8 +3,10 @@ mod chips;
 mod config;
 mod error;
 // mod machine;
+mod pcs;
 mod proof;
-// mod quotient;
+mod quotient;
 #[cfg(test)]
 mod test_util;
-// mod verify;
+mod trace;
+mod verify;

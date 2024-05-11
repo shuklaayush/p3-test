@@ -1,27 +1,30 @@
 use itertools::Itertools;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, Field};
+use p3_interaction::InteractionAir;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
+use p3_stark::verifier::VerifierConstraintFolder;
+use p3_stark::OpenedValues;
 use p3_uni_stark::Domain;
 use p3_uni_stark::StarkGenericConfig;
 
-use crate::chip::MachineChip;
 use crate::error::VerificationError;
-use crate::folder::VerifierConstraintFolder;
-use crate::permutation::eval_permutation_constraints;
-use crate::proof::OpenedValues;
 
-pub fn verify_constraints<SC: StarkGenericConfig, C: MachineChip<SC>>(
-    chip: &C,
+pub fn verify_constraints<SC, A>(
+    air: &A,
     opened_values: &OpenedValues<SC::Challenge>,
-    cumulative_sum: Option<SC::Challenge>,
     main_domain: Domain<SC>,
     qc_domains: &[Domain<SC>],
     zeta: SC::Challenge,
     alpha: SC::Challenge,
     permutation_challenges: &[SC::Challenge],
-) -> Result<(), VerificationError> {
+    cumulative_sum: Option<SC::Challenge>,
+) -> Result<(), VerificationError>
+where
+    SC: StarkGenericConfig,
+    A: for<'a> InteractionAir<VerifierConstraintFolder<'a, SC>>,
+{
     let zps = qc_domains
         .iter()
         .enumerate()
@@ -95,13 +98,14 @@ pub fn verify_constraints<SC: StarkGenericConfig, C: MachineChip<SC>>(
         ),
         perm_challenges: permutation_challenges,
         public_values: &vec![],
+        cumulative_sum: cumulative_sum.unwrap_or_default(),
         is_first_row: sels.is_first_row,
         is_last_row: sels.is_last_row,
         is_transition: sels.is_transition,
         alpha,
         accumulator: SC::Challenge::zero(),
     };
-    chip.eval_all(&mut folder);
+    air.eval_all(&mut folder);
 
     let folded_constraints = folder.accumulator;
     // Finally, check that

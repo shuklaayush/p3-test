@@ -2,7 +2,7 @@ use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
 use p3_field::{ExtensionField, Field};
-use p3_interaction::PermutationAirBuilderWithCumulativeSum;
+use p3_interaction::{PermutationAirBuilderWithCumulativeSum, NUM_PERM_CHALLENGES};
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 
@@ -15,7 +15,7 @@ pub struct DebugConstraintBuilder<'a, F: Field, EF: ExtensionField<F>> {
     pub preprocessed: ViewPair<'a, F>,
     pub main: ViewPair<'a, F>,
     pub permutation: ViewPair<'a, EF>,
-    pub perm_challenges: &'a [EF],
+    pub perm_challenges: &'a [EF; NUM_PERM_CHALLENGES],
     pub public_values: &'a [F],
     pub cumulative_sum: EF,
     pub is_first_row: F,

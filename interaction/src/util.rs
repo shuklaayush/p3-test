@@ -3,21 +3,21 @@ use alloc::vec::Vec;
 use p3_air::VirtualPairCol;
 use p3_field::{AbstractExtensionField, AbstractField, Field, Powers};
 
+use crate::InteractionType;
+
 use super::interaction::Interaction;
 
 pub fn generate_rlc_elements<F: AbstractField, EF: AbstractExtensionField<F>>(
-    sends: &[Interaction<F>],
-    receives: &[Interaction<F>],
+    interactions: &[(Interaction<F>, InteractionType)],
     random_element: EF,
 ) -> Vec<EF> {
     random_element
         .powers()
         .skip(1)
         .take(
-            sends
+            interactions
                 .iter()
-                .chain(receives)
-                .map(|interaction| interaction.argument_index)
+                .map(|(interaction, _)| interaction.argument_index)
                 .max()
                 .unwrap_or(0)
                 + 1,

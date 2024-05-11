@@ -2,15 +2,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Commitments<Com> {
-    pub main_trace: Com,
-    pub perm_trace: Com,
+    pub main: Com,
+    pub permutation: Com,
     pub quotient_chunks: Com,
 }
 
 // TODO: Rename
 #[derive(Serialize, Deserialize)]
 pub struct ChipProof<Challenge> {
-    pub degree_bits: usize,
+    pub degree: usize,
     pub opened_values: OpenedValues<Challenge>,
     pub cumulative_sum: Option<Challenge>,
 }

@@ -1,4 +1,6 @@
 use p3_field::{ExtensionField, Field};
+use p3_interaction::InteractionType;
+use p3_interaction::NUM_PERM_CHALLENGES;
 use p3_matrix::dense::RowMajorMatrix;
 
 #[cfg(feature = "debug-trace")]
@@ -23,11 +25,10 @@ pub trait InteractionStark<F: Field, EF: ExtensionField<F>>: Stark<F> {
         &self,
         preprocessed: &Option<RowMajorMatrix<F>>,
         main: &RowMajorMatrix<F>,
-        sends: &[Interaction<F>],
-        receives: &[Interaction<F>],
-        random_elements: Vec<EF>,
+        interactions: &[(Interaction<F>, InteractionType)],
+        random_elements: [EF; NUM_PERM_CHALLENGES],
     ) -> Option<RowMajorMatrix<EF>> {
-        generate_permutation_trace(preprocessed, main, sends, receives, random_elements)
+        generate_permutation_trace(preprocessed, main, interactions, random_elements)
     }
 
     #[cfg(feature = "debug-trace")]
@@ -43,9 +44,8 @@ pub trait InteractionStark<F: Field, EF: ExtensionField<F>>: Stark<F> {
     where
         F: PrimeField32,
     {
-        use std::iter::once;
-
         use p3_matrix::Matrix;
+        use std::iter::once;
 
         let perprocessed_headers: Vec<_> =
             (0..preprocessed_trace.as_ref().map_or(0, |t| t.width()))
