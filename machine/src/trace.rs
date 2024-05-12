@@ -18,17 +18,6 @@ where
 {
     pub value: RowMajorMatrix<F>,
     pub domain: Domain,
-    pub opening_index: usize,
-}
-
-#[derive(Clone)]
-pub struct QuotientTrace<Domain>
-where
-    Domain: PolynomialSpace,
-{
-    pub values: Vec<RowMajorMatrix<Domain::Val>>,
-    pub domains: Vec<Domain>,
-    pub opening_index: usize,
 }
 
 impl<EF, Domain> Trace<EF, Domain>
@@ -43,9 +32,27 @@ where
         Trace {
             value: self.value.flatten_to_base(),
             domain: self.domain,
-            opening_index: self.opening_index,
         }
     }
+}
+
+#[derive(Clone)]
+pub struct IndexedTrace<F, Domain>
+where
+    F: Field,
+    Domain: PolynomialSpace,
+{
+    pub trace: Trace<F, Domain>,
+    pub opening_index: usize,
+}
+
+#[derive(Clone)]
+pub struct QuotientTrace<Domain>
+where
+    Domain: PolynomialSpace,
+{
+    pub traces: Vec<Trace<Domain::Val, Domain>>,
+    pub opening_index: usize,
 }
 
 #[derive(Clone)]
@@ -56,9 +63,9 @@ where
 {
     pub chip: &'a ChipType,
 
-    pub preprocessed: Option<Trace<Domain::Val, Domain>>,
-    pub main: Option<Trace<Domain::Val, Domain>>,
-    pub permutation: Option<Trace<EF, Domain>>,
+    pub preprocessed: Option<IndexedTrace<Domain::Val, Domain>>,
+    pub main: Option<IndexedTrace<Domain::Val, Domain>>,
+    pub permutation: Option<IndexedTrace<EF, Domain>>,
 
     pub cumulative_sum: Option<EF>,
 
@@ -85,17 +92,17 @@ where
 
     pub fn domain(&self) -> Option<Domain> {
         match (&self.preprocessed, &self.main) {
-            (Some(preprocessed_trace), Some(main_trace)) => {
-                let preprocessed_domain = preprocessed_trace.domain;
-                let main_domain = main_trace.domain;
+            (Some(preprocessed), Some(main)) => {
+                let preprocessed_domain = preprocessed.trace.domain;
+                let main_domain = main.trace.domain;
                 if main_domain.size() > preprocessed_domain.size() {
                     Some(main_domain)
                 } else {
                     Some(preprocessed_domain)
                 }
             }
-            (Some(preprocessed_trace), None) => Some(preprocessed_trace.domain),
-            (None, Some(main_trace)) => Some(main_trace.domain),
+            (Some(preprocessed), None) => Some(preprocessed.trace.domain),
+            (None, Some(main)) => Some(main.trace.domain),
             (None, None) => None,
         }
     }
@@ -208,13 +215,14 @@ where
         let traces = self
             .iter()
             .map(|trace| {
-                let value = generate_permutation_trace(
-                    &trace.preprocessed.as_ref().map(|mt| mt.value.as_view()),
-                    &trace.main.as_ref().map(|mt| mt.value.as_view()),
-                    <ChipType as InteractionAir<AB>>::all_interactions(trace.chip).as_slice(),
-                    perm_challenges,
-                );
-                value
+                let preprocessed = trace
+                    .preprocessed
+                    .as_ref()
+                    .map(|mt| mt.trace.value.as_view());
+                let main = trace.main.as_ref().map(|mt| mt.trace.value.as_view());
+                let interactions = <ChipType as InteractionAir<AB>>::all_interactions(trace.chip);
+
+                generate_permutation_trace(&preprocessed, &main, &interactions, perm_challenges)
             })
             .collect_vec();
         let cumulative_sums = traces
@@ -256,16 +264,16 @@ where
         let alpha = PackedChallenge::<SC>::from_f(alpha);
 
         let mut count = 0;
-        for trace in self.iter_mut() {
-            let quotient_degree = get_quotient_degree::<Val<SC>, _>(trace.chip, 0);
-            let trace_domain = trace.domain();
+        for chip_trace in self.iter_mut() {
+            let quotient_degree = get_quotient_degree::<Val<SC>, _>(chip_trace.chip, 0);
+            let trace_domain = chip_trace.domain();
 
             if let Some(trace_domain) = trace_domain {
                 let quotient_domain =
                     trace_domain.create_disjoint_domain(trace_domain.size() * quotient_degree);
 
                 let preprocessed_trace_on_quotient_domains =
-                    if let Some(preprocessed) = &trace.preprocessed {
+                    if let Some(preprocessed) = &chip_trace.preprocessed {
                         pcs.get_evaluations_on_domain(
                             preprocessed_data.as_ref().unwrap(),
                             preprocessed.opening_index,
@@ -275,7 +283,7 @@ where
                     } else {
                         RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
                     };
-                let main_trace_on_quotient_domains = if let Some(main) = &trace.main {
+                let main_trace_on_quotient_domains = if let Some(main) = &chip_trace.main {
                     pcs.get_evaluations_on_domain(
                         main_data.as_ref().unwrap(),
                         main.opening_index,
@@ -285,24 +293,25 @@ where
                 } else {
                     RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
                 };
-                let perm_trace_on_quotient_domains = if let Some(permutation) = &trace.permutation {
-                    pcs.get_evaluations_on_domain(
-                        permutation_data.as_ref().unwrap(),
-                        permutation.opening_index,
-                        quotient_domain,
-                    )
-                    .to_row_major_matrix()
-                } else {
-                    RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
-                };
+                let perm_trace_on_quotient_domains =
+                    if let Some(permutation) = &chip_trace.permutation {
+                        pcs.get_evaluations_on_domain(
+                            permutation_data.as_ref().unwrap(),
+                            permutation.opening_index,
+                            quotient_domain,
+                        )
+                        .to_row_major_matrix()
+                    } else {
+                        RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
+                    };
 
-                let cumulative_sum = trace
+                let cumulative_sum = chip_trace
                     .cumulative_sum
                     .map(PackedChallenge::<SC>::from_f)
                     .unwrap_or_default();
 
                 let quotient_values = quotient_values::<SC, _, _>(
-                    trace.chip,
+                    chip_trace.chip,
                     trace_domain,
                     quotient_domain,
                     preprocessed_trace_on_quotient_domains,
@@ -314,12 +323,19 @@ where
                 );
                 let quotient_flat = RowMajorMatrix::new_col(quotient_values).flatten_to_base();
 
-                let quotient_chunks = quotient_domain.split_evals(quotient_degree, quotient_flat);
+                let chunks = quotient_domain.split_evals(quotient_degree, quotient_flat);
                 let chunk_domains = quotient_domain.split_domains(quotient_degree);
+                let traces = chunk_domains
+                    .into_iter()
+                    .zip(chunks.into_iter())
+                    .map(|(domain, chunk)| Trace {
+                        value: chunk,
+                        domain,
+                    })
+                    .collect();
 
-                trace.quotient_chunks = Some(QuotientTrace {
-                    values: quotient_chunks,
-                    domains: chunk_domains,
+                chip_trace.quotient_chunks = Some(QuotientTrace {
+                    traces,
                     opening_index: count,
                 });
                 count += 1;
@@ -349,6 +365,11 @@ where
     where
         SC: StarkGenericConfig,
         SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>;
+
+    fn commit_quotient<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
+    where
+        SC: StarkGenericConfig,
+        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>;
 }
 
 impl<'a, Domain, EF> MachineTraceCommiter<'a, Domain, EF> for MachineTrace<'a, Domain, EF>
@@ -363,7 +384,7 @@ where
     {
         let traces = self
             .into_iter()
-            .map(|trace| trace.preprocessed)
+            .flat_map(|trace| trace.preprocessed.map(|preprocessed| preprocessed.trace))
             .collect_vec();
         commit_traces::<SC>(pcs, traces)
     }
@@ -373,7 +394,10 @@ where
         SC: StarkGenericConfig,
         SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
     {
-        let traces = self.into_iter().map(|trace| trace.main).collect_vec();
+        let traces = self
+            .into_iter()
+            .flat_map(|trace| trace.main.map(|main| main.trace))
+            .collect_vec();
         commit_traces::<SC>(pcs, traces)
     }
 
@@ -384,7 +408,24 @@ where
     {
         let traces = self
             .into_iter()
-            .map(|trace| trace.permutation.map(|trace| trace.flatten_to_base()))
+            .flat_map(|trace| {
+                trace
+                    .permutation
+                    .map(|permutation| permutation.trace.flatten_to_base())
+            })
+            .collect_vec();
+        commit_traces::<SC>(pcs, traces)
+    }
+
+    fn commit_quotient<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
+    where
+        SC: StarkGenericConfig,
+        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
+    {
+        let traces = self
+            .into_iter()
+            .flat_map(|trace| trace.quotient_chunks.map(|quotient| quotient.traces))
+            .flatten()
             .collect_vec();
         commit_traces::<SC>(pcs, traces)
     }
@@ -393,7 +434,7 @@ where
 fn load_traces<SC, F>(
     pcs: &SC::Pcs,
     traces: Vec<Option<RowMajorMatrix<F>>>,
-) -> Vec<Option<Trace<F, Domain<SC>>>>
+) -> Vec<Option<IndexedTrace<F, Domain<SC>>>>
 where
     F: Field,
     SC: StarkGenericConfig,
@@ -406,12 +447,15 @@ where
                     let degree = trace.height();
                     if degree > 0 {
                         let domain = pcs.natural_domain_for_degree(degree);
+                        let trace = Trace {
+                            value: trace,
+                            domain,
+                        };
                         let index = *count;
                         *count += 1;
 
-                        Some(Trace {
-                            value: trace,
-                            domain,
+                        Some(IndexedTrace {
+                            trace,
                             opening_index: index,
                         })
                     } else {
@@ -427,14 +471,14 @@ where
 
 fn commit_traces<SC>(
     pcs: &SC::Pcs,
-    traces: Vec<Option<Trace<Val<SC>, Domain<SC>>>>,
+    traces: Vec<Trace<Val<SC>, Domain<SC>>>,
 ) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
 where
     SC: StarkGenericConfig,
 {
     let domains_and_traces: Vec<_> = traces
         .into_iter()
-        .flat_map(|mt| mt.map(|trace| (trace.domain, trace.value)))
+        .map(|trace| (trace.domain, trace.value))
         .collect();
     if !domains_and_traces.is_empty() {
         let (commit, data) = pcs.commit(domains_and_traces);

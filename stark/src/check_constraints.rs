@@ -10,8 +10,8 @@ use crate::air_builders::debug::DebugConstraintBuilder;
 /// Check that all constraints vanish on the subgroup.
 pub fn check_constraints<F, EF, A>(
     air: &A,
-    main: &RowMajorMatrix<F>,
-    perm: &Option<RowMajorMatrix<EF>>,
+    main: &Option<RowMajorMatrixView<F>>,
+    perm: &Option<RowMajorMatrixView<EF>>,
     perm_challenges: [EF; 2],
     cumulative_sum: Option<EF>,
     public_values: &[F],
@@ -21,13 +21,13 @@ pub fn check_constraints<F, EF, A>(
     A: for<'a> InteractionAir<DebugConstraintBuilder<'a, F, EF>>,
 {
     let preprocessed = air.preprocessed_trace();
+    let height = match (main.as_ref(), preprocessed.as_ref()) {
+        (Some(main), Some(preprocessed)) => std::cmp::max(main.height(), preprocessed.height()),
+        (Some(main), None) => main.height(),
+        (None, Some(preprocessed)) => preprocessed.height(),
+        (None, None) => 0,
+    };
 
-    let height = main.height().max(
-        preprocessed
-            .as_ref()
-            .map(|t| t.height())
-            .unwrap_or_default(),
-    );
     if let Some(perm) = perm {
         assert_eq!(perm.height(), height);
     }
@@ -45,7 +45,10 @@ pub fn check_constraints<F, EF, A>(
                 )
             })
             .unwrap_or((vec![], vec![]));
-        let (main_local, main_next) = (main.row_slice(i), main.row_slice(i_next));
+        let (main_local, main_next) = main
+            .as_ref()
+            .map(|main| (main.row_slice(i).to_vec(), main.row_slice(i_next).to_vec()))
+            .unwrap_or((vec![], vec![]));
         let (perm_local, perm_next) = perm
             .as_ref()
             .map(|perm| (perm.row_slice(i).to_vec(), perm.row_slice(i_next).to_vec()))

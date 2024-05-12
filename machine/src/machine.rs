@@ -184,115 +184,22 @@ impl Machine {
         // check_cumulative_sums(&permutation_traces[..]);
 
         // 5. Generate and commit to quotient traces
-        let quotient_degrees = chips
-            .iter()
-            .map(|&chip| get_quotient_degree::<Val<SC>, _>(chip, 0))
-            .collect_vec();
-        let quotient_domains = trace_domains
-            .iter()
-            .zip_eq(quotient_degrees.iter())
-            .map(|(domain, quotient_degree)| {
-                domain.map(|domain| domain.create_disjoint_domain(domain.size() * quotient_degree))
-            })
-            .collect_vec();
-
-        let quotient_values = quotient_domains
-            .clone()
-            .into_par_iter()
-            .zip_eq(pk.preprocessed_traces.par_iter())
-            .zip_eq(main_traces.par_iter())
-            .zip_eq(permutation_traces.par_iter())
-            .zip_eq(chips.par_iter())
-            .map(
-                |(
-                    (((quotient_domain, preprocessed_trace), main_trace), permutation_trace),
-                    &chip,
-                )| {
-                    quotient_domain.map(|quotient_domain| {
-                        let preprocessed_trace_on_quotient_domains =
-                            if let Some(preprocessed_data) = pk.preprocessed_data {
-                                let index = preprocessed_trace
-                                    .expect("Index shouldn't be None")
-                                    .opening_index;
-                                pcs.get_evaluations_on_domain(
-                                    &preprocessed_data.data,
-                                    index,
-                                    quotient_domain,
-                                )
-                                .to_row_major_matrix()
-                            } else {
-                                RowMajorMatrix::new_col(vec![
-                                    Val::<SC>::zero();
-                                    quotient_domain.size()
-                                ])
-                            };
-                        let main_trace_on_quotient_domains = {
-                            let index = main_trace.expect("Index shouldn't be None").opening_index;
-                            if let Some(main_data) = main_data {
-                                pcs.get_evaluations_on_domain(&main_data, index, quotient_domain)
-                                    .to_row_major_matrix()
-                            } else {
-                                RowMajorMatrix::new_col(vec![
-                                    Val::<SC>::zero();
-                                    quotient_domain.size()
-                                ])
-                            }
-                        };
-                        let perm_trace_on_quotient_domains = if let Some(permutation_data) =
-                            permutation_data
-                        {
-                            let index = permutation_trace
-                                .expect("Index shouldn't be None")
-                                .opening_index;
-                            pcs.get_evaluations_on_domain(&permutation_data, index, quotient_domain)
-                                .to_row_major_matrix()
-                        } else {
-                            RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
-                        };
-                        quotient_values::<SC, _, _>(
-                            chip,
-                            main_traces.domain,
-                            quotient_domain,
-                            preprocessed_trace_on_quotient_domains,
-                            main_trace_on_quotient_domains,
-                            perm_trace_on_quotient_domains,
-                            &packed_perm_challenges,
-                            alpha,
-                            cumulative_sums[i],
-                        )
-                    })
-                },
+        let quotient_traces = tracing::info_span!("generate quotient trace").in_scope(|| {
+            trace.generate_quotient(
+                pcs,
+                pk.preprocessed_data.map(|d| d.data),
+                main_data,
+                permutation_data,
+                perm_challenges,
+                alpha,
             )
-            .collect_vec();
-        let quotient_chunks = quotient_domains
-            .clone()
-            .into_iter()
-            .zip_eq(quotient_degrees.clone())
-            .zip_eq(quotient_values)
-            .map(|((domain, degree), values)| {
-                let quotient_flat = RowMajorMatrix::new_col(values).flatten_to_base();
-                domain.split_evals(degree, quotient_flat)
-            })
-            .collect_vec();
-        let qc_domains = quotient_domains
-            .into_iter()
-            .zip_eq(quotient_degrees.clone())
-            .map(|(quotient_domain, quotient_degree)| {
-                quotient_domain.split_domains(quotient_degree)
-            })
-            .collect_vec();
-
+        });
+        // TODO: Panic if this is None
         let (quotient_commit, quotient_data) = tracing::info_span!("commit to quotient chunks")
-            .in_scope(|| {
-                pcs.commit(
-                    qc_domains
-                        .into_iter()
-                        .flatten()
-                        .zip_eq(quotient_chunks.into_iter().flatten())
-                        .collect_vec(),
-                )
-            });
-        challenger.observe(quotient_commit.clone());
+            .in_scope(|| trace.commit_quotient::<SC>(pcs));
+        if let Some(quotient_commit) = quotient_commit {
+            challenger.observe(quotient_commit.clone());
+        }
 
         let commitments = Commitments {
             main: main_commit,
