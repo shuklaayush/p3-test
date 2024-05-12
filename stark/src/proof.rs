@@ -20,6 +20,7 @@ pub struct OpenedValues<Challenge> {
     pub preprocessed: Option<AdjacentOpenedValues<Challenge>>,
     pub main: AdjacentOpenedValues<Challenge>,
     pub permutation: Option<AdjacentOpenedValues<Challenge>>,
+    // TODO: Check if inner size is 2
     pub quotient_chunks: Vec<Vec<Challenge>>,
 }
 

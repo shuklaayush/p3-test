@@ -18,23 +18,23 @@ pub struct MachineProof<SC: StarkGenericConfig> {
     pub chip_proofs: Vec<ChipProof<SC::Challenge>>,
 }
 
-pub struct ProverData<SC: StarkGenericConfig> {
-    pub data: PcsProverData<SC>,
-    pub commitment: Com<SC>,
+pub struct ProverPreprocessedData<SC: StarkGenericConfig> {
+    pub traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
+    pub data: Option<PcsProverData<SC>>,
+    pub commitment: Option<Com<SC>>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct VerifierData<SC: StarkGenericConfig> {
+pub struct VerifierPreprocessedData<SC: StarkGenericConfig> {
     pub commitment: Com<SC>,
     pub degrees: Vec<usize>,
 }
 
 pub struct ProvingKey<SC: StarkGenericConfig> {
-    pub preprocessed_data: Option<ProverData<SC>>,
-    pub preprocessed_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
+    pub preprocessed: ProverPreprocessedData<SC>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct VerifyingKey<SC: StarkGenericConfig> {
-    pub preprocessed_data: Option<VerifierData<SC>>,
+    pub preprocessed: Option<VerifierPreprocessedData<SC>>,
 }

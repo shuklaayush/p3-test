@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use p3_air::BaseAir;
-use p3_commit::{Pcs, PolynomialSpace};
+use p3_commit::{OpenedValuesForMatrix, OpenedValuesForRound, Pcs, PolynomialSpace};
 use p3_field::{AbstractField, ExtensionField, Field};
 use p3_interaction::{
     generate_permutation_trace, InteractionAir, InteractionAirBuilder, NUM_PERM_CHALLENGES,
 };
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
-use p3_stark::symbolic::get_quotient_degree;
+use p3_stark::{symbolic::get_quotient_degree, AdjacentOpenedValues};
 use p3_uni_stark::{Com, Domain, PackedChallenge, StarkGenericConfig, Val};
 
 use crate::{chip::ChipType, proof::PcsProverData, quotient::quotient_values};
@@ -129,16 +129,19 @@ pub trait MachineTraceLoader<'a, SC>
 where
     SC: StarkGenericConfig,
 {
-    fn generate_preprocessed(self, pcs: &SC::Pcs) -> Self;
+    fn generate_preprocessed(self, pcs: &'a SC::Pcs) -> Self;
 
-    fn load_preprocessed(self, pcs: &SC::Pcs, traces: Vec<Option<RowMajorMatrix<Val<SC>>>>)
-        -> Self;
+    fn load_preprocessed(
+        self,
+        pcs: &'a SC::Pcs,
+        traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
+    ) -> Self;
 
-    fn load_main(self, pcs: &SC::Pcs, traces: Vec<Option<RowMajorMatrix<Val<SC>>>>) -> Self;
+    fn load_main(self, pcs: &'a SC::Pcs, traces: Vec<Option<RowMajorMatrix<Val<SC>>>>) -> Self;
 
     fn generate_permutation<AB>(
         self,
-        pcs: &SC::Pcs,
+        pcs: &'a SC::Pcs,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     ) -> Self
     where
@@ -146,7 +149,7 @@ where
 
     fn generate_quotient(
         self,
-        pcs: &SC::Pcs,
+        pcs: &'a SC::Pcs,
         preprocessed_data: Option<PcsProverData<SC>>,
         main_data: Option<PcsProverData<SC>>,
         permutation_data: Option<PcsProverData<SC>>,
@@ -159,7 +162,7 @@ impl<'a, SC> MachineTraceLoader<'a, SC> for MachineTrace<'a, SC>
 where
     SC: StarkGenericConfig,
 {
-    fn generate_preprocessed(mut self, pcs: &SC::Pcs) -> Self {
+    fn generate_preprocessed(mut self, pcs: &'a SC::Pcs) -> Self {
         let traces = self
             .iter()
             .map(|trace| trace.chip.preprocessed_trace())
@@ -173,7 +176,7 @@ where
 
     fn load_preprocessed(
         mut self,
-        pcs: &SC::Pcs,
+        pcs: &'a SC::Pcs,
         traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
     ) -> Self {
         let traces = load_traces::<SC, _>(pcs, traces);
@@ -183,7 +186,7 @@ where
         self
     }
 
-    fn load_main(mut self, pcs: &SC::Pcs, traces: Vec<Option<RowMajorMatrix<Val<SC>>>>) -> Self {
+    fn load_main(mut self, pcs: &'a SC::Pcs, traces: Vec<Option<RowMajorMatrix<Val<SC>>>>) -> Self {
         let traces = load_traces::<SC, _>(pcs, traces);
         for (chip_trace, main) in self.iter_mut().zip_eq(traces) {
             chip_trace.main = main;
@@ -193,7 +196,7 @@ where
 
     fn generate_permutation<AB>(
         mut self,
-        pcs: &SC::Pcs,
+        pcs: &'a SC::Pcs,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     ) -> Self
     where
@@ -236,7 +239,7 @@ where
 
     fn generate_quotient(
         mut self,
-        pcs: &SC::Pcs,
+        pcs: &'a SC::Pcs,
         preprocessed_data: Option<PcsProverData<SC>>,
         main_data: Option<PcsProverData<SC>>,
         permutation_data: Option<PcsProverData<SC>>,
@@ -333,20 +336,20 @@ pub trait MachineTraceCommiter<'a, SC>
 where
     SC: StarkGenericConfig,
 {
-    fn commit_preprocessed(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
+    fn commit_preprocessed(self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 
-    fn commit_main(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
+    fn commit_main(self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 
-    fn commit_permutation(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
+    fn commit_permutation(self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 
-    fn commit_quotient(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
+    fn commit_quotient(self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 }
 
 impl<'a, SC> MachineTraceCommiter<'a, SC> for MachineTrace<'a, SC>
 where
     SC: StarkGenericConfig,
 {
-    fn commit_preprocessed(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
+    fn commit_preprocessed(self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
             .into_iter()
             .flat_map(|trace| trace.preprocessed.map(|preprocessed| preprocessed.trace))
@@ -354,7 +357,7 @@ where
         commit_traces::<SC>(pcs, traces)
     }
 
-    fn commit_main(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
+    fn commit_main(self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
             .into_iter()
             .flat_map(|trace| trace.main.map(|main| main.trace))
@@ -362,7 +365,7 @@ where
         commit_traces::<SC>(pcs, traces)
     }
 
-    fn commit_permutation(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
+    fn commit_permutation(self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
             .into_iter()
             .flat_map(|trace| {
@@ -374,13 +377,208 @@ where
         commit_traces::<SC>(pcs, traces)
     }
 
-    fn commit_quotient(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
+    fn commit_quotient(self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
             .into_iter()
             .flat_map(|trace| trace.quotient_chunks.map(|quotient| quotient.traces))
             .flatten()
             .collect_vec();
         commit_traces::<SC>(pcs, traces)
+    }
+}
+
+pub trait MachineTraceOpener<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn generate_rounds(
+        self,
+        zeta: SC::Challenge,
+        preprocessed_data: &'a Option<PcsProverData<SC>>,
+        main_data: &'a Option<PcsProverData<SC>>,
+        permutation_data: &'a Option<PcsProverData<SC>>,
+        quotient_data: &'a Option<PcsProverData<SC>>,
+    ) -> Vec<(&'a PcsProverData<SC>, Vec<Vec<SC::Challenge>>)>;
+
+    fn unflatten_openings(
+        self,
+        opening_values: Vec<OpenedValuesForRound<SC::Challenge>>,
+        preprocessed_data: &'a Option<PcsProverData<SC>>,
+        main_data: &'a Option<PcsProverData<SC>>,
+        permutation_data: &'a Option<PcsProverData<SC>>,
+        quotient_data: &'a Option<PcsProverData<SC>>,
+    ) -> (
+        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
+        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
+        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
+        Vec<Option<Vec<OpenedValuesForMatrix<SC::Challenge>>>>,
+    );
+}
+
+impl<'a, SC> MachineTraceOpener<'a, SC> for MachineTrace<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn generate_rounds(
+        self,
+        zeta: SC::Challenge,
+        preprocessed_data: &'a Option<PcsProverData<SC>>,
+        main_data: &'a Option<PcsProverData<SC>>,
+        permutation_data: &'a Option<PcsProverData<SC>>,
+        quotient_data: &'a Option<PcsProverData<SC>>,
+    ) -> Vec<(&'a PcsProverData<SC>, Vec<Vec<SC::Challenge>>)> {
+        let mut rounds = vec![];
+        if let Some(preprocessed_data) = preprocessed_data {
+            let opening_points = self
+                .iter()
+                .flat_map(|chip_trace| {
+                    chip_trace.preprocessed.as_ref().map(|preprocessed| {
+                        let domain = preprocessed.trace.domain;
+                        vec![zeta, domain.next_point(zeta).unwrap()]
+                    })
+                })
+                .collect_vec();
+            rounds.push((preprocessed_data, opening_points));
+        }
+        if let Some(main_data) = main_data {
+            let opening_points = self
+                .iter()
+                .flat_map(|chip_trace| {
+                    chip_trace.main.as_ref().map(|main| {
+                        let domain = main.trace.domain;
+                        vec![zeta, domain.next_point(zeta).unwrap()]
+                    })
+                })
+                .collect_vec();
+            rounds.push((main_data, opening_points));
+        }
+        if let Some(permutation_data) = permutation_data {
+            let opening_points = self
+                .iter()
+                .flat_map(|chip_trace| {
+                    chip_trace.permutation.as_ref().map(|permutation| {
+                        let domain = permutation.trace.domain;
+                        vec![zeta, domain.next_point(zeta).unwrap()]
+                    })
+                })
+                .collect_vec();
+            rounds.push((permutation_data, opening_points));
+        }
+        if let Some(quotient_data) = quotient_data {
+            // open every chunk at zeta
+            let opening_points = self
+                .iter()
+                .flat_map(|chip_trace| {
+                    chip_trace
+                        .quotient_degree
+                        .map(|degree| (0..degree).map(|_| vec![zeta]).collect_vec())
+                })
+                .flatten()
+                .collect_vec();
+            rounds.push((quotient_data, opening_points));
+        }
+
+        rounds
+    }
+
+    fn unflatten_openings(
+        self,
+        mut opening_values: Vec<OpenedValuesForRound<SC::Challenge>>,
+        preprocessed_data: &'a Option<PcsProverData<SC>>,
+        main_data: &'a Option<PcsProverData<SC>>,
+        permutation_data: &'a Option<PcsProverData<SC>>,
+        quotient_data: &'a Option<PcsProverData<SC>>,
+    ) -> (
+        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
+        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
+        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
+        Vec<Option<Vec<OpenedValuesForMatrix<SC::Challenge>>>>,
+    ) {
+        let quotient_openings = if quotient_data.is_some() {
+            // Unflatten quotient openings
+            let openings = opening_values.pop().expect("Opening should be present");
+            let mut start = 0;
+            // TODO: use drain
+            // TODO: remove clone
+            self.iter()
+                .map(|chip_proof| {
+                    chip_proof.quotient_degree.map(|degree| {
+                        let end = start + degree;
+                        let openings = openings[start..end].to_vec();
+                        start = end;
+                        openings
+                    })
+                })
+                .collect_vec()
+        } else {
+            // TODO: Better way
+            self.iter().map(|_| None).collect_vec()
+        };
+
+        let permutation_openings = if permutation_data.is_some() {
+            let openings = opening_values.pop().expect("Opening should be present");
+            // TODO: remove clone
+            self.iter()
+                .map(|chip_trace| {
+                    chip_trace.permutation.as_ref().map(|permutation| {
+                        let openings = &openings[permutation.opening_index];
+                        assert_eq!(openings.len(), 2, "Should have 2 openings");
+                        AdjacentOpenedValues {
+                            local: openings[0].clone(),
+                            next: openings[1].clone(),
+                        }
+                    })
+                })
+                .collect_vec()
+        } else {
+            // TODO: Better way
+            self.iter().map(|_| None).collect_vec()
+        };
+
+        let main_openings = if main_data.is_some() {
+            let openings = opening_values.pop().expect("Opening should be present");
+            self.iter()
+                .map(|chip_trace| {
+                    chip_trace.main.as_ref().map(|main| {
+                        let openings = &openings[main.opening_index];
+                        assert_eq!(openings.len(), 2, "Should have 2 openings");
+                        AdjacentOpenedValues {
+                            local: openings[0].clone(),
+                            next: openings[1].clone(),
+                        }
+                    })
+                })
+                .collect_vec()
+        } else {
+            // TODO: Better way
+            self.iter().map(|_| None).collect_vec()
+        };
+
+        let preprocessed_openings = if preprocessed_data.is_some() {
+            let openings = opening_values.pop().expect("Opening should be present");
+            self.iter()
+                .map(|chip_trace| {
+                    chip_trace.preprocessed.as_ref().map(|preprocessed| {
+                        let openings = &openings[preprocessed.opening_index];
+                        assert_eq!(openings.len(), 2, "Should have 2 openings");
+                        AdjacentOpenedValues {
+                            local: openings[0].clone(),
+                            next: openings[1].clone(),
+                        }
+                    })
+                })
+                .collect_vec()
+        } else {
+            // TODO: Better way
+            self.iter().map(|_| None).collect_vec()
+        };
+
+        (
+            preprocessed_openings,
+            main_openings,
+            permutation_openings,
+            quotient_openings,
+        )
     }
 }
 
@@ -392,32 +590,31 @@ where
     F: Field,
     SC: StarkGenericConfig,
 {
+    let mut count = 0;
     traces
         .into_iter()
-        .scan(0usize, |count, mt| {
-            Some({
-                if let Some(trace) = mt {
-                    let degree = trace.height();
-                    if degree > 0 {
-                        let domain = pcs.natural_domain_for_degree(degree);
-                        let trace = Trace {
-                            value: trace,
-                            domain,
-                        };
-                        let index = *count;
-                        *count += 1;
+        .map(|mt| {
+            if let Some(trace) = mt {
+                let degree = trace.height();
+                if degree > 0 {
+                    let domain = pcs.natural_domain_for_degree(degree);
+                    let trace = Trace {
+                        value: trace,
+                        domain,
+                    };
+                    let index = count;
+                    count += 1;
 
-                        Some(IndexedTrace {
-                            trace,
-                            opening_index: index,
-                        })
-                    } else {
-                        None
-                    }
+                    Some(IndexedTrace {
+                        trace,
+                        opening_index: index,
+                    })
                 } else {
                     None
                 }
-            })
+            } else {
+                None
+            }
         })
         .collect()
 }
