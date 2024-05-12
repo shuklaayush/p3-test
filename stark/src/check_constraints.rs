@@ -12,7 +12,7 @@ pub fn check_constraints<F, EF, A>(
     air: &A,
     main: &RowMajorMatrix<F>,
     perm: &Option<RowMajorMatrix<EF>>,
-    perm_challenges: &[EF],
+    perm_challenges: [EF; 2],
     cumulative_sum: Option<EF>,
     public_values: &[F],
 ) where
@@ -22,7 +22,12 @@ pub fn check_constraints<F, EF, A>(
 {
     let preprocessed = air.preprocessed_trace();
 
-    let height = main.height();
+    let height = main.height().max(
+        preprocessed
+            .as_ref()
+            .map(|t| t.height())
+            .unwrap_or_default(),
+    );
     if let Some(perm) = perm {
         assert_eq!(perm.height(), height);
     }

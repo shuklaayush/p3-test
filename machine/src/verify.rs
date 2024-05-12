@@ -2,6 +2,7 @@ use itertools::Itertools;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, Field};
 use p3_interaction::InteractionAir;
+use p3_interaction::NUM_PERM_CHALLENGES;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use p3_stark::verifier::VerifierConstraintFolder;
@@ -18,7 +19,7 @@ pub fn verify_constraints<SC, A>(
     qc_domains: &[Domain<SC>],
     zeta: SC::Challenge,
     alpha: SC::Challenge,
-    permutation_challenges: &[SC::Challenge],
+    permutation_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     cumulative_sum: Option<SC::Challenge>,
 ) -> Result<(), VerificationError>
 where

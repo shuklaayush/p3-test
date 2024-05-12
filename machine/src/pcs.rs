@@ -46,7 +46,7 @@ impl<P> Commiter<P> for P {
                             *count += 1;
 
                             Some(Trace {
-                                matrix: trace,
+                                value: trace,
                                 domain,
                                 opening_index: index,
                             })
@@ -71,7 +71,7 @@ impl<P> Commiter<P> for P {
     {
         let domains_and_traces: Vec<_> = traces
             .into_iter()
-            .flat_map(|mt| mt.map(|trace| (trace.domain, trace.matrix)))
+            .flat_map(|mt| mt.map(|trace| (trace.domain, trace.value)))
             .collect();
         if !domains_and_traces.is_empty() {
             let (commit, data) = self.commit(domains_and_traces);

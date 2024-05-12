@@ -1,5 +1,5 @@
 mod air_builders;
-// mod check_constraints;
+mod check_constraints;
 mod proof;
 mod stark;
 

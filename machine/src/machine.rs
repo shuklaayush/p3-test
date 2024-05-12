@@ -7,7 +7,7 @@ use p3_interaction::{generate_permutation_trace, InteractionAir, NUM_PERM_CHALLE
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator};
 use p3_stark::{
-    symbolic::get_log_quotient_degree, AdjacentOpenedValues, ChipProof, Commitments, OpenedValues,
+    symbolic::get_quotient_degree, AdjacentOpenedValues, ChipProof, Commitments, OpenedValues,
 };
 use p3_uni_stark::{PackedChallenge, StarkGenericConfig, Val};
 use tracing::instrument;
@@ -139,15 +139,11 @@ impl Machine {
         }
 
         // 3. Sample permutation challenges
-        let mut perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
+        let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
             .map(|_| challenger.sample_ext_element::<SC::Challenge>())
             .collect_vec()
             .try_into()
             .unwrap();
-        let packed_perm_challenges = perm_challenges
-            .iter()
-            .map(|c| PackedChallenge::<SC>::from_f(*c))
-            .collect_vec();
 
         // 4. Generate and commit to permutation trace
         let permutation_traces = tracing::info_span!("generate permutation traces")
@@ -160,17 +156,7 @@ impl Machine {
         }
         let alpha: SC::Challenge = challenger.sample_ext_element();
 
-        let cumulative_sums = permutation_traces
-            .iter()
-            .map(|mt| {
-                mt.as_ref().map(|trace| {
-                    let matrix = trace.matrix;
-                    *matrix.row_slice(matrix.height() - 1).last().unwrap()
-                })
-            })
-            .collect_vec();
-
-        // 4. Verify constraints
+        // Verify constraints
         // #[cfg(feature = "debug-trace")]
         // let _ = self.write_traces_to_file::<SC>(
         //     "trace.xlsx",
@@ -200,10 +186,7 @@ impl Machine {
         // 5. Generate and commit to quotient traces
         let quotient_degrees = chips
             .iter()
-            .map(|&chip| {
-                let d = get_log_quotient_degree::<Val<SC>, _>(chip, 0);
-                1 << d
-            })
+            .map(|&chip| get_quotient_degree::<Val<SC>, _>(chip, 0))
             .collect_vec();
         let quotient_domains = trace_domains
             .iter()
@@ -480,10 +463,7 @@ impl Machine {
             .collect_vec();
         let quotient_degrees = chips
             .iter()
-            .map(|&chip| {
-                let d = get_log_quotient_degree::<Val<SC>, _>(chip, 0);
-                1 << d
-            })
+            .map(|&chip| get_quotient_degree::<Val<SC>, _>(chip, 0))
             .collect_vec();
 
         let main_domains = main_degrees
@@ -525,7 +505,7 @@ impl Machine {
         }
 
         challenger.observe(commitments.main.clone());
-        let mut perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
+        let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
             .map(|_| challenger.sample_ext_element::<SC::Challenge>())
             .collect_vec()
             .try_into()

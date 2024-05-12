@@ -1,8 +1,7 @@
 use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
-use p3_field::AbstractField;
-use p3_interaction::InteractionAirBuilder;
+use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
 use p3_uni_stark::{PackedChallenge, PackedVal, StarkGenericConfig, Val};
 
 use super::ViewPair;
@@ -12,13 +11,13 @@ pub struct ProverConstraintFolder<'a, SC: StarkGenericConfig> {
     pub preprocessed: ViewPair<'a, PackedVal<SC>>,
     pub main: ViewPair<'a, PackedVal<SC>>,
     pub perm: ViewPair<'a, PackedChallenge<SC>>,
-    pub perm_challenges: &'a [PackedChallenge<SC>],
+    pub perm_challenges: [PackedChallenge<SC>; NUM_PERM_CHALLENGES],
     pub public_values: &'a Vec<Val<SC>>,
     pub cumulative_sum: PackedChallenge<SC>,
     pub is_first_row: PackedVal<SC>,
     pub is_last_row: PackedVal<SC>,
     pub is_transition: PackedVal<SC>,
-    pub alpha: SC::Challenge,
+    pub alpha: PackedChallenge<SC>,
     pub accumulator: PackedChallenge<SC>,
 }
 
@@ -53,7 +52,7 @@ where
 
     fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) {
         let x: PackedVal<SC> = x.into();
-        self.accumulator *= PackedChallenge::<SC>::from_f(self.alpha);
+        self.accumulator *= self.alpha;
         self.accumulator += x;
     }
 }
@@ -80,7 +79,7 @@ where
         I: Into<Self::ExprEF>,
     {
         let x: PackedChallenge<SC> = x.into();
-        self.accumulator *= PackedChallenge::<SC>::from_f(self.alpha);
+        self.accumulator *= self.alpha;
         self.accumulator += x;
     }
 }
@@ -98,7 +97,7 @@ where
     }
 
     fn permutation_randomness(&self) -> &[Self::RandomVar] {
-        self.perm_challenges
+        &self.perm_challenges
     }
 }
 

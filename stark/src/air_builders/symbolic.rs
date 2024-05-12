@@ -11,7 +11,7 @@ use tracing::instrument;
 const NUM_PERM_CHALLENGES: usize = 2;
 
 #[instrument(name = "infer log of constraint degree", skip_all)]
-pub fn get_log_quotient_degree<F, A>(air: &A, num_public_values: usize) -> usize
+pub fn get_quotient_degree<F, A>(air: &A, num_public_values: usize) -> usize
 where
     F: Field,
     A: InteractionAir<SymbolicAirBuilder<F>>,
@@ -22,7 +22,8 @@ where
     // The quotient's actual degree is approximately (max_constraint_degree - 1) n,
     // where subtracting 1 comes from division by the zerofier.
     // But we pad it to a power of two so that we can efficiently decompose the quotient.
-    log2_ceil_usize(constraint_degree - 1)
+    let d = log2_ceil_usize(constraint_degree - 1);
+    1 << d
 }
 
 #[instrument(name = "infer constraint degree", skip_all, level = "debug")]
@@ -64,7 +65,7 @@ pub struct SymbolicAirBuilder<F: Field> {
     main: RowMajorMatrix<SymbolicVariable<F>>,
     permutation: RowMajorMatrix<SymbolicVariable<F>>,
     public_values: Vec<SymbolicVariable<F>>,
-    perm_challenges: Vec<SymbolicVariable<F>>,
+    perm_challenges: [SymbolicVariable<F>; NUM_PERM_CHALLENGES],
     cumulative_sum: SymbolicVariable<F>,
     constraints: Vec<SymbolicExpression<F>>,
 }
@@ -103,7 +104,9 @@ impl<F: Field> SymbolicAirBuilder<F> {
 
         let perm_challenges = (0..NUM_PERM_CHALLENGES)
             .map(move |index| SymbolicVariable::new(Entry::Challenge, index))
-            .collect();
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
         // TODO: This should be a symbolic variable
         let cumulative_sum = SymbolicVariable::new(Entry::Challenge, 0);
         Self {

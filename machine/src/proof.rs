@@ -23,6 +23,7 @@ pub struct ProverData<SC: StarkGenericConfig> {
     pub commitment: Com<SC>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct VerifierData<SC: StarkGenericConfig> {
     pub commitment: Com<SC>,
     pub degrees: Vec<usize>,
@@ -33,6 +34,7 @@ pub struct ProvingKey<SC: StarkGenericConfig> {
     pub preprocessed_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct VerifyingKey<SC: StarkGenericConfig> {
     pub preprocessed_data: Option<VerifierData<SC>>,
 }

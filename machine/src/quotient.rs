@@ -3,7 +3,7 @@ use std::cmp::min;
 use itertools::Itertools;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, PackedValue};
-use p3_interaction::InteractionAir;
+use p3_interaction::{InteractionAir, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrixView, stack::VerticalPair, Matrix};
 use p3_maybe_rayon::prelude::*;
 use p3_stark::prover::ProverConstraintFolder;
@@ -12,14 +12,14 @@ use p3_util::log2_strict_usize;
 
 pub fn quotient_values<SC, A, Mat>(
     air: &A,
-    main_domain: Domain<SC>,
+    trace_domain: Domain<SC>,
     quotient_domain: Domain<SC>,
     preprocessed_trace_on_quotient_domain: Mat,
     main_trace_on_quotient_domain: Mat,
     perm_trace_on_quotient_domain: Mat,
-    perm_challenges: &[PackedChallenge<SC>],
-    alpha: SC::Challenge,
-    cumulative_sum: SC::Challenge,
+    perm_challenges: [PackedChallenge<SC>; NUM_PERM_CHALLENGES],
+    alpha: PackedChallenge<SC>,
+    cumulative_sum: PackedChallenge<SC>,
 ) -> Vec<SC::Challenge>
 where
     SC: StarkGenericConfig,
@@ -28,9 +28,9 @@ where
 {
     let quotient_size = quotient_domain.size();
     let perm_width = perm_trace_on_quotient_domain.width();
-    let mut sels = main_domain.selectors_on_coset(quotient_domain);
+    let mut sels = trace_domain.selectors_on_coset(quotient_domain);
 
-    let qdb = log2_strict_usize(quotient_domain.size()) - log2_strict_usize(main_domain.size());
+    let qdb = log2_strict_usize(quotient_domain.size()) - log2_strict_usize(trace_domain.size());
     let next_step = 1 << qdb;
 
     // assert!(quotient_size >= PackedVal::<SC>::WIDTH);
@@ -109,10 +109,7 @@ where
                 ),
                 perm_challenges,
                 public_values: &vec![],
-                // TODO: Check this
-                cumulative_sum: PackedChallenge::<SC>::from_base_fn(|i| {
-                    PackedVal::<SC>::from(cumulative_sum.as_base_slice()[i])
-                }),
+                cumulative_sum,
                 is_first_row,
                 is_last_row,
                 is_transition,

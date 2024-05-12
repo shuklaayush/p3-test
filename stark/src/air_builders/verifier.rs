@@ -2,7 +2,7 @@ use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
 use p3_field::AbstractField;
-use p3_interaction::InteractionAirBuilder;
+use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
 use p3_uni_stark::{StarkGenericConfig, Val};
 
 use super::ViewPair;
@@ -11,7 +11,7 @@ pub struct VerifierConstraintFolder<'a, SC: StarkGenericConfig> {
     pub preprocessed: ViewPair<'a, SC::Challenge>,
     pub main: ViewPair<'a, SC::Challenge>,
     pub perm: ViewPair<'a, SC::Challenge>,
-    pub perm_challenges: &'a [SC::Challenge],
+    pub perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     pub public_values: &'a Vec<Val<SC>>,
     pub cumulative_sum: SC::Challenge,
     pub is_first_row: SC::Challenge,
@@ -94,7 +94,7 @@ where
     }
 
     fn permutation_randomness(&self) -> &[Self::RandomVar] {
-        self.perm_challenges
+        &self.perm_challenges
     }
 }
 
