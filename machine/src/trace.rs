@@ -57,27 +57,25 @@ where
 }
 
 #[derive(Clone)]
-pub struct ChipTrace<'a, Domain, EF>
+pub struct ChipTrace<'a, SC>
 where
-    Domain: PolynomialSpace,
-    EF: ExtensionField<Domain::Val>,
+    SC: StarkGenericConfig,
 {
     pub chip: &'a ChipType,
 
-    pub preprocessed: Option<IndexedTrace<Domain::Val, Domain>>,
-    pub main: Option<IndexedTrace<Domain::Val, Domain>>,
-    pub permutation: Option<IndexedTrace<EF, Domain>>,
+    pub preprocessed: Option<IndexedTrace<Val<SC>, Domain<SC>>>,
+    pub main: Option<IndexedTrace<Val<SC>, Domain<SC>>>,
+    pub permutation: Option<IndexedTrace<SC::Challenge, Domain<SC>>>,
 
-    pub cumulative_sum: Option<EF>,
+    pub cumulative_sum: Option<SC::Challenge>,
 
-    pub quotient_chunks: Option<QuotientTrace<Domain>>,
+    pub quotient_chunks: Option<QuotientTrace<Domain<SC>>>,
     pub quotient_degree: Option<usize>,
 }
 
-impl<'a, Domain, EF> ChipTrace<'a, Domain, EF>
+impl<'a, SC> ChipTrace<'a, SC>
 where
-    Domain: PolynomialSpace,
-    EF: ExtensionField<Domain::Val>,
+    SC: StarkGenericConfig,
 {
     pub fn new(chip: &'a ChipType) -> Self {
         Self {
@@ -91,7 +89,7 @@ where
         }
     }
 
-    pub fn domain(&self) -> Option<Domain> {
+    pub fn domain(&self) -> Option<Domain<SC>> {
         match (&self.preprocessed, &self.main) {
             (Some(preprocessed), Some(main)) => {
                 let preprocessed_domain = preprocessed.trace.domain;
@@ -109,37 +107,34 @@ where
     }
 }
 
-pub type MachineTrace<'a, Domain, EF> = Vec<ChipTrace<'a, Domain, EF>>;
+pub type MachineTrace<'a, SC> = Vec<ChipTrace<'a, SC>>;
 
 pub trait MachineTraceBuilder<'a> {
-    fn new(chips: &'a [&ChipType]) -> Self;
+    fn new(chips: Vec<&'a ChipType>) -> Self;
 }
 
-impl<'a, Domain, EF> MachineTraceBuilder<'a> for MachineTrace<'a, Domain, EF>
+impl<'a, SC> MachineTraceBuilder<'a> for MachineTrace<'a, SC>
 where
-    Domain: PolynomialSpace,
-    EF: ExtensionField<Domain::Val>,
+    SC: StarkGenericConfig,
 {
-    fn new(chips: &'a [&ChipType]) -> Self {
-        chips.iter().map(|chip| ChipTrace::new(chip)).collect_vec()
+    fn new(chips: Vec<&'a ChipType>) -> Self {
+        chips
+            .into_iter()
+            .map(|chip| ChipTrace::new(chip))
+            .collect_vec()
     }
 }
 
-pub trait MachineTraceLoader<'a, Domain, SC>
+pub trait MachineTraceLoader<'a, SC>
 where
-    Domain: PolynomialSpace,
     SC: StarkGenericConfig,
-    SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
 {
     fn generate_preprocessed(self, pcs: &SC::Pcs) -> Self;
 
-    fn load_preprocessed(
-        self,
-        pcs: &SC::Pcs,
-        traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
-    ) -> Self;
+    fn load_preprocessed(self, pcs: &SC::Pcs, traces: Vec<Option<RowMajorMatrix<Val<SC>>>>)
+        -> Self;
 
-    fn load_main(self, pcs: &SC::Pcs, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self;
+    fn load_main(self, pcs: &SC::Pcs, traces: Vec<Option<RowMajorMatrix<Val<SC>>>>) -> Self;
 
     fn generate_permutation<AB>(
         self,
@@ -147,7 +142,7 @@ where
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     ) -> Self
     where
-        AB: InteractionAirBuilder<Expr = Domain::Val>;
+        AB: InteractionAirBuilder<Expr = Val<SC>>;
 
     fn generate_quotient(
         self,
@@ -160,11 +155,9 @@ where
     ) -> Self;
 }
 
-impl<'a, Domain, SC> MachineTraceLoader<'a, Domain, SC> for MachineTrace<'a, Domain, SC::Challenge>
+impl<'a, SC> MachineTraceLoader<'a, SC> for MachineTrace<'a, SC>
 where
-    Domain: PolynomialSpace,
     SC: StarkGenericConfig,
-    SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
 {
     fn generate_preprocessed(mut self, pcs: &SC::Pcs) -> Self {
         let traces = self
@@ -181,7 +174,7 @@ where
     fn load_preprocessed(
         mut self,
         pcs: &SC::Pcs,
-        traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
+        traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
     ) -> Self {
         let traces = load_traces::<SC, _>(pcs, traces);
         for (chip_trace, preprocessed) in self.iter_mut().zip_eq(traces) {
@@ -190,11 +183,7 @@ where
         self
     }
 
-    fn load_main(
-        mut self,
-        pcs: &SC::Pcs,
-        traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
-    ) -> Self {
+    fn load_main(mut self, pcs: &SC::Pcs, traces: Vec<Option<RowMajorMatrix<Val<SC>>>>) -> Self {
         let traces = load_traces::<SC, _>(pcs, traces);
         for (chip_trace, main) in self.iter_mut().zip_eq(traces) {
             chip_trace.main = main;
@@ -208,7 +197,7 @@ where
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     ) -> Self
     where
-        AB: InteractionAirBuilder<Expr = Domain::Val>,
+        AB: InteractionAirBuilder<Expr = Val<SC>>,
     {
         let traces = self
             .iter()
@@ -340,11 +329,9 @@ where
     }
 }
 
-pub trait MachineTraceCommiter<'a, Domain, SC>
+pub trait MachineTraceCommiter<'a, SC>
 where
-    Domain: PolynomialSpace,
     SC: StarkGenericConfig,
-    SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
 {
     fn commit_preprocessed(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 
@@ -355,12 +342,9 @@ where
     fn commit_quotient(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 }
 
-impl<'a, Domain, SC> MachineTraceCommiter<'a, Domain, SC>
-    for MachineTrace<'a, Domain, SC::Challenge>
+impl<'a, SC> MachineTraceCommiter<'a, SC> for MachineTrace<'a, SC>
 where
-    Domain: PolynomialSpace,
     SC: StarkGenericConfig,
-    SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
 {
     fn commit_preprocessed(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self

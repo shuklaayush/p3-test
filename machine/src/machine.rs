@@ -63,37 +63,12 @@ impl Machine {
         SC: StarkGenericConfig,
     {
         let pcs = config.pcs();
-        let trace = MachineTraceBuilder::new(self.chips().as_slice());
+        let chips = self.chips();
+        let trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
 
         // 1. Generate and commit to preprocessed traces
         let trace = tracing::info_span!("generate preprocessed traces")
             .in_scope(|| trace.generate_preprocessed(pcs));
-
-        let (pdata, vdata) =
-            if let (Some(commit), Some(data)) = trace.commit_preprocessed::<SC>(pcs) {
-                let packed_degrees = trace
-                    .into_iter()
-                    .map(|chip_trace| {
-                        chip_trace
-                            .preprocessed
-                            .as_ref()
-                            .map(|trace| trace.trace.domain.size())
-                    })
-                    .flatten()
-                    .collect::<Vec<usize>>();
-
-                let vdata = VerifierData {
-                    commitment: commit.clone(),
-                    degrees: packed_degrees,
-                };
-                let pdata = ProverData {
-                    data,
-                    commitment: commit,
-                };
-                (Some(pdata), Some(vdata))
-            } else {
-                (None, None)
-            };
 
         let preprocessed_traces = trace
             .iter()
@@ -101,9 +76,32 @@ impl Machine {
                 chip_trace
                     .preprocessed
                     .as_ref()
-                    .map(|preprocessed| preprocessed.trace.value)
+                    .map(|preprocessed| preprocessed.trace.value.clone())
             })
             .collect();
+        let packed_degrees = trace
+            .iter()
+            .flat_map(|chip_trace| {
+                chip_trace
+                    .preprocessed
+                    .as_ref()
+                    .map(|trace| trace.trace.domain.size())
+            })
+            .collect::<Vec<usize>>();
+
+        let (pdata, vdata) = if let (Some(commit), Some(data)) = trace.commit_preprocessed(pcs) {
+            let vdata = VerifierData {
+                commitment: commit.clone(),
+                degrees: packed_degrees,
+            };
+            let pdata = ProverData {
+                data,
+                commitment: commit,
+            };
+            (Some(pdata), Some(vdata))
+        } else {
+            (None, None)
+        };
 
         let vk = VerifyingKey {
             preprocessed_data: vdata,
