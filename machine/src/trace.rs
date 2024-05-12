@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use p3_air::BaseAir;
-use p3_commit::{OpenedValuesForMatrix, OpenedValuesForRound, Pcs, PolynomialSpace};
+use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
 use p3_field::{AbstractField, ExtensionField, Field};
 use p3_interaction::{
     generate_permutation_trace, InteractionAir, InteractionAirBuilder, NUM_PERM_CHALLENGES,
 };
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
-use p3_stark::{symbolic::get_quotient_degree, AdjacentOpenedValues};
+use p3_stark::{symbolic::get_quotient_degree, AdjacentOpenedValues, ChipProof, OpenedValues};
 use p3_uni_stark::{Com, Domain, PackedChallenge, StarkGenericConfig, Val};
 
 use crate::{chip::ChipType, proof::PcsProverData, quotient::quotient_values};
@@ -313,7 +313,7 @@ where
                 let chunk_domains = quotient_domain.split_domains(quotient_degree);
                 let traces = chunk_domains
                     .into_iter()
-                    .zip(chunks.into_iter())
+                    .zip_eq(chunks.into_iter())
                     .map(|(domain, chunk)| Trace {
                         value: chunk,
                         domain,
@@ -407,12 +407,12 @@ where
         main_data: &'a Option<PcsProverData<SC>>,
         permutation_data: &'a Option<PcsProverData<SC>>,
         quotient_data: &'a Option<PcsProverData<SC>>,
-    ) -> (
-        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
-        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
-        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
-        Vec<Option<Vec<OpenedValuesForMatrix<SC::Challenge>>>>,
-    );
+    ) -> Vec<OpenedValues<SC::Challenge>>;
+
+    fn generate_proofs(
+        self,
+        openings: Vec<OpenedValues<SC::Challenge>>,
+    ) -> Vec<Option<ChipProof<SC::Challenge>>>;
 }
 
 impl<'a, SC> MachineTraceOpener<'a, SC> for MachineTrace<'a, SC>
@@ -488,12 +488,7 @@ where
         main_data: &'a Option<PcsProverData<SC>>,
         permutation_data: &'a Option<PcsProverData<SC>>,
         quotient_data: &'a Option<PcsProverData<SC>>,
-    ) -> (
-        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
-        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
-        Vec<Option<AdjacentOpenedValues<SC::Challenge>>>,
-        Vec<Option<Vec<OpenedValuesForMatrix<SC::Challenge>>>>,
-    ) {
+    ) -> Vec<OpenedValues<SC::Challenge>> {
         let quotient_openings = if quotient_data.is_some() {
             // Unflatten quotient openings
             let openings = opening_values.pop().expect("Opening should be present");
@@ -504,7 +499,13 @@ where
                 .map(|chip_proof| {
                     chip_proof.quotient_degree.map(|degree| {
                         let end = start + degree;
-                        let openings = openings[start..end].to_vec();
+                        let openings = openings[start..end]
+                            .iter()
+                            .map(|chunk| {
+                                assert_eq!(chunk.len(), 1, "Should have 1 opening");
+                                chunk[0].clone()
+                            })
+                            .collect_vec();
                         start = end;
                         openings
                     })
@@ -573,12 +574,41 @@ where
             self.iter().map(|_| None).collect_vec()
         };
 
-        (
-            preprocessed_openings,
-            main_openings,
-            permutation_openings,
-            quotient_openings,
-        )
+        preprocessed_openings
+            .into_iter()
+            .zip_eq(main_openings)
+            .zip_eq(permutation_openings)
+            .zip_eq(quotient_openings)
+            .map(
+                |(((preprocessed, main), permutation), quotient_chunks)| OpenedValues {
+                    preprocessed,
+                    main,
+                    permutation,
+                    quotient_chunks,
+                },
+            )
+            .collect()
+    }
+
+    fn generate_proofs(
+        self,
+        openings: Vec<OpenedValues<SC::Challenge>>,
+    ) -> Vec<Option<ChipProof<SC::Challenge>>> {
+        self.iter()
+            .zip_eq(openings)
+            .map(|(chip_trace, opened_values)| {
+                chip_trace.domain().map(|domain| {
+                    let degree = domain.size();
+                    let cumulative_sum = chip_trace.cumulative_sum;
+
+                    ChipProof {
+                        degree,
+                        opened_values,
+                        cumulative_sum,
+                    }
+                })
+            })
+            .collect()
     }
 }
 

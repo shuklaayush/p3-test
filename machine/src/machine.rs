@@ -238,61 +238,15 @@ impl Machine {
         let (opening_values, opening_proof) = pcs.open(rounds, challenger);
 
         // Unflatten quotient openings
-        let (preprocessed_openings, main_openings, permutation_openings, quotient_openings) = trace
-            .unflatten_openings(
-                opening_values,
-                &pk.preprocessed.data,
-                &main_data,
-                &permutation_data,
-                &quotient_data,
-            );
+        let opening_values = trace.unflatten_openings(
+            opening_values,
+            &pk.preprocessed.data,
+            &main_data,
+            &permutation_data,
+            &quotient_data,
+        );
 
-        let chip_proofs = izip!(
-            main_traces,
-            preprocessed_openings,
-            main_openings,
-            permutation_openings,
-            quotient_openings,
-            cumulative_sums,
-        )
-        .map(
-            |(main_trace, preprocessed, main, perm, quotient, cumulative_sum)| {
-                let preprocessed = preprocessed.map(|openings| {
-                    assert_eq!(openings.len(), 2, "Should have 2 openings");
-                    AdjacentOpenedValues {
-                        local: openings[0].clone(),
-                        next: openings[1].clone(),
-                    }
-                });
-                let [main_local, main_next] = main.try_into().expect("Should have 2 openings");
-                let perm = perm.map(|openings| {
-                    assert_eq!(openings.len(), 2, "Should have 2 openings");
-                    AdjacentOpenedValues {
-                        local: openings[0].clone(),
-                        next: openings[1].clone(),
-                    }
-                });
-                let quotient_chunks = quotient
-                    .into_iter()
-                    .map(|mut chunk| chunk.remove(0))
-                    .collect_vec();
-                let opened_values = OpenedValues {
-                    preprocessed,
-                    main: AdjacentOpenedValues {
-                        local: main_local,
-                        next: main_next,
-                    },
-                    permutation: perm,
-                    quotient_chunks,
-                };
-                ChipProof {
-                    degree: main_trace.degree,
-                    opened_values,
-                    cumulative_sum,
-                }
-            },
-        )
-        .collect_vec();
+        let chip_proofs = trace.generate_proofs(opening_values);
 
         MachineProof {
             commitments,

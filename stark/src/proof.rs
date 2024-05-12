@@ -18,10 +18,10 @@ pub struct ChipProof<Challenge> {
 #[derive(Serialize, Deserialize)]
 pub struct OpenedValues<Challenge> {
     pub preprocessed: Option<AdjacentOpenedValues<Challenge>>,
-    pub main: AdjacentOpenedValues<Challenge>,
+    pub main: Option<AdjacentOpenedValues<Challenge>>,
     pub permutation: Option<AdjacentOpenedValues<Challenge>>,
     // TODO: Check if inner size is 2
-    pub quotient_chunks: Vec<Vec<Challenge>>,
+    pub quotient_chunks: Option<Vec<Vec<Challenge>>>,
 }
 
 #[derive(Serialize, Deserialize)]
