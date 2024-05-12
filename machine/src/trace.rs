@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use p3_air::BaseAir;
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractField, ExtensionField, Field};
 use p3_interaction::{
@@ -128,61 +129,48 @@ pub trait MachineTraceLoader<'a, Domain, SC>
 where
     Domain: PolynomialSpace,
     SC: StarkGenericConfig,
-    SC::Challenge: ExtensionField<Domain::Val>,
+    SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
 {
-    fn load_preprocessed<P>(
+    fn generate_preprocessed(self, pcs: &SC::Pcs) -> Self;
+
+    fn load_preprocessed(
         self,
-        pcs: &P,
+        pcs: &SC::Pcs,
         traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
-    ) -> Self
-    where
-        P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-        SC: StarkGenericConfig<Pcs = P>;
+    ) -> Self;
 
-    fn load_main<P>(self, pcs: &P, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self
-    where
-        P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-        SC: StarkGenericConfig<Pcs = P>;
+    fn load_main(self, pcs: &SC::Pcs, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self;
 
-    fn generate_permutation<P, AB>(
+    fn generate_permutation<AB>(
         self,
-        pcs: &P,
+        pcs: &SC::Pcs,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     ) -> Self
     where
-        AB: InteractionAirBuilder<Expr = Domain::Val>,
-        P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-        SC: StarkGenericConfig<Pcs = P>;
+        AB: InteractionAirBuilder<Expr = Domain::Val>;
 
-    fn generate_quotient<P>(
+    fn generate_quotient(
         self,
-        pcs: &P,
+        pcs: &SC::Pcs,
         preprocessed_data: Option<PcsProverData<SC>>,
         main_data: Option<PcsProverData<SC>>,
         permutation_data: Option<PcsProverData<SC>>,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
         alpha: SC::Challenge,
-    ) -> Self
-    where
-        P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-        SC: StarkGenericConfig<Pcs = P>;
+    ) -> Self;
 }
 
 impl<'a, Domain, SC> MachineTraceLoader<'a, Domain, SC> for MachineTrace<'a, Domain, SC::Challenge>
 where
     Domain: PolynomialSpace,
     SC: StarkGenericConfig,
-    SC::Challenge: ExtensionField<Domain::Val>,
+    SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
 {
-    fn load_preprocessed<P>(
-        mut self,
-        pcs: &P,
-        traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
-    ) -> Self
-    where
-        P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-        SC: StarkGenericConfig<Pcs = P>,
-    {
+    fn generate_preprocessed(mut self, pcs: &SC::Pcs) -> Self {
+        let traces = self
+            .iter()
+            .map(|trace| trace.chip.preprocessed_trace())
+            .collect_vec();
         let traces = load_traces::<SC, _>(pcs, traces);
         for (chip_trace, preprocessed) in self.iter_mut().zip_eq(traces) {
             chip_trace.preprocessed = preprocessed;
@@ -190,11 +178,23 @@ where
         self
     }
 
-    fn load_main<P>(mut self, pcs: &P, traces: Vec<Option<RowMajorMatrix<Domain::Val>>>) -> Self
-    where
-        P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-        SC: StarkGenericConfig<Pcs = P>,
-    {
+    fn load_preprocessed(
+        mut self,
+        pcs: &SC::Pcs,
+        traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
+    ) -> Self {
+        let traces = load_traces::<SC, _>(pcs, traces);
+        for (chip_trace, preprocessed) in self.iter_mut().zip_eq(traces) {
+            chip_trace.preprocessed = preprocessed;
+        }
+        self
+    }
+
+    fn load_main(
+        mut self,
+        pcs: &SC::Pcs,
+        traces: Vec<Option<RowMajorMatrix<Domain::Val>>>,
+    ) -> Self {
         let traces = load_traces::<SC, _>(pcs, traces);
         for (chip_trace, main) in self.iter_mut().zip_eq(traces) {
             chip_trace.main = main;
@@ -202,15 +202,13 @@ where
         self
     }
 
-    fn generate_permutation<P, AB>(
+    fn generate_permutation<AB>(
         mut self,
-        pcs: &P,
+        pcs: &SC::Pcs,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     ) -> Self
     where
         AB: InteractionAirBuilder<Expr = Domain::Val>,
-        P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-        SC: StarkGenericConfig<Pcs = P>,
     {
         let traces = self
             .iter()
@@ -247,19 +245,15 @@ where
         self
     }
 
-    fn generate_quotient<P>(
+    fn generate_quotient(
         mut self,
-        pcs: &P,
+        pcs: &SC::Pcs,
         preprocessed_data: Option<PcsProverData<SC>>,
         main_data: Option<PcsProverData<SC>>,
         permutation_data: Option<PcsProverData<SC>>,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
         alpha: SC::Challenge,
-    ) -> Self
-    where
-        P: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-        SC: StarkGenericConfig<Pcs = P>,
-    {
+    ) -> Self {
         let perm_challenges = perm_challenges.map(PackedChallenge::<SC>::from_f);
         let alpha = PackedChallenge::<SC>::from_f(alpha);
 
@@ -346,42 +340,29 @@ where
     }
 }
 
-pub trait MachineTraceCommiter<'a, Domain, EF>
+pub trait MachineTraceCommiter<'a, Domain, SC>
 where
     Domain: PolynomialSpace,
-    EF: ExtensionField<Domain::Val>,
+    SC: StarkGenericConfig,
+    SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
 {
-    fn commit_preprocessed<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
-    where
-        SC: StarkGenericConfig,
-        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>;
+    fn commit_preprocessed(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 
-    fn commit_main<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
-    where
-        SC: StarkGenericConfig,
-        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>;
+    fn commit_main(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 
-    fn commit_permutation<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
-    where
-        SC: StarkGenericConfig,
-        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>;
+    fn commit_permutation(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 
-    fn commit_quotient<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
-    where
-        SC: StarkGenericConfig,
-        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>;
+    fn commit_quotient(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>);
 }
 
-impl<'a, Domain, EF> MachineTraceCommiter<'a, Domain, EF> for MachineTrace<'a, Domain, EF>
+impl<'a, Domain, SC> MachineTraceCommiter<'a, Domain, SC>
+    for MachineTrace<'a, Domain, SC::Challenge>
 where
     Domain: PolynomialSpace,
-    EF: ExtensionField<Domain::Val>,
+    SC: StarkGenericConfig,
+    SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
 {
-    fn commit_preprocessed<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
-    where
-        SC: StarkGenericConfig,
-        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-    {
+    fn commit_preprocessed(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
             .into_iter()
             .flat_map(|trace| trace.preprocessed.map(|preprocessed| preprocessed.trace))
@@ -389,11 +370,7 @@ where
         commit_traces::<SC>(pcs, traces)
     }
 
-    fn commit_main<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
-    where
-        SC: StarkGenericConfig,
-        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-    {
+    fn commit_main(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
             .into_iter()
             .flat_map(|trace| trace.main.map(|main| main.trace))
@@ -401,11 +378,7 @@ where
         commit_traces::<SC>(pcs, traces)
     }
 
-    fn commit_permutation<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
-    where
-        SC: StarkGenericConfig,
-        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-    {
+    fn commit_permutation(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
             .into_iter()
             .flat_map(|trace| {
@@ -417,11 +390,7 @@ where
         commit_traces::<SC>(pcs, traces)
     }
 
-    fn commit_quotient<SC>(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>)
-    where
-        SC: StarkGenericConfig,
-        SC::Pcs: Pcs<SC::Challenge, SC::Challenger, Domain = Domain>,
-    {
+    fn commit_quotient(self, pcs: &SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
             .into_iter()
             .flat_map(|trace| trace.quotient_chunks.map(|quotient| quotient.traces))
