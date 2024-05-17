@@ -1,5 +1,5 @@
-use p3_field::{ExtensionField, Field};
-use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder};
+use p3_field::{AbstractField, ExtensionField, Field};
+use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
 use p3_stark::{InteractionStark, Stark};
 
 use p3_air::{Air, AirBuilder, BaseAir};
@@ -86,30 +86,32 @@ impl<AB: AirBuilder> Air<AB> for ChipType {
     }
 }
 
-impl<AB: InteractionAirBuilder> InteractionAir<AB> for ChipType {
-    fn sends(&self) -> Vec<Interaction<AB::Expr>> {
+impl<F: AbstractField> InteractionChip<F> for ChipType {
+    fn sends(&self) -> Vec<Interaction<F>> {
         match self {
-            ChipType::KeccakPermute(chip) => <KeccakPermuteChip as InteractionAir<AB>>::sends(chip),
-            ChipType::KeccakSponge(chip) => <KeccakSpongeChip as InteractionAir<AB>>::sends(chip),
-            ChipType::MerkleTree(chip) => <MerkleTreeChip as InteractionAir<AB>>::sends(chip),
-            ChipType::Range8(chip) => <RangeCheckerChip<256> as InteractionAir<AB>>::sends(chip),
-            ChipType::Xor(chip) => <XorChip as InteractionAir<AB>>::sends(chip),
-            ChipType::Memory(chip) => <MemoryChip as InteractionAir<AB>>::sends(chip),
+            ChipType::KeccakPermute(chip) => <KeccakPermuteChip as InteractionChip<F>>::sends(chip),
+            ChipType::KeccakSponge(chip) => <KeccakSpongeChip as InteractionChip<F>>::sends(chip),
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as InteractionChip<F>>::sends(chip),
+            ChipType::Range8(chip) => <RangeCheckerChip<256> as InteractionChip<F>>::sends(chip),
+            ChipType::Xor(chip) => <XorChip as InteractionChip<F>>::sends(chip),
+            ChipType::Memory(chip) => <MemoryChip as InteractionChip<F>>::sends(chip),
         }
     }
 
-    fn receives(&self) -> Vec<Interaction<AB::Expr>> {
+    fn receives(&self) -> Vec<Interaction<F>> {
         match self {
             ChipType::KeccakPermute(chip) => {
-                <KeccakPermuteChip as InteractionAir<AB>>::receives(chip)
+                <KeccakPermuteChip as InteractionChip<F>>::receives(chip)
             }
             ChipType::KeccakSponge(chip) => {
-                <KeccakSpongeChip as InteractionAir<AB>>::receives(chip)
+                <KeccakSpongeChip as InteractionChip<F>>::receives(chip)
             }
-            ChipType::MerkleTree(chip) => <MerkleTreeChip as InteractionAir<AB>>::receives(chip),
-            ChipType::Range8(chip) => <RangeCheckerChip<256> as InteractionAir<AB>>::receives(chip),
-            ChipType::Xor(chip) => <XorChip as InteractionAir<AB>>::receives(chip),
-            ChipType::Memory(chip) => <MemoryChip as InteractionAir<AB>>::receives(chip),
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as InteractionChip<F>>::receives(chip),
+            ChipType::Range8(chip) => <RangeCheckerChip<256> as InteractionChip<F>>::receives(chip),
+            ChipType::Xor(chip) => <XorChip as InteractionChip<F>>::receives(chip),
+            ChipType::Memory(chip) => <MemoryChip as InteractionChip<F>>::receives(chip),
         }
     }
 }
+
+impl<AB: InteractionAirBuilder> InteractionAir<AB> for ChipType {}

@@ -23,7 +23,6 @@ impl<const MAX: u32, F: PrimeField32> Stark<F> for RangeCheckerChip<MAX> {
 }
 
 #[cfg(test)]
-#[cfg(debug_assertions)]
 mod tests {
     use super::*;
     use crate::test_util::prove_and_verify;

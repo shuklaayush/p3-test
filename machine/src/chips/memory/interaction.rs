@@ -1,10 +1,11 @@
 use p3_air::VirtualPairCol;
-use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder};
+use p3_field::AbstractField;
+use p3_interaction::{Interaction, InteractionChip};
 
 use super::{columns::MEMORY_COL_MAP, MemoryChip};
 
-impl<AB: InteractionAirBuilder> InteractionAir<AB> for MemoryChip {
-    fn sends(&self) -> Vec<Interaction<AB::Expr>> {
+impl<F: AbstractField> InteractionChip<F> for MemoryChip {
+    fn sends(&self) -> Vec<Interaction<F>> {
         vec![
             // TODO: Combine with is_write?
             Interaction {
@@ -43,7 +44,7 @@ impl<AB: InteractionAirBuilder> InteractionAir<AB> for MemoryChip {
         ]
     }
 
-    fn receives(&self) -> Vec<Interaction<AB::Expr>> {
+    fn receives(&self) -> Vec<Interaction<F>> {
         vec![Interaction {
             fields: vec![
                 VirtualPairCol::single_main(MEMORY_COL_MAP.timestamp),

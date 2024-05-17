@@ -1,10 +1,11 @@
 use p3_air::VirtualPairCol;
-use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder};
+use p3_field::AbstractField;
+use p3_interaction::{Interaction, InteractionChip};
 
 use super::{columns::MERKLE_TREE_COL_MAP, MerkleTreeChip};
 
-impl<AB: InteractionAirBuilder> InteractionAir<AB> for MerkleTreeChip {
-    fn sends(&self) -> Vec<Interaction<AB::Expr>> {
+impl<F: AbstractField> InteractionChip<F> for MerkleTreeChip {
+    fn sends(&self) -> Vec<Interaction<F>> {
         vec![Interaction {
             fields: MERKLE_TREE_COL_MAP
                 .left_node
@@ -18,7 +19,7 @@ impl<AB: InteractionAirBuilder> InteractionAir<AB> for MerkleTreeChip {
         }]
     }
 
-    fn receives(&self) -> Vec<Interaction<AB::Expr>> {
+    fn receives(&self) -> Vec<Interaction<F>> {
         vec![Interaction {
             fields: MERKLE_TREE_COL_MAP
                 .output

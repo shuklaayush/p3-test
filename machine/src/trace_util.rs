@@ -4,7 +4,7 @@ use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
 use p3_field::{AbstractField, ExtensionField, Field};
 use p3_interaction::{
     generate_permutation_trace, Interaction, InteractionAir, InteractionAirBuilder,
-    InteractionType, NUM_PERM_CHALLENGES,
+    InteractionChip, InteractionType, NUM_PERM_CHALLENGES,
 };
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_stark::{symbolic::get_quotient_degree, AdjacentOpenedValues, ChipProof, OpenedValues};
@@ -203,8 +203,7 @@ where
                     .as_ref()
                     .map(|mt| mt.trace.value.as_view());
                 let main = trace.main.as_ref().map(|mt| mt.trace.value.as_view());
-                // let interactions = trace.chip.all_interactions();
-                let interactions = vec![];
+                let interactions = trace.chip.all_interactions();
 
                 generate_permutation_trace(&preprocessed, &main, &interactions, perm_challenges)
             })

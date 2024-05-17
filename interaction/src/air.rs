@@ -14,15 +14,29 @@ pub trait InteractionAirBuilder: PermutationAirBuilder + PairBuilder {
     fn cumulative_sum(&self) -> Self::RandomVar;
 }
 
-pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> {
-    fn sends(&self) -> Vec<Interaction<AB::Expr>> {
+pub trait InteractionChip<F: AbstractField> {
+    fn sends(&self) -> Vec<Interaction<F>> {
         vec![]
     }
 
-    fn receives(&self) -> Vec<Interaction<AB::Expr>> {
+    fn receives(&self) -> Vec<Interaction<F>> {
         vec![]
     }
 
+    fn all_interactions(&self) -> Vec<(Interaction<F>, InteractionType)> {
+        self.sends()
+            .into_iter()
+            .map(|i| (i, InteractionType::Send))
+            .chain(
+                self.receives()
+                    .into_iter()
+                    .map(|i| (i, InteractionType::Receive)),
+            )
+            .collect()
+    }
+}
+
+pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> + InteractionChip<AB::Expr> {
     fn permutation_width(&self) -> Option<usize> {
         let num_interactions = self.sends().len() + self.receives().len();
         if num_interactions > 0 {
@@ -34,18 +48,6 @@ pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> {
 
     fn preprocessed_width(&self) -> usize {
         0
-    }
-
-    fn all_interactions(&self) -> Vec<(Interaction<AB::Expr>, InteractionType)> {
-        self.sends()
-            .into_iter()
-            .map(|i| (i, InteractionType::Send))
-            .chain(
-                self.receives()
-                    .into_iter()
-                    .map(|i| (i, InteractionType::Receive)),
-            )
-            .collect()
     }
 
     fn eval_permutation_constraints(&self, builder: &mut AB) {

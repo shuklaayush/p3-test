@@ -1,15 +1,15 @@
 use itertools::Itertools;
 use p3_air::VirtualPairCol;
 use p3_field::AbstractField;
-use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder};
+use p3_interaction::{Interaction, InteractionChip};
 
 use super::{
     columns::{KECCAK_RATE_BYTES, KECCAK_SPONGE_COL_MAP},
     KeccakSpongeChip,
 };
 
-impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakSpongeChip {
-    fn sends(&self) -> Vec<Interaction<AB::Expr>> {
+impl<F: AbstractField> InteractionChip<F> for KeccakSpongeChip {
+    fn sends(&self) -> Vec<Interaction<F>> {
         let is_real = VirtualPairCol::sum_main(vec![
             KECCAK_SPONGE_COL_MAP.is_padding_byte[KECCAK_RATE_BYTES - 1],
             KECCAK_SPONGE_COL_MAP.is_full_input_block,
@@ -25,17 +25,17 @@ impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakSpongeChip {
                         let column_weights = block
                             .iter()
                             .enumerate()
-                            .map(|(i, &c)| (c, AB::Expr::from_canonical_usize(1 << (8 * i))))
+                            .map(|(i, &c)| (c, F::from_canonical_usize(1 << (8 * i))))
                             .collect_vec();
-                        VirtualPairCol::new_main(column_weights, AB::Expr::zero())
+                        VirtualPairCol::new_main(column_weights, F::zero())
                     };
                     let vc2 = {
                         let column_weights = rate
                             .iter()
                             .enumerate()
-                            .map(|(i, &c)| (c, AB::Expr::from_canonical_usize(1 << (16 * i))))
+                            .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
                             .collect_vec();
-                        VirtualPairCol::new_main(column_weights, AB::Expr::zero())
+                        VirtualPairCol::new_main(column_weights, F::zero())
                     };
                     Interaction {
                         fields: vec![vc1, vc2],
@@ -67,7 +67,7 @@ impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakSpongeChip {
         .concat()
     }
 
-    fn receives(&self) -> Vec<Interaction<AB::Expr>> {
+    fn receives(&self) -> Vec<Interaction<F>> {
         let is_real = VirtualPairCol::sum_main(vec![
             KECCAK_SPONGE_COL_MAP.is_padding_byte[KECCAK_RATE_BYTES - 1],
             KECCAK_SPONGE_COL_MAP.is_full_input_block,
@@ -82,9 +82,9 @@ impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakSpongeChip {
                 let column_weights = cols
                     .iter()
                     .enumerate()
-                    .map(|(i, &c)| (c, AB::Expr::from_canonical_usize(1 << (8 * i))))
+                    .map(|(i, &c)| (c, F::from_canonical_usize(1 << (8 * i))))
                     .collect_vec();
-                VirtualPairCol::new_main(column_weights, AB::Expr::zero())
+                VirtualPairCol::new_main(column_weights, F::zero())
             })
             .collect_vec();
 
@@ -103,14 +103,14 @@ impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakSpongeChip {
                     } else {
                         VirtualPairCol::new_main(
                             vec![
-                                (KECCAK_SPONGE_COL_MAP.is_full_input_block, AB::Expr::one()),
+                                (KECCAK_SPONGE_COL_MAP.is_full_input_block, F::one()),
                                 (
                                     KECCAK_SPONGE_COL_MAP.is_padding_byte[KECCAK_RATE_BYTES - 1],
-                                    AB::Expr::one(),
+                                    F::one(),
                                 ),
-                                (KECCAK_SPONGE_COL_MAP.is_padding_byte[i], -AB::Expr::one()),
+                                (KECCAK_SPONGE_COL_MAP.is_padding_byte[i], -F::one()),
                             ],
-                            AB::Expr::zero(),
+                            F::zero(),
                         )
                     };
                     Interaction {
@@ -118,13 +118,10 @@ impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakSpongeChip {
                             VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.timestamp),
                             VirtualPairCol::new_main(
                                 vec![
-                                    (KECCAK_SPONGE_COL_MAP.base_addr, AB::Expr::one()),
-                                    (
-                                        KECCAK_SPONGE_COL_MAP.already_absorbed_bytes,
-                                        AB::Expr::one(),
-                                    ),
+                                    (KECCAK_SPONGE_COL_MAP.base_addr, F::one()),
+                                    (KECCAK_SPONGE_COL_MAP.already_absorbed_bytes, F::one()),
                                 ],
-                                AB::Expr::from_canonical_usize(i),
+                                F::from_canonical_usize(i),
                             ),
                             VirtualPairCol::single_main(KECCAK_SPONGE_COL_MAP.block_bytes[i]),
                         ],
@@ -140,10 +137,10 @@ impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakSpongeChip {
                     let column_weights = rate
                         .iter()
                         .enumerate()
-                        .map(|(i, &c)| (c, AB::Expr::from_canonical_usize(1 << (16 * i))))
+                        .map(|(i, &c)| (c, F::from_canonical_usize(1 << (16 * i))))
                         .collect_vec();
                     Interaction {
-                        fields: vec![VirtualPairCol::new_main(column_weights, AB::Expr::zero())],
+                        fields: vec![VirtualPairCol::new_main(column_weights, F::zero())],
                         count: is_real.clone(),
                         argument_index: self.bus_xor_output,
                     }

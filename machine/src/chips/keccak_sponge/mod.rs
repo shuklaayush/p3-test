@@ -37,7 +37,6 @@ impl<F: PrimeField32> Stark<F> for KeccakSpongeChip {
 }
 
 #[cfg(test)]
-#[cfg(debug_assertions)]
 mod tests {
     use super::*;
     use crate::test_util::prove_and_verify;

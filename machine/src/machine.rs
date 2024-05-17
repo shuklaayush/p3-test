@@ -161,141 +161,141 @@ impl Machine {
         (pk, vk)
     }
 
-    // #[instrument(skip_all)]
-    // fn prove<SC>(
-    //     &self,
-    //     config: &SC,
-    //     pk: &ProvingKey<SC>,
-    //     main_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
-    //     challenger: &mut SC::Challenger,
-    // ) -> MachineProof<SC>
-    // where
-    //     SC: StarkGenericConfig,
-    //     Val<SC>: PrimeField32,
-    //     <<SC as StarkGenericConfig>::Pcs as Pcs<
-    //         <SC as StarkGenericConfig>::Challenge,
-    //         <SC as StarkGenericConfig>::Challenger,
-    //     >>::Domain: Send + Sync,
-    // {
-    //     // TODO: Use fixed size array instead of Vecs
-    //     let chips = self.chips();
-    //     assert_eq!(main_traces.len(), chips.len(), "Length mismatch");
+    #[instrument(skip_all)]
+    fn prove<SC>(
+        &self,
+        config: &SC,
+        pk: &ProvingKey<SC>,
+        main_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
+        challenger: &mut SC::Challenger,
+    ) -> MachineProof<SC>
+    where
+        SC: StarkGenericConfig,
+        Val<SC>: PrimeField32,
+        <<SC as StarkGenericConfig>::Pcs as Pcs<
+            <SC as StarkGenericConfig>::Challenge,
+            <SC as StarkGenericConfig>::Challenger,
+        >>::Domain: Send + Sync,
+    {
+        // TODO: Use fixed size array instead of Vecs
+        let chips = self.chips();
+        assert_eq!(main_traces.len(), chips.len(), "Length mismatch");
 
-    //     let pcs = config.pcs();
-    //     let mut trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
+        let pcs = config.pcs();
+        let mut trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
 
-    //     // 1. Observe preprocessed commitment
-    //     tracing::info_span!("load preprocessed traces")
-    //         .in_scope(|| trace.load_preprocessed(pcs, pk.preprocessed.traces.as_slice()));
-    //     if let Some(commit) = &pk.preprocessed.commitment {
-    //         challenger.observe(commit.clone());
-    //     }
+        // 1. Observe preprocessed commitment
+        tracing::info_span!("load preprocessed traces")
+            .in_scope(|| trace.load_preprocessed(pcs, pk.preprocessed.traces.as_slice()));
+        if let Some(commit) = &pk.preprocessed.commitment {
+            challenger.observe(commit.clone());
+        }
 
-    //     // 2. Generate and commit to main trace
-    //     tracing::info_span!("load main traces").in_scope(|| trace.load_main(pcs, main_traces));
-    //     let (main_commit, main_data) =
-    //         tracing::info_span!("commit to main traces").in_scope(|| trace.commit_main(pcs));
-    //     if let Some(main_commit) = &main_commit {
-    //         challenger.observe(main_commit.clone());
-    //     }
+        // 2. Generate and commit to main trace
+        tracing::info_span!("load main traces").in_scope(|| trace.load_main(pcs, main_traces));
+        let (main_commit, main_data) =
+            tracing::info_span!("commit to main traces").in_scope(|| trace.commit_main(pcs));
+        if let Some(main_commit) = &main_commit {
+            challenger.observe(main_commit.clone());
+        }
 
-    //     // 3. Sample permutation challenges
-    //     let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
-    //         .map(|_| challenger.sample_ext_element::<SC::Challenge>())
-    //         .collect_vec()
-    //         .try_into()
-    //         .unwrap();
+        // 3. Sample permutation challenges
+        let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
+            .map(|_| challenger.sample_ext_element::<SC::Challenge>())
+            .collect_vec()
+            .try_into()
+            .unwrap();
 
-    //     // 4. Generate and commit to permutation trace
-    //     tracing::info_span!("generate permutation traces")
-    //         .in_scope(|| trace.generate_permutation(pcs, perm_challenges));
-    //     let (permutation_commit, permutation_data) =
-    //         tracing::info_span!("commit to permutation traces")
-    //             .in_scope(|| trace.commit_permutation(pcs));
-    //     if let Some(permutation_commit) = &permutation_commit {
-    //         challenger.observe(permutation_commit.clone());
-    //     }
-    //     let alpha: SC::Challenge = challenger.sample_ext_element();
+        // 4. Generate and commit to permutation trace
+        tracing::info_span!("generate permutation traces")
+            .in_scope(|| trace.generate_permutation(pcs, perm_challenges));
+        let (permutation_commit, permutation_data) =
+            tracing::info_span!("commit to permutation traces")
+                .in_scope(|| trace.commit_permutation(pcs));
+        if let Some(permutation_commit) = &permutation_commit {
+            challenger.observe(permutation_commit.clone());
+        }
+        let alpha: SC::Challenge = challenger.sample_ext_element();
 
-    //     // Verify constraints
-    //     // #[cfg(feature = "debug-trace")]
-    //     // let _ = self.write_traces_to_file::<SC>(
-    //     //     "trace.xlsx",
-    //     //     preprocessed_traces.iter().map(|mt| mt.matrix),
-    //     //     main_traces.iter().map(|mt| mt.matrix),
-    //     //     permutation_traces.iter().map(|mt| mt.matrix),
-    //     // );
-    //     // #[cfg(debug_assertions)]
-    //     // for (chip, main_trace, permutation_trace, &cumulative_sum) in izip!(
-    //     //     chips,
-    //     //     main_traces.iter(),
-    //     //     permutation_traces.iter(),
-    //     //     cumulative_sums.iter()
-    //     // ) {
-    //     //     check_constraints::<_, SC>(
-    //     //         chip,
-    //     //         main_trace,
-    //     //         permutation_trace,
-    //     //         &perm_challenges,
-    //     //         cumulative_sum,
-    //     //         &[],
-    //     //     );
-    //     // }
-    //     // #[cfg(debug_assertions)]
-    //     // check_cumulative_sums(&permutation_traces[..]);
+        // Verify constraints
+        // #[cfg(feature = "debug-trace")]
+        // let _ = self.write_traces_to_file::<SC>(
+        //     "trace.xlsx",
+        //     preprocessed_traces.iter().map(|mt| mt.matrix),
+        //     main_traces.iter().map(|mt| mt.matrix),
+        //     permutation_traces.iter().map(|mt| mt.matrix),
+        // );
+        // #[cfg(debug_assertions)]
+        // for (chip, main_trace, permutation_trace, &cumulative_sum) in izip!(
+        //     chips,
+        //     main_traces.iter(),
+        //     permutation_traces.iter(),
+        //     cumulative_sums.iter()
+        // ) {
+        //     check_constraints::<_, SC>(
+        //         chip,
+        //         main_trace,
+        //         permutation_trace,
+        //         &perm_challenges,
+        //         cumulative_sum,
+        //         &[],
+        //     );
+        // }
+        // #[cfg(debug_assertions)]
+        // check_cumulative_sums(&permutation_traces[..]);
 
-    //     // 5. Generate and commit to quotient traces
-    //     tracing::info_span!("generate quotient trace").in_scope(|| {
-    //         trace.generate_quotient(
-    //             pcs,
-    //             &pk.preprocessed.data,
-    //             &main_data,
-    //             &permutation_data,
-    //             perm_challenges,
-    //             alpha,
-    //         )
-    //     });
-    //     // TODO: Panic if this is None
-    //     let (quotient_commit, quotient_data) = tracing::info_span!("commit to quotient chunks")
-    //         .in_scope(|| trace.commit_quotient(pcs));
-    //     if let Some(quotient_commit) = &quotient_commit {
-    //         challenger.observe(quotient_commit.clone());
-    //     }
+        // 5. Generate and commit to quotient traces
+        tracing::info_span!("generate quotient trace").in_scope(|| {
+            trace.generate_quotient(
+                pcs,
+                &pk.preprocessed.data,
+                &main_data,
+                &permutation_data,
+                perm_challenges,
+                alpha,
+            )
+        });
+        // TODO: Panic if this is None
+        let (quotient_commit, quotient_data) = tracing::info_span!("commit to quotient chunks")
+            .in_scope(|| trace.commit_quotient(pcs));
+        if let Some(quotient_commit) = &quotient_commit {
+            challenger.observe(quotient_commit.clone());
+        }
 
-    //     let commitments = Commitments {
-    //         main: main_commit,
-    //         permutation: permutation_commit,
-    //         quotient_chunks: quotient_commit,
-    //     };
+        let commitments = Commitments {
+            main: main_commit,
+            permutation: permutation_commit,
+            quotient_chunks: quotient_commit,
+        };
 
-    //     // 6. Sample OOD point and generate opening proof
-    //     let zeta: SC::Challenge = challenger.sample_ext_element();
-    //     let rounds = trace.generate_rounds(
-    //         zeta,
-    //         &pk.preprocessed.data,
-    //         &main_data,
-    //         &permutation_data,
-    //         &quotient_data,
-    //     );
-    //     let (opening_values, opening_proof) = pcs.open(rounds, challenger);
+        // 6. Sample OOD point and generate opening proof
+        let zeta: SC::Challenge = challenger.sample_ext_element();
+        let rounds = trace.generate_rounds(
+            zeta,
+            &pk.preprocessed.data,
+            &main_data,
+            &permutation_data,
+            &quotient_data,
+        );
+        let (opening_values, opening_proof) = pcs.open(rounds, challenger);
 
-    //     // Unflatten quotient openings
-    //     let opening_values = trace.unflatten_openings(
-    //         opening_values,
-    //         &pk.preprocessed.data,
-    //         &main_data,
-    //         &permutation_data,
-    //         &quotient_data,
-    //     );
+        // Unflatten quotient openings
+        let opening_values = trace.unflatten_openings(
+            opening_values,
+            &pk.preprocessed.data,
+            &main_data,
+            &permutation_data,
+            &quotient_data,
+        );
 
-    //     let chip_proofs = trace.generate_proofs(opening_values);
+        let chip_proofs = trace.generate_proofs(opening_values);
 
-    //     MachineProof {
-    //         commitments,
-    //         opening_proof,
-    //         chip_proofs,
-    //     }
-    // }
+        MachineProof {
+            commitments,
+            opening_proof,
+            chip_proofs,
+        }
+    }
 
     // #[instrument(skip_all)]
     // fn verify<SC>(
@@ -597,8 +597,7 @@ mod tests {
         let config = default_config();
         let mut challenger = default_challenger();
         let traces = generate_machine_trace::<MyConfig>(preimage, digests, leaf_index);
-        dbg!(traces.clone());
-        // let proof = machine.prove(&config, &pk, traces, &mut challenger);
+        let proof = machine.prove(&config, &pk, traces, &mut challenger);
 
         // let mut challenger = default_challenger();
         // machine.verify(&config, &proof, &mut challenger)
