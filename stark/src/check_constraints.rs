@@ -10,6 +10,7 @@ use crate::air_builders::debug::DebugConstraintBuilder;
 /// Check that all constraints vanish on the subgroup.
 pub fn check_constraints<F, EF, A>(
     air: &A,
+    preprocessed: &Option<RowMajorMatrixView<F>>,
     main: &Option<RowMajorMatrixView<F>>,
     perm: &Option<RowMajorMatrixView<EF>>,
     perm_challenges: [EF; 2],
@@ -20,7 +21,6 @@ pub fn check_constraints<F, EF, A>(
     EF: ExtensionField<F>,
     A: for<'a> InteractionAir<DebugConstraintBuilder<'a, F, EF>>,
 {
-    let preprocessed = air.preprocessed_trace();
     let height = match (main.as_ref(), preprocessed.as_ref()) {
         (Some(main), Some(preprocessed)) => std::cmp::max(main.height(), preprocessed.height()),
         (Some(main), None) => main.height(),
@@ -89,7 +89,7 @@ pub fn check_constraints<F, EF, A>(
 
 /// Check that the combined cumulative sum across all lookup tables is zero.
 pub fn check_cumulative_sums<F: Field, EF: ExtensionField<F>>(
-    perms: &[Option<RowMajorMatrix<EF>>],
+    perms: &[Option<RowMajorMatrixView<EF>>],
 ) {
     let sum: EF = perms
         .iter()

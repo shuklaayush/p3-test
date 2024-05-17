@@ -25,8 +25,8 @@ use crate::{
         MachineProof, ProverPreprocessedData, ProvingKey, VerifierPreprocessedData, VerifyingKey,
     },
     trace_util::{
-        ChipTrace, IndexedTrace, MachineTrace, MachineTraceBuilder, MachineTraceCommiter,
-        MachineTraceLoader, MachineTraceOpener, Trace,
+        ChipTrace, IndexedTrace, MachineTrace, MachineTraceBuilder, MachineTraceChecker,
+        MachineTraceCommiter, MachineTraceLoader, MachineTraceOpener, Trace,
     }, // verify::verify_constraints,
 };
 
@@ -225,24 +225,8 @@ impl Machine {
         //     main_traces.iter().map(|mt| mt.matrix),
         //     permutation_traces.iter().map(|mt| mt.matrix),
         // );
-        // #[cfg(debug_assertions)]
-        // for (chip, main_trace, permutation_trace, &cumulative_sum) in izip!(
-        //     chips,
-        //     main_traces.iter(),
-        //     permutation_traces.iter(),
-        //     cumulative_sums.iter()
-        // ) {
-        //     check_constraints::<_, SC>(
-        //         chip,
-        //         main_trace,
-        //         permutation_trace,
-        //         &perm_challenges,
-        //         cumulative_sum,
-        //         &[],
-        //     );
-        // }
-        // #[cfg(debug_assertions)]
-        // check_cumulative_sums(&permutation_traces[..]);
+        #[cfg(debug_assertions)]
+        trace.check_constraints(perm_challenges, &[]);
 
         // 5. Generate and commit to quotient traces
         tracing::info_span!("generate quotient trace").in_scope(|| {
@@ -598,7 +582,7 @@ mod tests {
         let traces = generate_machine_trace::<MyConfig>(preimage, digests, leaf_index);
         let proof = machine.prove(&config, &pk, traces, &mut challenger);
 
-        // let mut challenger = default_challenger();
+        let mut challenger = default_challenger();
         // machine.verify(&config, &proof, &mut challenger)
     }
 }

@@ -1,13 +1,19 @@
 use itertools::Itertools;
 use p3_air::BaseAir;
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
-use p3_field::{AbstractField, ExtensionField, Field};
+use p3_field::{AbstractField, ExtensionField, Field, PackedValue};
 use p3_interaction::{
     generate_permutation_trace, Interaction, InteractionAir, InteractionAirBuilder,
     InteractionChip, InteractionType, NUM_PERM_CHALLENGES,
 };
-use p3_matrix::{dense::RowMajorMatrix, Matrix};
-use p3_stark::{symbolic::get_quotient_degree, AdjacentOpenedValues, ChipProof, OpenedValues};
+use p3_matrix::{
+    dense::{RowMajorMatrix, RowMajorMatrixView},
+    Matrix,
+};
+use p3_stark::{
+    check_constraints, check_cumulative_sums, symbolic::get_quotient_degree, AdjacentOpenedValues,
+    ChipProof, OpenedValues,
+};
 use p3_uni_stark::{Com, Domain, PackedChallenge, StarkGenericConfig, Val};
 
 use crate::{chip::ChipType, proof::PcsProverData, quotient::quotient_values};
@@ -389,6 +395,51 @@ where
             .flatten()
             .collect_vec();
         commit_traces::<SC>(pcs, traces)
+    }
+}
+
+pub trait MachineTraceChecker<SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]);
+}
+
+impl<SC> MachineTraceChecker<SC> for MachineTrace<'_, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]) {
+        for chip_trace in self.iter() {
+            check_constraints(
+                chip_trace.chip,
+                &chip_trace
+                    .preprocessed
+                    .as_ref()
+                    .map(|preprocessed| preprocessed.trace.value.as_view()),
+                &chip_trace
+                    .main
+                    .as_ref()
+                    .map(|main| main.trace.value.as_view()),
+                &chip_trace
+                    .permutation
+                    .as_ref()
+                    .map(|permutation| permutation.trace.value.as_view()),
+                perm_challenges,
+                chip_trace.cumulative_sum,
+                public_values,
+            )
+        }
+        let permutation_traces = self
+            .iter()
+            .map(|chip_trace| {
+                chip_trace
+                    .permutation
+                    .as_ref()
+                    .map(|permutation| permutation.trace.value.as_view())
+            })
+            .collect_vec();
+        check_cumulative_sums(permutation_traces.as_slice());
     }
 }
 
