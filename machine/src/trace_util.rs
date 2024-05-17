@@ -8,9 +8,14 @@ use p3_interaction::{
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_stark::{
     check_constraints, check_cumulative_sums, symbolic::get_quotient_degree, AdjacentOpenedValues,
-    ChipProof, OpenedValues,
+    AirDebug, ChipProof, OpenedValues,
 };
 use p3_uni_stark::{Com, Domain, PackedChallenge, StarkGenericConfig, Val};
+
+#[cfg(feature = "debug-trace")]
+use p3_field::PrimeField32;
+#[cfg(feature = "debug-trace")]
+use std::error::Error;
 
 use crate::{
     chip::ChipType, error::VerificationError, proof::PcsProverData, quotient::quotient_values,
@@ -441,6 +446,66 @@ where
             })
             .collect_vec();
         check_cumulative_sums(permutation_traces.as_slice());
+    }
+}
+
+#[cfg(feature = "debug-trace")]
+pub trait MachineTraceDebugger<SC>
+where
+    SC: StarkGenericConfig,
+    Val<SC>: PrimeField32,
+{
+    fn write_traces_to_file(&self, path: &str) -> Result<(), Box<dyn Error>>;
+}
+
+#[cfg(feature = "debug-trace")]
+impl<SC> MachineTraceDebugger<SC> for MachineTrace<'_, SC>
+where
+    SC: StarkGenericConfig,
+    Val<SC>: PrimeField32,
+{
+    fn write_traces_to_file(&self, path: &str) -> Result<(), Box<dyn Error>>
+    where
+        Val<SC>: PrimeField32,
+    {
+        use rust_xlsxwriter::Workbook;
+
+        let mut workbook = Workbook::new();
+        for chip_trace in self.iter() {
+            let chip = chip_trace.chip;
+
+            let worksheet = workbook.add_worksheet();
+            worksheet.set_name(format!("{}", chip))?;
+
+            let preprocessed_trace = chip_trace
+                .preprocessed
+                .as_ref()
+                .map(|preprocessed| preprocessed.trace.value.as_view());
+            let main_trace = chip_trace
+                .main
+                .as_ref()
+                .map(|main| main.trace.value.as_view());
+            let permutation_trace = chip_trace
+                .permutation
+                .as_ref()
+                .map(|permutation| permutation.trace.value.as_view());
+
+            let num_sends = <ChipType as InteractionChip<Val<SC>>>::sends(chip).len();
+            let num_receives = <ChipType as InteractionChip<Val<SC>>>::receives(chip).len();
+
+            chip.write_traces_to_worksheet(
+                worksheet,
+                &preprocessed_trace,
+                &main_trace,
+                &permutation_trace,
+                num_sends,
+                num_receives,
+            )?;
+        }
+
+        workbook.save(path)?;
+
+        Ok(())
     }
 }
 

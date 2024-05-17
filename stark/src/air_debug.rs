@@ -1,5 +1,5 @@
 use p3_field::{ExtensionField, Field};
-use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixView};
+use p3_matrix::dense::RowMajorMatrixView;
 
 #[cfg(feature = "debug-trace")]
 use p3_field::PrimeField32;
