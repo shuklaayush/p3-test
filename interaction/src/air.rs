@@ -23,12 +23,12 @@ pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> {
         vec![]
     }
 
-    fn permutation_width(&self) -> usize {
+    fn permutation_width(&self) -> Option<usize> {
         let num_interactions = self.sends().len() + self.receives().len();
         if num_interactions > 0 {
-            num_interactions + 1
+            Some(num_interactions + 1)
         } else {
-            0
+            None
         }
     }
 

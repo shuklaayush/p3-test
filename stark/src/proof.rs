@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Commitments<Com> {
-    pub main: Com,
-    pub permutation: Com,
-    pub quotient_chunks: Com,
+    pub main: Option<Com>,
+    pub permutation: Option<Com>,
+    pub quotient_chunks: Option<Com>,
 }
 
 // TODO: Rename

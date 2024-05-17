@@ -51,7 +51,7 @@ where
     let mut builder = SymbolicAirBuilder::new(
         air.preprocessed_width(),
         air.width(),
-        air.permutation_width(),
+        air.permutation_width().unwrap_or_default(),
         num_public_values,
     );
     air.eval_all(&mut builder);

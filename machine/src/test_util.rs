@@ -1,5 +1,6 @@
 use p3_air::Air;
 use p3_field::PrimeField32;
+use p3_matrix::dense::RowMajorMatrix;
 use p3_stark::Stark;
 use p3_uni_stark::{
     prove, verify, DebugConstraintBuilder, SymbolicAirBuilder, Val, VerificationError,
@@ -11,6 +12,7 @@ use crate::config::{default_challenger, default_config, MyConfig};
 #[cfg(debug_assertions)]
 pub(crate) fn prove_and_verify<A>(
     air: &A,
+    trace: RowMajorMatrix<Val<MyConfig>>,
     public_values: Vec<Val<MyConfig>>,
 ) -> Result<(), VerificationError>
 where
@@ -22,8 +24,6 @@ where
         + for<'a> Air<DebugConstraintBuilder<'a, Val<MyConfig>>>,
 {
     let config = default_config();
-
-    let trace = air.generate_trace();
 
     let mut challenger = default_challenger();
     let proof = prove(&config, air, &mut challenger, trace, &public_values);

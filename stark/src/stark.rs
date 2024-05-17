@@ -15,8 +15,6 @@ use p3_interaction::generate_permutation_trace;
 use p3_interaction::Interaction;
 
 pub trait Stark<F: Field> {
-    fn generate_trace(&self) -> RowMajorMatrix<F>;
-
     #[cfg(feature = "debug-trace")]
     fn main_headers(&self) -> Vec<String>;
 }

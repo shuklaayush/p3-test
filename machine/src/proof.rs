@@ -15,7 +15,7 @@ pub type PcsProverData<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
 pub struct MachineProof<SC: StarkGenericConfig> {
     pub commitments: Commitments<Com<SC>>,
     pub opening_proof: PcsProof<SC>,
-    pub chip_proofs: Vec<ChipProof<SC::Challenge>>,
+    pub chip_proofs: Vec<Option<ChipProof<SC::Challenge>>>,
 }
 
 pub struct ProverPreprocessedData<SC: StarkGenericConfig> {

@@ -1,9 +1,20 @@
-use p3_field::PrimeField64;
+use p3_field::{PrimeField32, PrimeField64};
 use p3_keccak_air::logic::{andn, xor};
 use p3_keccak_air::{rc_value_limb, BITS_PER_LIMB, NUM_ROUNDS, U64_LIMBS};
 use p3_matrix::dense::RowMajorMatrix;
+use tracing::instrument;
 
-use super::columns::{KeccakCols, NUM_KECCAK_COLS};
+use super::{
+    columns::{KeccakCols, NUM_KECCAK_COLS},
+    KeccakPermuteChip,
+};
+
+impl KeccakPermuteChip {
+    #[instrument(name = "generate Keccak trace", skip_all)]
+    pub fn generate_trace<F: PrimeField32>(inputs: Vec<([u64; 25], bool)>) -> RowMajorMatrix<F> {
+        generate_trace_rows(&inputs)
+    }
+}
 
 pub fn generate_trace_rows<F: PrimeField64>(inputs: &[([u64; 25], bool)]) -> RowMajorMatrix<F> {
     let num_real_rows = inputs.len() * NUM_ROUNDS;

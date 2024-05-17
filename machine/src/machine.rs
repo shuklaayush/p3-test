@@ -3,12 +3,12 @@ use p3_air::BaseAir;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
-use p3_interaction::NUM_PERM_CHALLENGES;
+use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_stark::{
     symbolic::get_quotient_degree, AdjacentOpenedValues, ChipProof, Commitments, OpenedValues,
 };
-use p3_uni_stark::{Domain, StarkGenericConfig, Val};
+use p3_uni_stark::{Domain, PackedVal, StarkGenericConfig, Val};
 use tracing::instrument;
 
 // #[cfg(feature = "debug-trace")]
@@ -16,15 +16,18 @@ use tracing::instrument;
 
 use crate::{
     chip::ChipType,
+    chips::{
+        keccak_permute::KeccakPermuteChip, keccak_sponge::KeccakSpongeChip, memory::MemoryChip,
+        merkle_tree::MerkleTreeChip, range_checker::RangeCheckerChip, xor::XorChip,
+    },
     error::VerificationError,
     proof::{
-        MachineProof, ProverData, ProverPreprocessedData, ProvingKey, VerifierData, VerifyingKey,
+        MachineProof, ProverPreprocessedData, ProvingKey, VerifierPreprocessedData, VerifyingKey,
     },
-    trace::{
+    trace_util::{
         ChipTrace, IndexedTrace, MachineTrace, MachineTraceBuilder, MachineTraceCommiter,
         MachineTraceLoader, MachineTraceOpener, Trace,
-    },
-    verify::verify_constraints,
+    }, // verify::verify_constraints,
 };
 
 pub struct Machine {
@@ -60,16 +63,56 @@ pub enum MachineBus {
 }
 
 impl Machine {
+    fn new() -> Self {
+        let keccak_permute_chip = KeccakPermuteChip {
+            bus_keccak_permute_input: MachineBus::KeccakPermuteInput as usize,
+            bus_keccak_permute_output: MachineBus::KeccakPermuteOutput as usize,
+            bus_keccak_permute_digest_output: MachineBus::KeccakPermuteDigest as usize,
+        };
+        let keccak_sponge_chip = KeccakSpongeChip {
+            bus_xor_input: MachineBus::XorInput as usize,
+            bus_keccak_permute_input: MachineBus::KeccakPermuteInput as usize,
+            bus_range_8: MachineBus::Range8 as usize,
+            bus_memory: MachineBus::Memory as usize,
+            bus_xor_output: MachineBus::XorOutput as usize,
+            bus_keccak_permute_output: MachineBus::KeccakPermuteOutput as usize,
+        };
+        let merkle_tree_chip = MerkleTreeChip {
+            bus_keccak_permute_input: MachineBus::KeccakPermuteInput as usize,
+            bus_keccak_digest_output: MachineBus::KeccakPermuteDigest as usize,
+        };
+        let range_chip = RangeCheckerChip {
+            bus_range_8: MachineBus::Range8 as usize,
+        };
+        let xor_chip = XorChip {
+            bus_xor_input: MachineBus::XorInput as usize,
+            bus_xor_output: MachineBus::XorOutput as usize,
+        };
+        let memory_chip = MemoryChip {
+            bus_memory: MachineBus::Memory as usize,
+            bus_range_8: MachineBus::Range8 as usize,
+        };
+
+        Self {
+            keccak_permute_chip: ChipType::KeccakPermute(keccak_permute_chip),
+            keccak_sponge_chip: ChipType::KeccakSponge(keccak_sponge_chip),
+            merkle_tree_chip: ChipType::MerkleTree(merkle_tree_chip),
+            range_chip: ChipType::Range8(range_chip),
+            xor_chip: ChipType::Xor(xor_chip),
+            memory_chip: ChipType::Memory(memory_chip),
+        }
+    }
+
     fn setup<SC>(&self, config: &SC) -> (ProvingKey<SC>, VerifyingKey<SC>)
     where
         SC: StarkGenericConfig,
     {
         let pcs = config.pcs();
         let chips = self.chips();
-        let trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
+        let mut trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
 
         // 1. Generate and commit to preprocessed traces
-        let trace = tracing::info_span!("generate preprocessed traces")
+        tracing::info_span!("generate preprocessed traces")
             .in_scope(|| trace.generate_preprocessed(pcs));
 
         let traces = trace
@@ -97,10 +140,10 @@ impl Machine {
             data: None,
         };
         let verifier_data = if let (Some(commit), Some(data)) = trace.commit_preprocessed(pcs) {
-            prover_data.commitment = Some(commit);
+            prover_data.commitment = Some(commit.clone());
             prover_data.data = Some(data);
 
-            Some(VerifierData {
+            Some(VerifierPreprocessedData {
                 commitment: commit,
                 degrees: flat_degrees,
             })
@@ -118,145 +161,144 @@ impl Machine {
         (pk, vk)
     }
 
-    #[instrument(skip_all)]
-    fn prove<SC>(
-        &self,
-        config: &SC,
-        pk: &ProvingKey<SC>,
-        main_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
-        challenger: &mut SC::Challenger,
-    ) -> MachineProof<SC>
-    where
-        SC: StarkGenericConfig,
-        // Val<SC>: PrimeField32,
-        // <<SC as StarkGenericConfig>::Pcs as Pcs<
-        //     <SC as StarkGenericConfig>::Challenge,
-        //     <SC as StarkGenericConfig>::Challenger,
-        // >>::Domain: Send + Sync,
-    {
-        // TODO: Use fixed size array instead of Vecs
-        let chips = self.chips();
-        assert_eq!(main_traces.len(), chips.len(), "Length mismatch");
+    // #[instrument(skip_all)]
+    // fn prove<SC>(
+    //     &self,
+    //     config: &SC,
+    //     pk: &ProvingKey<SC>,
+    //     main_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
+    //     challenger: &mut SC::Challenger,
+    // ) -> MachineProof<SC>
+    // where
+    //     SC: StarkGenericConfig,
+    //     Val<SC>: PrimeField32,
+    //     <<SC as StarkGenericConfig>::Pcs as Pcs<
+    //         <SC as StarkGenericConfig>::Challenge,
+    //         <SC as StarkGenericConfig>::Challenger,
+    //     >>::Domain: Send + Sync,
+    // {
+    //     // TODO: Use fixed size array instead of Vecs
+    //     let chips = self.chips();
+    //     assert_eq!(main_traces.len(), chips.len(), "Length mismatch");
 
-        let pcs = config.pcs();
-        let trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
+    //     let pcs = config.pcs();
+    //     let mut trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
 
-        // 1. Observe preprocessed commitment
-        let trace = tracing::info_span!("load preprocessed traces")
-            .in_scope(|| trace.load_preprocessed(pcs, pk.preprocessed.traces));
-        if let Some(commit) = pk.preprocessed.commitment {
-            challenger.observe(commit);
-        }
+    //     // 1. Observe preprocessed commitment
+    //     tracing::info_span!("load preprocessed traces")
+    //         .in_scope(|| trace.load_preprocessed(pcs, pk.preprocessed.traces.as_slice()));
+    //     if let Some(commit) = &pk.preprocessed.commitment {
+    //         challenger.observe(commit.clone());
+    //     }
 
-        // 2. Generate and commit to main trace
-        let trace =
-            tracing::info_span!("load main traces").in_scope(|| trace.load_main(pcs, main_traces));
-        let (main_commit, main_data) =
-            tracing::info_span!("commit to main traces").in_scope(|| trace.commit_main(pcs));
-        if let Some(main_commit) = main_commit {
-            challenger.observe(main_commit.clone());
-        }
+    //     // 2. Generate and commit to main trace
+    //     tracing::info_span!("load main traces").in_scope(|| trace.load_main(pcs, main_traces));
+    //     let (main_commit, main_data) =
+    //         tracing::info_span!("commit to main traces").in_scope(|| trace.commit_main(pcs));
+    //     if let Some(main_commit) = &main_commit {
+    //         challenger.observe(main_commit.clone());
+    //     }
 
-        // 3. Sample permutation challenges
-        let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
-            .map(|_| challenger.sample_ext_element::<SC::Challenge>())
-            .collect_vec()
-            .try_into()
-            .unwrap();
+    //     // 3. Sample permutation challenges
+    //     let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
+    //         .map(|_| challenger.sample_ext_element::<SC::Challenge>())
+    //         .collect_vec()
+    //         .try_into()
+    //         .unwrap();
 
-        // 4. Generate and commit to permutation trace
-        let permutation_traces = tracing::info_span!("generate permutation traces")
-            .in_scope(|| trace.generate_permutation(pcs, perm_challenges));
-        let (permutation_commit, permutation_data) =
-            tracing::info_span!("commit to permutation traces")
-                .in_scope(|| trace.commit_permutation(pcs));
-        if let Some(permutation_commit) = permutation_commit {
-            challenger.observe(permutation_commit.clone());
-        }
-        let alpha: SC::Challenge = challenger.sample_ext_element();
+    //     // 4. Generate and commit to permutation trace
+    //     tracing::info_span!("generate permutation traces")
+    //         .in_scope(|| trace.generate_permutation(pcs, perm_challenges));
+    //     let (permutation_commit, permutation_data) =
+    //         tracing::info_span!("commit to permutation traces")
+    //             .in_scope(|| trace.commit_permutation(pcs));
+    //     if let Some(permutation_commit) = &permutation_commit {
+    //         challenger.observe(permutation_commit.clone());
+    //     }
+    //     let alpha: SC::Challenge = challenger.sample_ext_element();
 
-        // Verify constraints
-        // #[cfg(feature = "debug-trace")]
-        // let _ = self.write_traces_to_file::<SC>(
-        //     "trace.xlsx",
-        //     preprocessed_traces.iter().map(|mt| mt.matrix),
-        //     main_traces.iter().map(|mt| mt.matrix),
-        //     permutation_traces.iter().map(|mt| mt.matrix),
-        // );
-        // #[cfg(debug_assertions)]
-        // for (chip, main_trace, permutation_trace, &cumulative_sum) in izip!(
-        //     chips,
-        //     main_traces.iter(),
-        //     permutation_traces.iter(),
-        //     cumulative_sums.iter()
-        // ) {
-        //     check_constraints::<_, SC>(
-        //         chip,
-        //         main_trace,
-        //         permutation_trace,
-        //         &perm_challenges,
-        //         cumulative_sum,
-        //         &[],
-        //     );
-        // }
-        // #[cfg(debug_assertions)]
-        // check_cumulative_sums(&permutation_traces[..]);
+    //     // Verify constraints
+    //     // #[cfg(feature = "debug-trace")]
+    //     // let _ = self.write_traces_to_file::<SC>(
+    //     //     "trace.xlsx",
+    //     //     preprocessed_traces.iter().map(|mt| mt.matrix),
+    //     //     main_traces.iter().map(|mt| mt.matrix),
+    //     //     permutation_traces.iter().map(|mt| mt.matrix),
+    //     // );
+    //     // #[cfg(debug_assertions)]
+    //     // for (chip, main_trace, permutation_trace, &cumulative_sum) in izip!(
+    //     //     chips,
+    //     //     main_traces.iter(),
+    //     //     permutation_traces.iter(),
+    //     //     cumulative_sums.iter()
+    //     // ) {
+    //     //     check_constraints::<_, SC>(
+    //     //         chip,
+    //     //         main_trace,
+    //     //         permutation_trace,
+    //     //         &perm_challenges,
+    //     //         cumulative_sum,
+    //     //         &[],
+    //     //     );
+    //     // }
+    //     // #[cfg(debug_assertions)]
+    //     // check_cumulative_sums(&permutation_traces[..]);
 
-        // 5. Generate and commit to quotient traces
-        let quotient_traces = tracing::info_span!("generate quotient trace").in_scope(|| {
-            trace.generate_quotient(
-                pcs,
-                pk.preprocessed.data,
-                main_data,
-                permutation_data,
-                perm_challenges,
-                alpha,
-            )
-        });
-        // TODO: Panic if this is None
-        let (quotient_commit, quotient_data) = tracing::info_span!("commit to quotient chunks")
-            .in_scope(|| trace.commit_quotient(pcs));
-        if let Some(quotient_commit) = quotient_commit {
-            challenger.observe(quotient_commit.clone());
-        }
+    //     // 5. Generate and commit to quotient traces
+    //     tracing::info_span!("generate quotient trace").in_scope(|| {
+    //         trace.generate_quotient(
+    //             pcs,
+    //             &pk.preprocessed.data,
+    //             &main_data,
+    //             &permutation_data,
+    //             perm_challenges,
+    //             alpha,
+    //         )
+    //     });
+    //     // TODO: Panic if this is None
+    //     let (quotient_commit, quotient_data) = tracing::info_span!("commit to quotient chunks")
+    //         .in_scope(|| trace.commit_quotient(pcs));
+    //     if let Some(quotient_commit) = &quotient_commit {
+    //         challenger.observe(quotient_commit.clone());
+    //     }
 
-        let commitments = Commitments {
-            main: main_commit,
-            permutation: permutation_commit,
-            quotient_chunks: quotient_commit,
-        };
+    //     let commitments = Commitments {
+    //         main: main_commit,
+    //         permutation: permutation_commit,
+    //         quotient_chunks: quotient_commit,
+    //     };
 
-        // 6. Sample OOD point and generate opening proof
-        let zeta: SC::Challenge = challenger.sample_ext_element();
-        let rounds = trace.generate_rounds(
-            zeta,
-            &pk.preprocessed.data,
-            &main_data,
-            &permutation_data,
-            &quotient_data,
-        );
-        let (opening_values, opening_proof) = pcs.open(rounds, challenger);
+    //     // 6. Sample OOD point and generate opening proof
+    //     let zeta: SC::Challenge = challenger.sample_ext_element();
+    //     let rounds = trace.generate_rounds(
+    //         zeta,
+    //         &pk.preprocessed.data,
+    //         &main_data,
+    //         &permutation_data,
+    //         &quotient_data,
+    //     );
+    //     let (opening_values, opening_proof) = pcs.open(rounds, challenger);
 
-        // Unflatten quotient openings
-        let opening_values = trace.unflatten_openings(
-            opening_values,
-            &pk.preprocessed.data,
-            &main_data,
-            &permutation_data,
-            &quotient_data,
-        );
+    //     // Unflatten quotient openings
+    //     let opening_values = trace.unflatten_openings(
+    //         opening_values,
+    //         &pk.preprocessed.data,
+    //         &main_data,
+    //         &permutation_data,
+    //         &quotient_data,
+    //     );
 
-        let chip_proofs = trace.generate_proofs(opening_values);
+    //     let chip_proofs = trace.generate_proofs(opening_values);
 
-        MachineProof {
-            commitments,
-            opening_proof,
-            chip_proofs,
-        }
-    }
+    //     MachineProof {
+    //         commitments,
+    //         opening_proof,
+    //         chip_proofs,
+    //     }
+    // }
 
     // #[instrument(skip_all)]
-    // fn verify<SC: StarkGenericConfig>(
+    // fn verify<SC>(
     //     &self,
     //     config: &SC,
     //     proof: &MachineProof<SC>,
@@ -264,12 +306,13 @@ impl Machine {
     //     challenger: &mut SC::Challenger,
     // ) -> Result<(), VerificationError>
     // where
-    //     Val<SC>: PrimeField32,
+    //     SC: StarkGenericConfig,
+    //     // Val<SC>: PrimeField32,
     // {
     //     let pcs = config.pcs();
     //     let chips = self.chips();
 
-    //     if let Some(preprocessed) = vk.preprocessed_data {
+    //     if let Some(preprocessed) = &vk.preprocessed {
     //         challenger.observe(preprocessed.commitment.clone());
     //     }
 
@@ -281,7 +324,7 @@ impl Machine {
 
     //     let main_degrees = chip_proofs
     //         .iter()
-    //         .map(|chip_proof| chip_proof.degree)
+    //         .map(|chip_proof| chip_proof.map(|proof| proof.degree))
     //         .collect_vec();
     //     let quotient_degrees = chips
     //         .iter()
@@ -290,7 +333,7 @@ impl Machine {
 
     //     let main_domains = main_degrees
     //         .iter()
-    //         .map(|&degree| pcs.natural_domain_for_degree(degree))
+    //         .map(|&degree| degree.map(|degree| pcs.natural_domain_for_degree(degree)))
     //         .collect_vec();
     //     let quotient_domains = main_domains
     //         .iter()
@@ -307,34 +350,53 @@ impl Machine {
     //         })
     //         .collect_vec();
 
-    //     let main_widths = chips.iter().map(|chip| chip.width()).collect_vec();
     //     // TODO: Add preprocessed and permutation size check
-    //     let valid_shape =
-    //         chip_proofs
-    //             .iter()
-    //             .zip(main_widths.iter())
-    //             .zip(quotient_degrees.iter())
-    //             .all(|((chip_proof, &air_width), &quotient_degree)| {
-    //                 chip_proof.opened_values.main.local.len() == air_width
-    //                     && chip_proof.opened_values.main.next.len() == air_width
-    //                     && chip_proof.opened_values.quotient_chunks.len() == quotient_degree
-    //                     && chip_proof.opened_values.quotient_chunks.iter().all(|qc| {
-    //                         qc.len() == <SC::Challenge as AbstractExtensionField<Val<SC>>>::D
-    //                     })
-    //             });
-    //     if !valid_shape {
-    //         return Err(VerificationError::InvalidProofShape);
+    //     let main_widths = chips.iter().map(|chip| chip.width()).collect_vec();
+    //     for ((chip_proof, &air_width), &quotient_degree) in chip_proofs
+    //         .iter()
+    //         .zip(main_widths.iter())
+    //         .zip(quotient_degrees.iter())
+    //     {
+    //         if let Some(proof) = chip_proof {
+    //             if let Some(main) = &proof.opened_values.main {
+    //                 if main.local.len() != air_width {
+    //                     return Err(VerificationError::InvalidProofShape);
+    //                 }
+    //             }
+    //             if let Some(main) = &proof.opened_values.main {
+    //                 if main.next.len() != air_width {
+    //                     return Err(VerificationError::InvalidProofShape);
+    //                 }
+    //             }
+    //             if let Some(quotient_chunks) = &proof.opened_values.quotient_chunks {
+    //                 if quotient_chunks.len() != quotient_degree {
+    //                     return Err(VerificationError::InvalidProofShape);
+    //                 }
+    //                 if !quotient_chunks
+    //                     .iter()
+    //                     .all(|qc| qc.len() == <SC::Challenge as AbstractExtensionField<Val<SC>>>::D)
+    //                 {
+    //                     return Err(VerificationError::InvalidProofShape);
+    //                 }
+    //             }
+    //         }
     //     }
 
-    //     challenger.observe(commitments.main.clone());
+    //     if let Some(main) = &commitments.main {
+    //         challenger.observe(main.clone());
+    //     }
     //     let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
     //         .map(|_| challenger.sample_ext_element::<SC::Challenge>())
     //         .collect_vec()
     //         .try_into()
     //         .unwrap();
-    //     challenger.observe(commitments.permutation.clone());
+    //     if let Some(permutation) = &commitments.permutation {
+    //         challenger.observe(permutation.clone());
+    //     }
     //     let alpha = challenger.sample_ext_element::<SC::Challenge>();
-    //     challenger.observe(commitments.quotient_chunks.clone());
+    //     if let Some(quotient_chunks) = &commitments.quotient_chunks {
+    //         challenger.observe(quotient_chunks.clone());
+    //     }
 
     //     let zeta: SC::Challenge = challenger.sample_ext_element();
 
@@ -342,8 +404,13 @@ impl Machine {
     //     if let Some(preprocessed) = vk.preprocessed {
     //         let preprocessed_domains_and_openings = chip_proofs
     //             .iter()
-    //             .flat_map(|proof| proof.opened_values.preprocessed.as_ref())
     //             .zip_eq(preprocessed.degrees.iter())
+    //             .map(|(chip_proof, _)| {
+    //                 chip_proof
+    //                     .as_ref()
+    //                     .map(|proof| proof.opened_values.preprocessed)
+    //             })
+    //             .flatten()
     //             .map(|(opening, &domain)| {
     //                 (
     //                     domain,
@@ -468,63 +535,72 @@ impl Machine {
     // }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::config::{default_challenger, default_config};
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        config::{default_challenger, default_config, MyConfig},
+        trace::generate_machine_trace,
+    };
 
-//     use p3_keccak::KeccakF;
-//     use p3_symmetric::{PseudoCompressionFunction, TruncatedPermutation};
-//     use rand::{random, thread_rng, Rng};
-//     use tracing_forest::{util::LevelFilter, ForestLayer};
-//     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
+    use p3_keccak::KeccakF;
+    use p3_stark::prover::ProverConstraintFolder;
+    use p3_symmetric::{PseudoCompressionFunction, TruncatedPermutation};
+    use rand::{random, thread_rng, Rng};
+    use tracing_forest::{util::LevelFilter, ForestLayer};
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
-//     fn generate_digests(leaf_hashes: &[[u8; 32]]) -> Vec<Vec<[u8; 32]>> {
-//         let keccak = TruncatedPermutation::new(KeccakF {});
-//         let mut digests = vec![leaf_hashes.to_vec()];
+    fn generate_digests(leaf_hashes: &[[u8; 32]]) -> Vec<Vec<[u8; 32]>> {
+        let keccak = TruncatedPermutation::new(KeccakF {});
+        let mut digests = vec![leaf_hashes.to_vec()];
 
-//         while let Some(last_level) = digests.last().cloned() {
-//             if last_level.len() == 1 {
-//                 break;
-//             }
+        while let Some(last_level) = digests.last().cloned() {
+            if last_level.len() == 1 {
+                break;
+            }
 
-//             let next_level = last_level
-//                 .chunks_exact(2)
-//                 .map(|chunk| keccak.compress([chunk[0], chunk[1]]))
-//                 .collect();
+            let next_level = last_level
+                .chunks_exact(2)
+                .map(|chunk| keccak.compress([chunk[0], chunk[1]]))
+                .collect();
 
-//             digests.push(next_level);
-//         }
+            digests.push(next_level);
+        }
 
-//         digests
-//     }
+        digests
+    }
 
-//     #[test]
-//     fn test_machine_prove() -> Result<(), VerificationError> {
-//         let env_filter = EnvFilter::builder()
-//             .with_default_directive(LevelFilter::INFO.into())
-//             .from_env_lossy();
+    #[test]
+    fn test_machine_prove() {
+        // fn test_machine_prove() -> Result<(), VerificationError> {
+        let env_filter = EnvFilter::builder()
+            .with_default_directive(LevelFilter::INFO.into())
+            .from_env_lossy();
 
-//         Registry::default()
-//             .with(env_filter)
-//             .with(ForestLayer::default())
-//             .init();
+        Registry::default()
+            .with(env_filter)
+            .with(ForestLayer::default())
+            .init();
 
-//         const NUM_BYTES: usize = 1000;
-//         let preimage = (0..NUM_BYTES).map(|_| random()).collect_vec();
+        const NUM_BYTES: usize = 1000;
+        let preimage = (0..NUM_BYTES).map(|_| random()).collect_vec();
 
-//         const HEIGHT: usize = 8;
-//         let leaf_hashes = (0..2u64.pow(HEIGHT as u32)).map(|_| random()).collect_vec();
-//         let digests = generate_digests(&leaf_hashes);
+        const HEIGHT: usize = 8;
+        let leaf_hashes = (0..2u64.pow(HEIGHT as u32)).map(|_| random()).collect_vec();
+        let digests = generate_digests(&leaf_hashes);
 
-//         let leaf_index = thread_rng().gen_range(0..leaf_hashes.len());
-//         let machine = Machine::new(preimage, digests, leaf_index);
+        let leaf_index = thread_rng().gen_range(0..leaf_hashes.len());
+        let machine = Machine::new();
 
-//         let config = default_config();
-//         let mut challenger = default_challenger();
-//         let proof = machine.prove(&config, &mut challenger);
+        let (pk, vk) = machine.setup(&default_config());
 
-//         let mut challenger = default_challenger();
-//         machine.verify(&config, &proof, &mut challenger)
-//     }
-// }
+        let config = default_config();
+        let mut challenger = default_challenger();
+        let traces = generate_machine_trace::<MyConfig>(preimage, digests, leaf_index);
+        dbg!(traces.clone());
+        // let proof = machine.prove(&config, &pk, traces, &mut challenger);
+
+        // let mut challenger = default_challenger();
+        // machine.verify(&config, &proof, &mut challenger)
+    }
+}

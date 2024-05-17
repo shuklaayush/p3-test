@@ -1,10 +1,63 @@
-use p3_field::PrimeField64;
+use p3_field::{PrimeField32, PrimeField64};
 use p3_keccak::KeccakF;
 use p3_keccak_air::U64_LIMBS;
+use p3_matrix::dense::RowMajorMatrix;
 use p3_symmetric::{PseudoCompressionFunction, TruncatedPermutation};
+use tracing::instrument;
 
-use super::{columns::MerkleTreeCols, NUM_U8_HASH_ELEMS};
+use super::{
+    columns::{MerkleTreeCols, NUM_MERKLE_TREE_COLS},
+    MerkleTreeChip, NUM_U8_HASH_ELEMS,
+};
 use crate::chips::keccak_permute::NUM_U64_HASH_ELEMS;
+
+impl MerkleTreeChip {
+    // TODO: Allow empty traces
+    #[instrument(name = "generate MerkleTree trace", skip_all)]
+    pub fn generate_trace<F: PrimeField32>(
+        leaves: Vec<[u8; NUM_U8_HASH_ELEMS]>,
+        leaf_indices: Vec<usize>,
+        siblings: Vec<Vec<[u8; NUM_U8_HASH_ELEMS]>>,
+    ) -> RowMajorMatrix<F> {
+        let num_real_rows = siblings.iter().map(|s| s.len()).sum::<usize>();
+        let num_rows = num_real_rows.next_power_of_two();
+        let mut trace = RowMajorMatrix::new(
+            vec![F::zero(); num_rows * NUM_MERKLE_TREE_COLS],
+            NUM_MERKLE_TREE_COLS,
+        );
+        let (prefix, rows, suffix) = unsafe { trace.values.align_to_mut::<MerkleTreeCols<F>>() };
+        assert!(prefix.is_empty(), "Alignment should match");
+        assert!(suffix.is_empty(), "Alignment should match");
+        assert_eq!(rows.len(), num_rows);
+
+        let mut offset = 0;
+        for ((leaf, &leaf_index), siblings) in
+            leaves.iter().zip(leaf_indices.iter()).zip(siblings.iter())
+        {
+            let len = siblings.len();
+            let leaf_rows = &mut rows[offset..offset + len];
+            generate_trace_rows_for_leaf(leaf_rows, leaf, leaf_index, siblings);
+            offset += len;
+
+            // TODO: This is unconstrained
+            for row in leaf_rows.iter_mut() {
+                row.is_real = F::one();
+            }
+        }
+
+        // Fill padding rows
+        for input_rows in rows.chunks_mut(1).skip(num_real_rows) {
+            generate_trace_rows_for_leaf(
+                input_rows,
+                &[0; NUM_U8_HASH_ELEMS],
+                0,
+                vec![[0; NUM_U8_HASH_ELEMS]].as_slice(),
+            );
+        }
+
+        trace
+    }
+}
 
 pub fn generate_trace_rows_for_leaf<F: PrimeField64>(
     rows: &mut [MerkleTreeCols<F>],

@@ -1,14 +1,40 @@
 use itertools::Itertools;
-use p3_field::PrimeField64;
+use p3_field::{PrimeField32, PrimeField64};
+use p3_matrix::dense::RowMajorMatrix;
+use tracing::instrument;
 
 use super::{
     columns::{
         KeccakSpongeCols, KECCAK_DIGEST_U16S, KECCAK_RATE_BYTES, KECCAK_RATE_U16S,
-        KECCAK_WIDTH_U16S,
+        KECCAK_WIDTH_U16S, NUM_KECCAK_SPONGE_COLS,
     },
     util::keccakf_u16s,
-    KeccakSpongeOp,
+    KeccakSpongeChip, KeccakSpongeOp,
 };
+
+impl KeccakSpongeChip {
+    #[instrument(name = "generate KeccakSponge trace", skip_all)]
+    pub fn generate_trace<F: PrimeField32>(inputs: Vec<KeccakSpongeOp>) -> RowMajorMatrix<F> {
+        // Generate the witness row-wise.
+        let num_rows = inputs
+            .iter()
+            .map(|op| op.input.len() / KECCAK_RATE_BYTES + 1)
+            .sum::<usize>()
+            .next_power_of_two();
+        let mut trace = RowMajorMatrix::new(
+            vec![F::zero(); num_rows * NUM_KECCAK_SPONGE_COLS],
+            NUM_KECCAK_SPONGE_COLS,
+        );
+        let (prefix, rows, suffix) = unsafe { trace.values.align_to_mut::<KeccakSpongeCols<F>>() };
+        assert!(prefix.is_empty(), "Alignment should match");
+        assert!(suffix.is_empty(), "Alignment should match");
+        assert_eq!(rows.len(), num_rows);
+
+        generate_trace_rows(rows, inputs.as_slice());
+
+        trace
+    }
+}
 
 pub fn generate_trace_rows<F: PrimeField64>(
     rows: &mut [KeccakSpongeCols<F>],
