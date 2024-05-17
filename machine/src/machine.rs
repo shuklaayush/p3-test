@@ -1,14 +1,11 @@
-use itertools::{izip, Itertools};
-use p3_air::BaseAir;
+use itertools::Itertools;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
-use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
-use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
+use p3_field::PrimeField32;
+use p3_interaction::NUM_PERM_CHALLENGES;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_stark::{
-    symbolic::get_quotient_degree, AdjacentOpenedValues, ChipProof, Commitments, OpenedValues,
-};
-use p3_uni_stark::{Domain, PackedVal, StarkGenericConfig, Val};
+use p3_stark::Commitments;
+use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
 
 // #[cfg(feature = "debug-trace")]
@@ -25,9 +22,11 @@ use crate::{
         MachineProof, ProverPreprocessedData, ProvingKey, VerifierPreprocessedData, VerifyingKey,
     },
     trace_util::{
-        ChipTrace, IndexedTrace, MachineTrace, MachineTraceBuilder, MachineTraceChecker,
-        MachineTraceCommiter, MachineTraceLoader, MachineTraceOpener, Trace,
-    }, // verify::verify_constraints,
+        MachineTrace, MachineTraceBuilder, MachineTraceChecker, MachineTraceCommiter,
+        MachineTraceLoader, MachineTraceOpener, MachineTraceOpening, MachineTraceOpeningBuilder,
+        MachineTraceOpeningLoader, MachineTraceOpeningVerifier,
+    },
+    // verify::verify_constraints,
 };
 
 pub struct Machine {
@@ -124,15 +123,16 @@ impl Machine {
                     .map(|preprocessed| preprocessed.trace.value.clone())
             })
             .collect();
-        let flat_degrees = trace
+        let indexed_degrees: Vec<(usize, usize)> = trace
             .iter()
-            .flat_map(|chip_trace| {
+            .enumerate()
+            .flat_map(|(i, chip_trace)| {
                 chip_trace
                     .preprocessed
                     .as_ref()
-                    .map(|trace| trace.trace.domain.size())
+                    .map(|trace| (i, trace.trace.domain.size()))
             })
-            .collect::<Vec<usize>>();
+            .collect();
 
         let mut prover_data = ProverPreprocessedData {
             traces,
@@ -145,7 +145,7 @@ impl Machine {
 
             Some(VerifierPreprocessedData {
                 commitment: commit,
-                degrees: flat_degrees,
+                degrees: indexed_degrees,
             })
         } else {
             None
@@ -281,214 +281,106 @@ impl Machine {
         }
     }
 
-    // #[instrument(skip_all)]
-    // fn verify<SC>(
-    //     &self,
-    //     config: &SC,
-    //     proof: &MachineProof<SC>,
-    //     vk: &VerifyingKey<SC>,
-    //     challenger: &mut SC::Challenger,
-    // ) -> Result<(), VerificationError>
-    // where
-    //     SC: StarkGenericConfig,
-    //     // Val<SC>: PrimeField32,
-    // {
-    //     let pcs = config.pcs();
-    //     let chips = self.chips();
+    #[instrument(skip_all)]
+    fn verify<SC>(
+        &self,
+        config: &SC,
+        proof: MachineProof<SC>,
+        vk: &VerifyingKey<SC>,
+        challenger: &mut SC::Challenger,
+    ) -> Result<(), VerificationError>
+    where
+        SC: StarkGenericConfig,
+        Val<SC>: PrimeField32,
+    {
+        let pcs = config.pcs();
+        let chips = self.chips();
 
-    //     if let Some(preprocessed) = &vk.preprocessed {
-    //         challenger.observe(preprocessed.commitment.clone());
-    //     }
+        let mut trace: MachineTraceOpening<SC> = MachineTraceOpeningBuilder::new(chips);
 
-    //     let MachineProof {
-    //         commitments,
-    //         opening_proof,
-    //         chip_proofs,
-    //     } = proof;
+        let MachineProof {
+            commitments,
+            opening_proof,
+            chip_proofs,
+        } = proof;
 
-    //     let main_degrees = chip_proofs
-    //         .iter()
-    //         .map(|chip_proof| chip_proof.map(|proof| proof.degree))
-    //         .collect_vec();
-    //     let quotient_degrees = chips
-    //         .iter()
-    //         .map(|&chip| get_quotient_degree::<Val<SC>, _>(chip, 0))
-    //         .collect_vec();
+        let mut preprocessed_degrees = (0..trace.len()).map(|_| 0usize).collect_vec();
+        if let Some(preprocessed) = &vk.preprocessed {
+            for (i, degree) in preprocessed.degrees.iter() {
+                preprocessed_degrees[*i] = *degree;
+            }
+        }
+        trace.load_openings(pcs, chip_proofs, preprocessed_degrees);
 
-    //     let main_domains = main_degrees
-    //         .iter()
-    //         .map(|&degree| degree.map(|degree| pcs.natural_domain_for_degree(degree)))
-    //         .collect_vec();
-    //     let quotient_domains = main_domains
-    //         .iter()
-    //         .zip(quotient_degrees.iter())
-    //         .map(|(domain, quotient_degree)| {
-    //             domain.create_disjoint_domain(domain.size() * quotient_degree)
-    //         })
-    //         .collect_vec();
-    //     let quotient_chunks_domains = quotient_domains
-    //         .into_iter()
-    //         .zip(quotient_degrees.clone())
-    //         .map(|(quotient_domain, quotient_degree)| {
-    //             quotient_domain.split_domains(quotient_degree)
-    //         })
-    //         .collect_vec();
+        // Verify proof shape
+        trace.verify_shapes()?;
 
-    //     // TODO: Add preprocessed and permutation size check
-    //     let main_widths = chips.iter().map(|chip| chip.width()).collect_vec();
-    //     for ((chip_proof, &air_width), &quotient_degree) in chip_proofs
-    //         .iter()
-    //         .zip(main_widths.iter())
-    //         .zip(quotient_degrees.iter())
-    //     {
-    //         if let Some(proof) = chip_proof {
-    //             if let Some(main) = &proof.opened_values.main {
-    //                 if main.local.len() != air_width {
-    //                     return Err(VerificationError::InvalidProofShape);
-    //                 }
-    //             }
-    //             if let Some(main) = &proof.opened_values.main {
-    //                 if main.next.len() != air_width {
-    //                     return Err(VerificationError::InvalidProofShape);
-    //                 }
-    //             }
-    //             if let Some(quotient_chunks) = &proof.opened_values.quotient_chunks {
-    //                 if quotient_chunks.len() != quotient_degree {
-    //                     return Err(VerificationError::InvalidProofShape);
-    //                 }
-    //                 if !quotient_chunks
-    //                     .iter()
-    //                     .all(|qc| qc.len() == <SC::Challenge as AbstractExtensionField<Val<SC>>>::D)
-    //                 {
-    //                     return Err(VerificationError::InvalidProofShape);
-    //                 }
-    //             }
-    //         }
-    //     }
+        // Observe commitments
+        if let Some(preprocessed) = &vk.preprocessed {
+            challenger.observe(preprocessed.commitment.clone());
+        }
+        if let Some(main) = &commitments.main {
+            challenger.observe(main.clone());
+        }
+        let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
+            .map(|_| challenger.sample_ext_element::<SC::Challenge>())
+            .collect_vec()
+            .try_into()
+            .unwrap();
+        if let Some(permutation) = &commitments.permutation {
+            challenger.observe(permutation.clone());
+        }
+        let alpha = challenger.sample_ext_element::<SC::Challenge>();
+        if let Some(quotient_chunks) = &commitments.quotient_chunks {
+            challenger.observe(quotient_chunks.clone());
+        }
 
-    //     if let Some(main) = &commitments.main {
-    //         challenger.observe(main.clone());
-    //     }
-    //     let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
-    //         .map(|_| challenger.sample_ext_element::<SC::Challenge>())
-    //         .collect_vec()
-    //         .try_into()
-    //         .unwrap();
-    //     if let Some(permutation) = &commitments.permutation {
-    //         challenger.observe(permutation.clone());
-    //     }
-    //     let alpha = challenger.sample_ext_element::<SC::Challenge>();
-    //     if let Some(quotient_chunks) = &commitments.quotient_chunks {
-    //         challenger.observe(quotient_chunks.clone());
-    //     }
+        let zeta: SC::Challenge = challenger.sample_ext_element();
 
-    //     let zeta: SC::Challenge = challenger.sample_ext_element();
+        // TODO: Remove clone
+        let rounds = trace.generate_rounds(
+            zeta,
+            &vk.preprocessed
+                .as_ref()
+                .map(|preprocessed| preprocessed.commitment.clone()),
+            &commitments.main,
+            &commitments.permutation,
+            &commitments.quotient_chunks,
+        );
 
-    //     let mut rounds = vec![];
-    //     if let Some(preprocessed) = vk.preprocessed {
-    //         let preprocessed_domains_and_openings = chip_proofs
-    //             .iter()
-    //             .zip_eq(preprocessed.degrees.iter())
-    //             .map(|(chip_proof, _)| {
-    //                 chip_proof
-    //                     .as_ref()
-    //                     .map(|proof| proof.opened_values.preprocessed)
-    //             })
-    //             .flatten()
-    //             .map(|(opening, &domain)| {
-    //                 (
-    //                     domain,
-    //                     vec![
-    //                         (zeta, opening.local.clone()),
-    //                         (domain.next_point(zeta).unwrap(), opening.next.clone()),
-    //                     ],
-    //                 )
-    //             })
-    //             .collect_vec();
-    //         rounds.push((preprocessed.commitment, preprocessed_domains_and_openings));
-    //     }
-    //     let main_domains_and_openings = main_domains
-    //         .iter()
-    //         .zip(chip_proofs.iter())
-    //         .map(|(&domain, proof)| {
-    //             (
-    //                 domain,
-    //                 vec![
-    //                     (zeta, proof.opened_values.main.local.clone()),
-    //                     (
-    //                         domain.next_point(zeta).unwrap(),
-    //                         proof.opened_values.main.next.clone(),
-    //                     ),
-    //                 ],
-    //             )
-    //         })
-    //         .collect_vec();
-    //     rounds.push((commitments.main.clone(), main_domains_and_openings));
+        pcs.verify(rounds, &opening_proof, challenger)
+            .map_err(|_| VerificationError::InvalidOpeningArgument)?;
 
-    //     let perm_domains_and_openings = chip_proofs
-    //         .iter()
-    //         .zip(main_domains.iter())
-    //         .flat_map(|(proof, &domain)| {
-    //             proof.opened_values.permutation.as_ref().map(|opening| {
-    //                 (
-    //                     domain,
-    //                     vec![
-    //                         (zeta, opening.local.clone()),
-    //                         (domain.next_point(zeta).unwrap(), opening.next.clone()),
-    //                     ],
-    //                 )
-    //             })
-    //         })
-    //         .collect_vec();
-    //     rounds.push((commitments.permutation.clone(), perm_domains_and_openings));
+        // for (qc_domains, chip_proof, &main_domain, &chip) in izip!(
+        //     quotient_chunks_domains.iter(),
+        //     chip_proofs.iter(),
+        //     main_domains.iter(),
+        //     chips.iter()
+        // ) {
+        //     verify_constraints::<SC, _>(
+        //         chip,
+        //         &chip_proof.opened_values,
+        //         main_domain,
+        //         qc_domains,
+        //         zeta,
+        //         alpha,
+        //         perm_challenges,
+        //         chip_proof.cumulative_sum,
+        //     )?;
+        // }
 
-    //     let quotient_chunks_domains_and_openings = quotient_chunks_domains
-    //         .iter()
-    //         .flatten()
-    //         .zip(
-    //             chip_proofs
-    //                 .iter()
-    //                 .flat_map(|proof| &proof.opened_values.quotient_chunks),
-    //         )
-    //         .map(|(&domain, opened_values)| (domain, vec![(zeta, opened_values.clone())]))
-    //         .collect_vec();
-    //     rounds.push((
-    //         commitments.quotient_chunks.clone(),
-    //         quotient_chunks_domains_and_openings,
-    //     ));
+        // let sum: SC::Challenge = proof
+        //     .chip_proofs
+        //     .iter()
+        //     .flat_map(|chip_proof| chip_proof.as_ref().map(|proof| proof.cumulative_sum))
+        //     .flatten()
+        //     .sum();
+        // if sum != SC::Challenge::zero() {
+        //     return Err(VerificationError::NonZeroCumulativeSum);
+        // }
 
-    //     pcs.verify(rounds, opening_proof, challenger)
-    //         .map_err(|_| VerificationError::InvalidOpeningArgument)?;
-
-    //     for (qc_domains, chip_proof, &main_domain, &chip) in izip!(
-    //         quotient_chunks_domains.iter(),
-    //         chip_proofs.iter(),
-    //         main_domains.iter(),
-    //         chips.iter()
-    //     ) {
-    //         verify_constraints::<SC, _>(
-    //             chip,
-    //             &chip_proof.opened_values,
-    //             main_domain,
-    //             qc_domains,
-    //             zeta,
-    //             alpha,
-    //             perm_challenges.as_slice(),
-    //             chip_proof.cumulative_sum,
-    //         )?;
-    //     }
-
-    //     let sum: SC::Challenge = proof
-    //         .chip_proofs
-    //         .iter()
-    //         .flat_map(|chip_proof| chip_proof.cumulative_sum)
-    //         .sum();
-    //     if sum != SC::Challenge::zero() {
-    //         return Err(VerificationError::NonZeroCumulativeSum);
-    //     }
-
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     // #[cfg(feature = "debug-trace")]
     // fn write_traces_to_file<SC: StarkGenericConfig>(
@@ -554,8 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn test_machine_prove() {
-        // fn test_machine_prove() -> Result<(), VerificationError> {
+    fn test_machine_prove() -> Result<(), VerificationError> {
         let env_filter = EnvFilter::builder()
             .with_default_directive(LevelFilter::INFO.into())
             .from_env_lossy();
@@ -583,6 +474,6 @@ mod tests {
         let proof = machine.prove(&config, &pk, traces, &mut challenger);
 
         let mut challenger = default_challenger();
-        // machine.verify(&config, &proof, &mut challenger)
+        machine.verify(&config, proof, &vk, &mut challenger)
     }
 }

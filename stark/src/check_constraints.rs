@@ -1,6 +1,6 @@
 use p3_field::{ExtensionField, Field};
 use p3_interaction::InteractionAir;
-use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixView};
+use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use p3_matrix::Matrix;
 use p3_maybe_rayon::prelude::IntoParallelIterator;

@@ -1,22 +1,20 @@
 use itertools::Itertools;
 use p3_air::BaseAir;
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
-use p3_field::{AbstractField, ExtensionField, Field, PackedValue};
+use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field, PackedValue};
 use p3_interaction::{
-    generate_permutation_trace, Interaction, InteractionAir, InteractionAirBuilder,
-    InteractionChip, InteractionType, NUM_PERM_CHALLENGES,
+    generate_permutation_trace, InteractionAirBuilder, InteractionChip, NUM_PERM_CHALLENGES,
 };
-use p3_matrix::{
-    dense::{RowMajorMatrix, RowMajorMatrixView},
-    Matrix,
-};
+use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_stark::{
     check_constraints, check_cumulative_sums, symbolic::get_quotient_degree, AdjacentOpenedValues,
     ChipProof, OpenedValues,
 };
 use p3_uni_stark::{Com, Domain, PackedChallenge, StarkGenericConfig, Val};
 
-use crate::{chip::ChipType, proof::PcsProverData, quotient::quotient_values};
+use crate::{
+    chip::ChipType, error::VerificationError, proof::PcsProverData, quotient::quotient_values,
+};
 
 #[derive(Clone)]
 pub struct Trace<F, Domain>
@@ -96,6 +94,7 @@ where
         }
     }
 
+    // TODO: Has to be main degree
     pub fn domain(&self) -> Option<Domain<SC>> {
         match (&self.preprocessed, &self.main) {
             (Some(preprocessed), Some(main)) => {
@@ -318,6 +317,7 @@ where
                     })
                     .collect();
 
+                chip_trace.quotient_degree = Some(quotient_degree);
                 chip_trace.quotient_chunks = Some(QuotientTrace {
                     traces,
                     opening_index: count,
@@ -351,7 +351,7 @@ where
         pcs: &'a SC::Pcs,
     ) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
-            .into_iter()
+            .iter()
             .flat_map(|trace| {
                 trace
                     .preprocessed
@@ -364,7 +364,7 @@ where
 
     fn commit_main(&self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
-            .into_iter()
+            .iter()
             .flat_map(|trace| trace.main.as_ref().map(|main| main.trace.clone()))
             .collect_vec();
         commit_traces::<SC>(pcs, traces)
@@ -372,7 +372,7 @@ where
 
     fn commit_permutation(&self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
-            .into_iter()
+            .iter()
             .flat_map(|trace| {
                 trace
                     .permutation
@@ -385,7 +385,7 @@ where
 
     fn commit_quotient(&self, pcs: &'a SC::Pcs) -> (Option<Com<SC>>, Option<PcsProverData<SC>>) {
         let traces = self
-            .into_iter()
+            .iter()
             .flat_map(|trace| {
                 trace
                     .quotient_chunks
@@ -721,5 +721,308 @@ where
         (Some(commit), Some(data))
     } else {
         (None, None)
+    }
+}
+
+#[derive(Clone)]
+pub struct TraceOpening<EF, Domain>
+where
+    EF: Field,
+    Domain: PolynomialSpace,
+{
+    pub values: AdjacentOpenedValues<EF>,
+    pub domain: Domain,
+}
+
+#[derive(Clone)]
+pub struct SingleQuotientTraceOpening<EF, Domain>
+where
+    EF: Field,
+    Domain: PolynomialSpace,
+{
+    pub values: Vec<EF>,
+    pub domain: Domain,
+}
+
+#[derive(Clone)]
+pub struct QuotientTraceOpening<EF, Domain>
+where
+    EF: Field,
+    Domain: PolynomialSpace,
+{
+    pub traces: Vec<SingleQuotientTraceOpening<EF, Domain>>,
+    // pub opening_index: usize,
+}
+
+#[derive(Clone)]
+pub struct ChipTraceOpening<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    pub chip: &'a ChipType,
+
+    pub preprocessed: Option<TraceOpening<SC::Challenge, Domain<SC>>>,
+    pub main: Option<TraceOpening<SC::Challenge, Domain<SC>>>,
+    pub permutation: Option<TraceOpening<SC::Challenge, Domain<SC>>>,
+
+    pub cumulative_sum: Option<SC::Challenge>,
+
+    pub quotient_chunks: Option<QuotientTraceOpening<SC::Challenge, Domain<SC>>>,
+    pub quotient_degree: Option<usize>,
+}
+
+impl<'a, SC> ChipTraceOpening<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    pub fn new(chip: &'a ChipType) -> Self {
+        Self {
+            chip,
+            preprocessed: None,
+            main: None,
+            permutation: None,
+            cumulative_sum: None,
+            quotient_chunks: None,
+            quotient_degree: None,
+        }
+    }
+}
+
+pub type MachineTraceOpening<'a, SC> = Vec<ChipTraceOpening<'a, SC>>;
+
+pub trait MachineTraceOpeningBuilder<'a> {
+    fn new(chips: Vec<&'a ChipType>) -> Self;
+}
+
+impl<'a, SC> MachineTraceOpeningBuilder<'a> for MachineTraceOpening<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn new(chips: Vec<&'a ChipType>) -> Self {
+        chips
+            .into_iter()
+            .map(|chip| ChipTraceOpening::new(chip))
+            .collect_vec()
+    }
+}
+
+pub trait MachineTraceOpeningLoader<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn load_openings(
+        &mut self,
+        pcs: &'a SC::Pcs,
+        chip_proofs: Vec<Option<ChipProof<SC::Challenge>>>,
+        preprocessed_degrees: Vec<usize>,
+    );
+
+    fn verify_shapes(&self) -> Result<(), VerificationError>;
+}
+
+impl<'a, SC> MachineTraceOpeningLoader<'a, SC> for Vec<ChipTraceOpening<'a, SC>>
+where
+    SC: StarkGenericConfig,
+{
+    fn load_openings(
+        &mut self,
+        pcs: &'a SC::Pcs,
+        chip_proofs: Vec<Option<ChipProof<SC::Challenge>>>,
+        preprocessed_degrees: Vec<usize>,
+    ) {
+        for ((chip_trace, chip_proof), preprocessed_degree) in self
+            .iter_mut()
+            .zip_eq(chip_proofs.into_iter())
+            .zip_eq(preprocessed_degrees.into_iter())
+        {
+            if let Some(proof) = chip_proof {
+                chip_trace.preprocessed = proof.opened_values.preprocessed.map(|values| {
+                    let domain = pcs.natural_domain_for_degree(preprocessed_degree);
+                    TraceOpening { values, domain }
+                });
+
+                let domain = pcs.natural_domain_for_degree(proof.degree);
+                chip_trace.main = proof
+                    .opened_values
+                    .main
+                    .map(|values| TraceOpening { values, domain });
+                chip_trace.permutation = proof
+                    .opened_values
+                    .permutation
+                    .map(|values| TraceOpening { values, domain });
+                chip_trace.cumulative_sum = proof.cumulative_sum;
+
+                let quotient_degree = get_quotient_degree::<Val<SC>, _>(chip_trace.chip, 0);
+                chip_trace.quotient_degree = Some(quotient_degree);
+
+                let quotient_domain =
+                    domain.create_disjoint_domain(domain.size() * quotient_degree);
+                let quotient_chunks_domains = quotient_domain.split_domains(quotient_degree);
+                chip_trace.quotient_chunks = proof.opened_values.quotient_chunks.map(|chunks| {
+                    let values = chunks
+                        .into_iter()
+                        .zip_eq(quotient_chunks_domains.into_iter())
+                        .map(|(chunk, domain)| SingleQuotientTraceOpening {
+                            values: chunk,
+                            domain,
+                        })
+                        .collect();
+                    QuotientTraceOpening { traces: values }
+                });
+            }
+        }
+    }
+
+    fn verify_shapes(&self) -> Result<(), VerificationError> {
+        // TODO: Add preprocessed and permutation size check
+        for chip_trace in self.iter() {
+            // TODO: Try to do without the cast
+            let main_width = <ChipType as BaseAir<Val<SC>>>::width(chip_trace.chip);
+
+            if let Some(main) = &chip_trace.main {
+                if main.values.local.len() != main_width {
+                    return Err(VerificationError::InvalidProofShape);
+                }
+                if main.values.next.len() != main_width {
+                    return Err(VerificationError::InvalidProofShape);
+                }
+            }
+            if let Some(quotient_chunks) = &chip_trace.quotient_chunks {
+                dbg!("quotient_chunks");
+                let quotient_degree = get_quotient_degree::<Val<SC>, _>(chip_trace.chip, 0);
+                if quotient_chunks.traces.len() != quotient_degree {
+                    return Err(VerificationError::InvalidProofShape);
+                }
+                if !quotient_chunks.traces.iter().all(|qc| {
+                    qc.values.len() == <SC::Challenge as AbstractExtensionField<Val<SC>>>::D
+                }) {
+                    return Err(VerificationError::InvalidProofShape);
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub trait MachineTraceOpeningVerifier<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn generate_rounds(
+        &self,
+        zeta: SC::Challenge,
+        preprocessed_commitment: &Option<Com<SC>>,
+        main_commitment: &Option<Com<SC>>,
+        permutation_commitment: &Option<Com<SC>>,
+        quotient_chunks_commitment: &Option<Com<SC>>,
+    ) -> Vec<(
+        Com<SC>,
+        Vec<(Domain<SC>, Vec<(SC::Challenge, Vec<SC::Challenge>)>)>,
+    )>;
+}
+
+impl<'a, SC> MachineTraceOpeningVerifier<'a, SC> for MachineTraceOpening<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn generate_rounds(
+        &self,
+        zeta: SC::Challenge,
+        preprocessed_commitment: &Option<Com<SC>>,
+        main_commitment: &Option<Com<SC>>,
+        permutation_commitment: &Option<Com<SC>>,
+        quotient_chunks_commitment: &Option<Com<SC>>,
+    ) -> Vec<(
+        Com<SC>,
+        Vec<(Domain<SC>, Vec<(SC::Challenge, Vec<SC::Challenge>)>)>,
+    )> {
+        let mut rounds = vec![];
+        if let Some(preprocessed_commitment) = preprocessed_commitment {
+            let preprocessed_domains_and_openings = self
+                .iter()
+                .filter_map(|chip_trace| {
+                    chip_trace.preprocessed.as_ref().map(|trace| {
+                        (
+                            trace.domain,
+                            vec![
+                                (zeta, trace.values.local.clone()),
+                                (
+                                    trace.domain.next_point(zeta).unwrap(),
+                                    trace.values.next.clone(),
+                                ),
+                            ],
+                        )
+                    })
+                })
+                .collect_vec();
+            rounds.push((
+                preprocessed_commitment.clone(),
+                preprocessed_domains_and_openings,
+            ));
+        }
+        if let Some(main_commitment) = main_commitment {
+            let main_domains_and_openings = self
+                .iter()
+                .filter_map(|chip_trace| {
+                    chip_trace.main.as_ref().map(|trace| {
+                        (
+                            trace.domain,
+                            vec![
+                                (zeta, trace.values.local.clone()),
+                                (
+                                    trace.domain.next_point(zeta).unwrap(),
+                                    trace.values.next.clone(),
+                                ),
+                            ],
+                        )
+                    })
+                })
+                .collect_vec();
+            rounds.push((main_commitment.clone(), main_domains_and_openings));
+        }
+        if let Some(permutation_commitment) = permutation_commitment {
+            let permutation_domains_and_openings = self
+                .iter()
+                .filter_map(|chip_trace| {
+                    chip_trace.permutation.as_ref().map(|trace| {
+                        (
+                            trace.domain,
+                            vec![
+                                (zeta, trace.values.local.clone()),
+                                (
+                                    trace.domain.next_point(zeta).unwrap(),
+                                    trace.values.next.clone(),
+                                ),
+                            ],
+                        )
+                    })
+                })
+                .collect_vec();
+            rounds.push((
+                permutation_commitment.clone(),
+                permutation_domains_and_openings,
+            ));
+        }
+        if let Some(quotient_chunks_commitment) = quotient_chunks_commitment {
+            let quotient_chunks_domains_and_openings = self
+                .iter()
+                .filter_map(|chip_trace| {
+                    chip_trace.quotient_chunks.as_ref().map(|quotient_trace| {
+                        quotient_trace
+                            .traces
+                            .iter()
+                            .map(|trace| (trace.domain, vec![(zeta, trace.values.clone())]))
+                            .collect_vec()
+                    })
+                })
+                .flatten()
+                .collect_vec();
+            rounds.push((
+                quotient_chunks_commitment.clone(),
+                quotient_chunks_domains_and_openings,
+            ));
+        }
+        rounds
     }
 }

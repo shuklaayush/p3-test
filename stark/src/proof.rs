@@ -24,7 +24,7 @@ pub struct OpenedValues<Challenge> {
     pub quotient_chunks: Option<Vec<Vec<Challenge>>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct AdjacentOpenedValues<Challenge> {
     pub local: Vec<Challenge>,
     pub next: Vec<Challenge>,

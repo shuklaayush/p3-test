@@ -27,7 +27,8 @@ pub struct ProverPreprocessedData<SC: StarkGenericConfig> {
 #[derive(Serialize, Deserialize)]
 pub struct VerifierPreprocessedData<SC: StarkGenericConfig> {
     pub commitment: Com<SC>,
-    pub degrees: Vec<usize>,
+    // Index, degree
+    pub degrees: Vec<(usize, usize)>,
 }
 
 pub struct ProvingKey<SC: StarkGenericConfig> {
