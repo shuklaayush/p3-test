@@ -14,6 +14,7 @@ use p3_uni_stark::{Com, Domain, PackedChallenge, StarkGenericConfig, Val};
 
 use crate::{
     chip::ChipType, error::VerificationError, proof::PcsProverData, quotient::quotient_values,
+    verify::verify_constraints,
 };
 
 #[derive(Clone)]
@@ -94,7 +95,7 @@ where
         }
     }
 
-    // TODO: Has to be main degree
+    // TODO: Change to be just main degree
     pub fn domain(&self) -> Option<Domain<SC>> {
         match (&self.preprocessed, &self.main) {
             (Some(preprocessed), Some(main)) => {
@@ -786,6 +787,24 @@ where
             quotient_degree: None,
         }
     }
+
+    // TODO: Change to be just main degree
+    pub fn domain(&self) -> Option<Domain<SC>> {
+        match (&self.preprocessed, &self.main) {
+            (Some(preprocessed), Some(main)) => {
+                let preprocessed_domain = preprocessed.domain;
+                let main_domain = main.domain;
+                if main_domain.size() > preprocessed_domain.size() {
+                    Some(main_domain)
+                } else {
+                    Some(preprocessed_domain)
+                }
+            }
+            (Some(preprocessed), None) => Some(preprocessed.domain),
+            (None, Some(main)) => Some(main.domain),
+            (None, None) => None,
+        }
+    }
 }
 
 pub type MachineTraceOpening<'a, SC> = Vec<ChipTraceOpening<'a, SC>>;
@@ -888,7 +907,6 @@ where
                 }
             }
             if let Some(quotient_chunks) = &chip_trace.quotient_chunks {
-                dbg!("quotient_chunks");
                 let quotient_degree = get_quotient_degree::<Val<SC>, _>(chip_trace.chip, 0);
                 if quotient_chunks.traces.len() != quotient_degree {
                     return Err(VerificationError::InvalidProofShape);
@@ -1024,5 +1042,86 @@ where
             ));
         }
         rounds
+    }
+}
+
+pub trait MachineTraceConstraintVerifier<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn verify_constraints(
+        &self,
+        zeta: SC::Challenge,
+        alpha: SC::Challenge,
+        permutation_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
+    ) -> Result<(), VerificationError>;
+
+    fn check_cumulative_sums(&self) -> Result<(), VerificationError>;
+}
+
+impl<'a, SC> MachineTraceConstraintVerifier<'a, SC> for MachineTraceOpening<'a, SC>
+where
+    SC: StarkGenericConfig,
+{
+    fn verify_constraints(
+        &self,
+        zeta: SC::Challenge,
+        alpha: SC::Challenge,
+        permutation_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
+    ) -> Result<(), VerificationError> {
+        for chip_trace in self.iter() {
+            if let Some(domain) = chip_trace.domain() {
+                let qc_domains = chip_trace
+                    .quotient_chunks
+                    .as_ref()
+                    .expect("Quotient chunks should be present")
+                    .traces
+                    .iter()
+                    .map(|trace| trace.domain)
+                    .collect_vec();
+                // TODO: Remove clones
+                let opened_values = OpenedValues {
+                    preprocessed: chip_trace
+                        .preprocessed
+                        .as_ref()
+                        .map(|trace| trace.values.clone()),
+                    main: chip_trace.main.as_ref().map(|trace| trace.values.clone()),
+                    permutation: chip_trace
+                        .permutation
+                        .as_ref()
+                        .map(|trace| trace.values.clone()),
+                    quotient_chunks: chip_trace.quotient_chunks.as_ref().map(|chunk| {
+                        chunk
+                            .traces
+                            .iter()
+                            .map(|trace| trace.values.clone())
+                            .collect_vec()
+                    }),
+                };
+                verify_constraints::<SC, _>(
+                    chip_trace.chip,
+                    &opened_values,
+                    domain,
+                    &qc_domains,
+                    zeta,
+                    alpha,
+                    permutation_challenges,
+                    chip_trace.cumulative_sum,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    fn check_cumulative_sums(&self) -> Result<(), VerificationError> {
+        let sum: SC::Challenge = self
+            .iter()
+            .flat_map(|chip_trace| chip_trace.cumulative_sum)
+            .sum();
+
+        if sum != SC::Challenge::zero() {
+            return Err(VerificationError::NonZeroCumulativeSum);
+        }
+        Ok(())
     }
 }

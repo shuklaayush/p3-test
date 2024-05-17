@@ -4,8 +4,8 @@ mod interaction;
 mod round_flags;
 mod trace;
 
-use p3_field::PrimeField32;
-use p3_stark::Stark;
+use p3_field::{ExtensionField, PrimeField32};
+use p3_stark::AirDebug;
 
 use self::columns::KeccakCols;
 
@@ -19,7 +19,7 @@ pub struct KeccakPermuteChip {
     pub bus_keccak_permute_digest_output: usize,
 }
 
-impl<F: PrimeField32> Stark<F> for KeccakPermuteChip {
+impl<F: PrimeField32, EF: ExtensionField<F>> AirDebug<F, EF> for KeccakPermuteChip {
     #[cfg(feature = "debug-trace")]
     fn main_headers(&self) -> Vec<String> {
         KeccakCols::<F>::headers()

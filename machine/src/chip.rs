@@ -1,6 +1,6 @@
-use p3_field::{AbstractField, ExtensionField, Field};
+use p3_field::{AbstractField, ExtensionField, Field, PrimeField32};
 use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
-use p3_stark::{InteractionStark, Stark};
+use p3_stark::AirDebug;
 
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_matrix::dense::RowMajorMatrix;
@@ -11,13 +11,6 @@ use crate::{
     chips::memory::MemoryChip, chips::merkle_tree::MerkleTreeChip,
     chips::range_checker::RangeCheckerChip, chips::xor::XorChip,
 };
-
-pub trait Chip<F: Field, EF: ExtensionField<F>>: Stark<F> + InteractionStark<F, EF> {}
-
-// pub trait Chip<SC: StarkGenericConfig>:
-//     for<'a> InteractionAir<ProverConstraintFolder<'a, SC>>
-//     + for<'a> InteractionAir<VerifierConstraintFolder<'a, SC>>
-//     + for<'a> InteractionAir<DebugConstraintBuilder<'a, SC>>
 
 #[derive(Clone, Debug)]
 pub enum ChipType {
@@ -131,6 +124,25 @@ impl<AB: InteractionAirBuilder> InteractionAir<AB> for ChipType {
             }
             ChipType::Xor(chip) => <XorChip as InteractionAir<AB>>::preprocessed_width(chip),
             ChipType::Memory(chip) => <MemoryChip as InteractionAir<AB>>::preprocessed_width(chip),
+        }
+    }
+}
+
+impl<F: PrimeField32, EF: ExtensionField<F>> AirDebug<F, EF> for ChipType {
+    fn main_headers(&self) -> Vec<String> {
+        match self {
+            ChipType::KeccakPermute(chip) => {
+                <KeccakPermuteChip as AirDebug<F, EF>>::main_headers(chip)
+            }
+            ChipType::KeccakSponge(chip) => {
+                <KeccakSpongeChip as AirDebug<F, EF>>::main_headers(chip)
+            }
+            ChipType::MerkleTree(chip) => <MerkleTreeChip as AirDebug<F, EF>>::main_headers(chip),
+            ChipType::Range8(chip) => {
+                <RangeCheckerChip<256> as AirDebug<F, EF>>::main_headers(chip)
+            }
+            ChipType::Xor(chip) => <XorChip as AirDebug<F, EF>>::main_headers(chip),
+            ChipType::Memory(chip) => <MemoryChip as AirDebug<F, EF>>::main_headers(chip),
         }
     }
 }

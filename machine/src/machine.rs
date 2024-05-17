@@ -4,12 +4,16 @@ use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::PrimeField32;
 use p3_interaction::NUM_PERM_CHALLENGES;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_stark::Commitments;
+use p3_stark::{AirDebug, Commitments};
 use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
 
-// #[cfg(feature = "debug-trace")]
-// use std::error::Error;
+#[cfg(feature = "debug-trace")]
+use p3_interaction::InteractionChip;
+#[cfg(feature = "debug-trace")]
+use p3_matrix::dense::RowMajorMatrixView;
+#[cfg(feature = "debug-trace")]
+use std::error::Error;
 
 use crate::{
     chip::ChipType,
@@ -23,10 +27,10 @@ use crate::{
     },
     trace_util::{
         MachineTrace, MachineTraceBuilder, MachineTraceChecker, MachineTraceCommiter,
-        MachineTraceLoader, MachineTraceOpener, MachineTraceOpening, MachineTraceOpeningBuilder,
-        MachineTraceOpeningLoader, MachineTraceOpeningVerifier,
+        MachineTraceConstraintVerifier, MachineTraceLoader, MachineTraceOpener,
+        MachineTraceOpening, MachineTraceOpeningBuilder, MachineTraceOpeningLoader,
+        MachineTraceOpeningVerifier,
     },
-    // verify::verify_constraints,
 };
 
 pub struct Machine {
@@ -351,64 +355,52 @@ impl Machine {
         pcs.verify(rounds, &opening_proof, challenger)
             .map_err(|_| VerificationError::InvalidOpeningArgument)?;
 
-        // for (qc_domains, chip_proof, &main_domain, &chip) in izip!(
-        //     quotient_chunks_domains.iter(),
-        //     chip_proofs.iter(),
-        //     main_domains.iter(),
-        //     chips.iter()
-        // ) {
-        //     verify_constraints::<SC, _>(
-        //         chip,
-        //         &chip_proof.opened_values,
-        //         main_domain,
-        //         qc_domains,
-        //         zeta,
-        //         alpha,
-        //         perm_challenges,
-        //         chip_proof.cumulative_sum,
-        //     )?;
-        // }
+        // Verify constraints at zeta
+        trace.verify_constraints(zeta, alpha, perm_challenges)?;
 
-        // let sum: SC::Challenge = proof
-        //     .chip_proofs
-        //     .iter()
-        //     .flat_map(|chip_proof| chip_proof.as_ref().map(|proof| proof.cumulative_sum))
-        //     .flatten()
-        //     .sum();
-        // if sum != SC::Challenge::zero() {
-        //     return Err(VerificationError::NonZeroCumulativeSum);
-        // }
+        // Verify cumulative sum adds to zero
+        trace.check_cumulative_sums()?;
 
         Ok(())
     }
 
-    // #[cfg(feature = "debug-trace")]
-    // fn write_traces_to_file<SC: StarkGenericConfig>(
-    //     &self,
-    //     path: &str,
-    //     preprocessed_traces: &[Option<RowMajorMatrix<Val<SC>>>],
-    //     main_traces: &[RowMajorMatrix<Val<SC>>],
-    //     perm_traces: &[Option<RowMajorMatrix<SC::Challenge>>],
-    // ) -> Result<(), Box<dyn Error>>
-    // where
-    //     Val<SC>: PrimeField32,
-    // {
-    //     use rust_xlsxwriter::Workbook;
+    #[cfg(feature = "debug-trace")]
+    fn write_traces_to_file<SC: StarkGenericConfig>(
+        &self,
+        path: &str,
+        preprocessed_traces: &[Option<RowMajorMatrixView<Val<SC>>>],
+        main_traces: &[Option<RowMajorMatrixView<Val<SC>>>],
+        perm_traces: &[Option<RowMajorMatrixView<SC::Challenge>>],
+    ) -> Result<(), Box<dyn Error>>
+    where
+        Val<SC>: PrimeField32,
+    {
+        use itertools::izip;
+        use rust_xlsxwriter::Workbook;
 
-    //     let chips = self.chips();
-    //     let mut workbook = Workbook::new();
-    //     for (chip, preprocessed_trace, main_trace, perm_trace) in
-    //         izip!(chips, preprocessed_traces, main_traces, perm_traces)
-    //     {
-    //         let worksheet = workbook.add_worksheet();
-    //         worksheet.set_name(format!("{}", chip))?;
-    //         chip.write_traces_to_worksheet(worksheet, preprocessed_trace, main_trace, perm_trace)?;
-    //     }
+        let chips = self.chips();
+        let mut workbook = Workbook::new();
+        for (chip, preprocessed_trace, main_trace, perm_trace) in
+            izip!(chips, preprocessed_traces, main_traces, perm_traces)
+        {
+            let worksheet = workbook.add_worksheet();
+            worksheet.set_name(format!("{}", chip))?;
+            let num_sends = <ChipType as InteractionChip<Val<SC>>>::sends(chip).len();
+            let num_receives = <ChipType as InteractionChip<Val<SC>>>::receives(chip).len();
+            chip.write_traces_to_worksheet(
+                worksheet,
+                preprocessed_trace,
+                main_trace,
+                perm_trace,
+                num_sends,
+                num_receives,
+            )?;
+        }
 
-    //     workbook.save(path)?;
+        workbook.save(path)?;
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

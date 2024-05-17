@@ -4,8 +4,8 @@ mod interaction;
 mod trace;
 pub mod util;
 
-use p3_field::PrimeField32;
-use p3_stark::Stark;
+use p3_field::{ExtensionField, PrimeField32};
+use p3_stark::AirDebug;
 
 pub(crate) use self::columns::KeccakSpongeCols;
 
@@ -29,7 +29,7 @@ pub struct KeccakSpongeChip {
     pub bus_keccak_permute_output: usize,
 }
 
-impl<F: PrimeField32> Stark<F> for KeccakSpongeChip {
+impl<F: PrimeField32, EF: ExtensionField<F>> AirDebug<F, EF> for KeccakSpongeChip {
     #[cfg(feature = "debug-trace")]
     fn main_headers(&self) -> Vec<String> {
         KeccakSpongeCols::<F>::headers()

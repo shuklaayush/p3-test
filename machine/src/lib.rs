@@ -9,4 +9,4 @@ mod quotient;
 mod test_util;
 mod trace;
 mod trace_util;
-// mod verify;
+mod verify;

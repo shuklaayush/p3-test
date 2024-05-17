@@ -44,6 +44,9 @@ where
 
     let quotient = opened_values
         .quotient_chunks
+        .as_ref()
+        // TODO: Remove
+        .expect("Quotient should be present")
         .iter()
         .enumerate()
         .map(|(ch_i, ch)| {
@@ -75,6 +78,12 @@ where
             (vec![], vec![])
         };
 
+    let (main_local, main_next) = if let Some(opened_values) = &opened_values.main {
+        (opened_values.local.clone(), opened_values.next.clone())
+    } else {
+        (vec![], vec![])
+    };
+
     let (perm_local, perm_next) = if let Some(opened_values) = &opened_values.permutation {
         (
             unflatten(&opened_values.local),
@@ -90,8 +99,8 @@ where
             RowMajorMatrixView::new_row(&preprocessed_next),
         ),
         main: VerticalPair::new(
-            RowMajorMatrixView::new_row(&opened_values.main.local),
-            RowMajorMatrixView::new_row(&opened_values.main.next),
+            RowMajorMatrixView::new_row(&main_local),
+            RowMajorMatrixView::new_row(&main_next),
         ),
         perm: VerticalPair::new(
             RowMajorMatrixView::new_row(&perm_local),

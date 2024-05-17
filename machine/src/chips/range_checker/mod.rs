@@ -5,8 +5,8 @@ mod trace;
 
 extern crate alloc;
 
-use p3_field::PrimeField32;
-use p3_stark::Stark;
+use p3_field::{ExtensionField, PrimeField32};
+use p3_stark::AirDebug;
 
 use self::columns::RangeCols;
 
@@ -15,7 +15,9 @@ pub struct RangeCheckerChip<const MAX: u32> {
     pub bus_range_8: usize,
 }
 
-impl<const MAX: u32, F: PrimeField32> Stark<F> for RangeCheckerChip<MAX> {
+impl<const MAX: u32, F: PrimeField32, EF: ExtensionField<F>> AirDebug<F, EF>
+    for RangeCheckerChip<MAX>
+{
     #[cfg(feature = "debug-trace")]
     fn main_headers(&self) -> Vec<String> {
         RangeCols::<F>::headers()

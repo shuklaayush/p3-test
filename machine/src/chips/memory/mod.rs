@@ -3,8 +3,8 @@ mod columns;
 mod interaction;
 mod trace;
 
-use p3_field::PrimeField32;
-use p3_stark::Stark;
+use p3_field::{ExtensionField, PrimeField32};
+use p3_stark::AirDebug;
 
 use self::columns::MemoryCols;
 
@@ -28,7 +28,7 @@ pub struct MemoryChip {
     pub bus_range_8: usize,
 }
 
-impl<F: PrimeField32> Stark<F> for MemoryChip {
+impl<F: PrimeField32, EF: ExtensionField<F>> AirDebug<F, EF> for MemoryChip {
     #[cfg(feature = "debug-trace")]
     fn main_headers(&self) -> Vec<String> {
         MemoryCols::<F>::headers()

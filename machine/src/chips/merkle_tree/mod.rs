@@ -3,8 +3,8 @@ mod columns;
 mod interaction;
 mod trace;
 
-use p3_field::PrimeField32;
-use p3_stark::Stark;
+use p3_field::{ExtensionField, PrimeField32};
+use p3_stark::AirDebug;
 
 use self::columns::MerkleTreeCols;
 
@@ -16,7 +16,7 @@ pub struct MerkleTreeChip {
     pub bus_keccak_digest_output: usize,
 }
 
-impl<F: PrimeField32> Stark<F> for MerkleTreeChip {
+impl<F: PrimeField32, EF: ExtensionField<F>> AirDebug<F, EF> for MerkleTreeChip {
     #[cfg(feature = "debug-trace")]
     fn main_headers(&self) -> Vec<String> {
         MerkleTreeCols::<F>::headers()

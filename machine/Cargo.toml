@@ -28,7 +28,7 @@ tracing = { workspace = true }
 
 p3-derive = { path = "../derive" }
 p3-interaction = { path = "../interaction" }
-p3-stark = { path = "../stark" }
+p3-stark = { path = "../stark", features = ["debug-trace"] }
 
 itertools = "0.12.1"
 rand = "0.8.5"
@@ -39,4 +39,4 @@ tiny-keccak = "2.0.2"
 
 [features]
 default = ["debug-trace"]
-debug-trace = ["dep:rust_xlsxwriter"]
+debug-trace = ["dep:rust_xlsxwriter", "p3-stark/debug-trace"]
