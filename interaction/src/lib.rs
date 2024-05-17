@@ -1,6 +1,6 @@
 //! APIs for RAPs.
 
-#![no_std]
+// #![no_std]
 
 extern crate alloc;
 

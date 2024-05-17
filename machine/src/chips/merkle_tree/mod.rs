@@ -10,7 +10,7 @@ use self::columns::MerkleTreeCols;
 
 pub(crate) const NUM_U8_HASH_ELEMS: usize = 32;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct MerkleTreeChip {
     pub bus_keccak_permute_input: usize,
     pub bus_keccak_digest_output: usize,

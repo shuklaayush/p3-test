@@ -544,7 +544,6 @@ mod tests {
     };
 
     use p3_keccak::KeccakF;
-    use p3_stark::prover::ProverConstraintFolder;
     use p3_symmetric::{PseudoCompressionFunction, TruncatedPermutation};
     use rand::{random, thread_rng, Rng};
     use tracing_forest::{util::LevelFilter, ForestLayer};

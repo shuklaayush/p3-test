@@ -19,7 +19,7 @@ pub trait Chip<F: Field, EF: ExtensionField<F>>: Stark<F> + InteractionStark<F, 
 //     + for<'a> InteractionAir<VerifierConstraintFolder<'a, SC>>
 //     + for<'a> InteractionAir<DebugConstraintBuilder<'a, SC>>
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ChipType {
     KeccakPermute(KeccakPermuteChip),
     KeccakSponge(KeccakSpongeChip),
@@ -114,4 +114,23 @@ impl<F: AbstractField> InteractionChip<F> for ChipType {
     }
 }
 
-impl<AB: InteractionAirBuilder> InteractionAir<AB> for ChipType {}
+impl<AB: InteractionAirBuilder> InteractionAir<AB> for ChipType {
+    fn preprocessed_width(&self) -> usize {
+        match self {
+            ChipType::KeccakPermute(chip) => {
+                <KeccakPermuteChip as InteractionAir<AB>>::preprocessed_width(chip)
+            }
+            ChipType::KeccakSponge(chip) => {
+                <KeccakSpongeChip as InteractionAir<AB>>::preprocessed_width(chip)
+            }
+            ChipType::MerkleTree(chip) => {
+                <MerkleTreeChip as InteractionAir<AB>>::preprocessed_width(chip)
+            }
+            ChipType::Range8(chip) => {
+                <RangeCheckerChip<256> as InteractionAir<AB>>::preprocessed_width(chip)
+            }
+            ChipType::Xor(chip) => <XorChip as InteractionAir<AB>>::preprocessed_width(chip),
+            ChipType::Memory(chip) => <MemoryChip as InteractionAir<AB>>::preprocessed_width(chip),
+        }
+    }
+}

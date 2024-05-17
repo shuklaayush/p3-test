@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use p3_air::VirtualPairCol;
 use p3_field::AbstractField;
-use p3_interaction::{Interaction, InteractionChip};
+use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
 
 use super::{
     columns::{RANGE_COL_MAP, RANGE_PREPROCESSED_COL_MAP},
@@ -21,5 +21,11 @@ impl<const MAX: u32, F: AbstractField> InteractionChip<F> for RangeCheckerChip<M
             count: VirtualPairCol::single_main(RANGE_COL_MAP.mult),
             argument_index: self.bus_range_8,
         }]
+    }
+}
+
+impl<const MAX: u32, AB: InteractionAirBuilder> InteractionAir<AB> for RangeCheckerChip<MAX> {
+    fn preprocessed_width(&self) -> usize {
+        1
     }
 }

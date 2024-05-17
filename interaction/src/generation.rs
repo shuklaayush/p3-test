@@ -66,8 +66,8 @@ pub fn generate_permutation_trace<F: Field, EF: ExtensionField<F>>(
         for (m, (interaction, _)) in interactions.iter().enumerate() {
             let alpha_m = alphas[interaction.argument_index];
             row[m] = reduce_row(
-                main_row.as_slice(),
                 preprocessed_row.as_slice(),
+                main_row.as_slice(),
                 &interaction.fields,
                 alpha_m,
                 betas.clone(),

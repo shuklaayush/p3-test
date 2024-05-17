@@ -10,7 +10,7 @@ use super::{
 
 impl<const MAX: u32> RangeCheckerChip<MAX> {
     pub fn generate_trace<F: PrimeField32>(count: BTreeMap<u32, u32>) -> RowMajorMatrix<F> {
-        let num_rows = NUM_RANGE_COLS.next_power_of_two();
+        let num_rows = MAX.next_power_of_two() as usize;
         let mut trace =
             RowMajorMatrix::new(vec![F::zero(); num_rows * NUM_RANGE_COLS], NUM_RANGE_COLS);
         let (prefix, rows, suffix) = unsafe { trace.values.align_to_mut::<RangeCols<F>>() };

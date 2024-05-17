@@ -12,7 +12,7 @@ use self::columns::KeccakCols;
 pub const NUM_U64_HASH_ELEMS: usize = 4;
 
 /// Assumes the field size is at least 16 bits.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct KeccakPermuteChip {
     pub bus_keccak_permute_input: usize,
     pub bus_keccak_permute_output: usize,

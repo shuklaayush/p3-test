@@ -22,7 +22,7 @@ pub struct MemoryOp {
     pub kind: OperationKind,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct MemoryChip {
     pub bus_memory: usize,
     pub bus_range_8: usize,

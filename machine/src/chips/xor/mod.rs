@@ -13,7 +13,7 @@ use self::columns::XorCols;
 
 // TODO: Just proof of concept, should be implemented as lookup.
 //       Can be extended to a general CPU chip.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct XorChip {
     pub bus_xor_input: usize,
     pub bus_xor_output: usize,

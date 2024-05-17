@@ -19,7 +19,7 @@ pub struct KeccakSpongeOp {
     pub input: Vec<u8>,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct KeccakSpongeChip {
     pub bus_xor_input: usize,
     pub bus_keccak_permute_input: usize,

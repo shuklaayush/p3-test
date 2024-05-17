@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use p3_air::VirtualPairCol;
 use p3_field::AbstractField;
-use p3_interaction::{Interaction, InteractionChip};
+use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
 
 use super::{
     columns::{KECCAK_RATE_BYTES, KECCAK_SPONGE_COL_MAP},
@@ -155,3 +155,5 @@ impl<F: AbstractField> InteractionChip<F> for KeccakSpongeChip {
         .concat()
     }
 }
+
+impl<AB: InteractionAirBuilder> InteractionAir<AB> for KeccakSpongeChip {}

@@ -1,6 +1,6 @@
 use p3_air::VirtualPairCol;
 use p3_field::AbstractField;
-use p3_interaction::{Interaction, InteractionChip};
+use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
 
 use super::{columns::MEMORY_COL_MAP, MemoryChip};
 
@@ -56,3 +56,5 @@ impl<F: AbstractField> InteractionChip<F> for MemoryChip {
         }]
     }
 }
+
+impl<AB: InteractionAirBuilder> InteractionAir<AB> for MemoryChip {}

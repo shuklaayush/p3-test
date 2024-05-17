@@ -10,7 +10,7 @@ use super::{
 };
 
 impl KeccakPermuteChip {
-    #[instrument(name = "generate Keccak trace", skip_all)]
+    #[instrument(name = "generate KeccakPermute trace", skip_all)]
     pub fn generate_trace<F: PrimeField32>(inputs: Vec<([u64; 25], bool)>) -> RowMajorMatrix<F> {
         generate_trace_rows(&inputs)
     }

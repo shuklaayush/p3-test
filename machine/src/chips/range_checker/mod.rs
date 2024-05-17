@@ -10,7 +10,7 @@ use p3_stark::Stark;
 
 use self::columns::RangeCols;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct RangeCheckerChip<const MAX: u32> {
     pub bus_range_8: usize,
 }
