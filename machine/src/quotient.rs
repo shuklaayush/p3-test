@@ -20,6 +20,7 @@ pub fn quotient_values<SC, A, Mat>(
     perm_challenges: [PackedChallenge<SC>; NUM_PERM_CHALLENGES],
     alpha: PackedChallenge<SC>,
     cumulative_sum: PackedChallenge<SC>,
+    public_values: &[Val<SC>],
 ) -> Vec<SC::Challenge>
 where
     SC: StarkGenericConfig,
@@ -108,7 +109,7 @@ where
                     RowMajorMatrixView::new_row(&perm_next),
                 ),
                 perm_challenges,
-                public_values: &vec![],
+                public_values,
                 cumulative_sum,
                 is_first_row,
                 is_last_row,

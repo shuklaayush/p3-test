@@ -9,6 +9,7 @@ use p3_stark::verifier::VerifierConstraintFolder;
 use p3_stark::OpenedValues;
 use p3_uni_stark::Domain;
 use p3_uni_stark::StarkGenericConfig;
+use p3_uni_stark::Val;
 
 use crate::error::VerificationError;
 
@@ -21,6 +22,7 @@ pub fn verify_constraints<SC, A>(
     alpha: SC::Challenge,
     permutation_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
     cumulative_sum: Option<SC::Challenge>,
+    public_values: &[Val<SC>],
 ) -> Result<(), VerificationError>
 where
     SC: StarkGenericConfig,
@@ -107,7 +109,7 @@ where
             RowMajorMatrixView::new_row(&perm_next),
         ),
         perm_challenges: permutation_challenges,
-        public_values: &vec![],
+        public_values,
         cumulative_sum: cumulative_sum.unwrap_or_default(),
         is_first_row: sels.is_first_row,
         is_last_row: sels.is_last_row,

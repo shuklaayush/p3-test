@@ -1,10 +1,8 @@
 use itertools::Itertools;
 use p3_air::BaseAir;
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
-use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field, PackedValue};
-use p3_interaction::{
-    generate_permutation_trace, InteractionAirBuilder, InteractionChip, NUM_PERM_CHALLENGES,
-};
+use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
+use p3_interaction::{generate_permutation_trace, InteractionChip, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_stark::{
     check_constraints, check_cumulative_sums, symbolic::get_quotient_degree, AdjacentOpenedValues,
@@ -165,6 +163,7 @@ where
         permutation_data: &'a Option<PcsProverData<SC>>,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
         alpha: SC::Challenge,
+        public_values: &[Val<SC>],
     );
 }
 
@@ -248,6 +247,7 @@ where
         permutation_data: &'a Option<PcsProverData<SC>>,
         perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
         alpha: SC::Challenge,
+        public_values: &[Val<SC>],
     ) {
         let perm_challenges = perm_challenges.map(PackedChallenge::<SC>::from_f);
         let alpha = PackedChallenge::<SC>::from_f(alpha);
@@ -309,6 +309,7 @@ where
                     perm_challenges,
                     alpha,
                     cumulative_sum,
+                    public_values,
                 );
                 let quotient_flat = RowMajorMatrix::new_col(quotient_values).flatten_to_base();
 
@@ -1119,6 +1120,7 @@ where
         zeta: SC::Challenge,
         alpha: SC::Challenge,
         permutation_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
+        public_values: &[Val<SC>],
     ) -> Result<(), VerificationError>;
 
     fn check_cumulative_sums(&self) -> Result<(), VerificationError>;
@@ -1133,6 +1135,7 @@ where
         zeta: SC::Challenge,
         alpha: SC::Challenge,
         permutation_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
+        public_values: &[Val<SC>],
     ) -> Result<(), VerificationError> {
         for chip_trace in self.iter() {
             if let Some(domain) = chip_trace.domain() {
@@ -1172,6 +1175,7 @@ where
                     alpha,
                     permutation_challenges,
                     chip_trace.cumulative_sum,
+                    public_values,
                 )?;
             }
         }

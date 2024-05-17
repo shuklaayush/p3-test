@@ -12,7 +12,7 @@ pub struct VerifierConstraintFolder<'a, SC: StarkGenericConfig> {
     pub main: ViewPair<'a, SC::Challenge>,
     pub perm: ViewPair<'a, SC::Challenge>,
     pub perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
-    pub public_values: &'a Vec<Val<SC>>,
+    pub public_values: &'a [Val<SC>],
     pub cumulative_sum: SC::Challenge,
     pub is_first_row: SC::Challenge,
     pub is_last_row: SC::Challenge,

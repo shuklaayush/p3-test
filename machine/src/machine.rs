@@ -8,7 +8,6 @@ use p3_stark::Commitments;
 use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
 
-
 use crate::{
     chip::ChipType,
     chips::{
@@ -163,9 +162,11 @@ impl Machine {
     fn prove<SC>(
         &self,
         config: &SC,
+        challenger: &mut SC::Challenger,
         pk: &ProvingKey<SC>,
         main_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
-        challenger: &mut SC::Challenger,
+        // TODO: Change to 2d vector?
+        public_values: Vec<Val<SC>>,
     ) -> MachineProof<SC>
     where
         SC: StarkGenericConfig,
@@ -180,16 +181,20 @@ impl Machine {
         assert_eq!(main_traces.len(), chips.len(), "Length mismatch");
 
         let pcs = config.pcs();
+
+        // 1. Observe public values
+        challenger.observe_slice(&public_values);
+
         let mut trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
 
-        // 1. Observe preprocessed commitment
+        // 2. Observe preprocessed commitment
         tracing::info_span!("load preprocessed traces")
             .in_scope(|| trace.load_preprocessed(pcs, pk.preprocessed.traces.as_slice()));
         if let Some(commit) = &pk.preprocessed.commitment {
             challenger.observe(commit.clone());
         }
 
-        // 2. Generate and commit to main trace
+        // 3. Generate and commit to main trace
         tracing::info_span!("load main traces").in_scope(|| trace.load_main(pcs, main_traces));
         let (main_commit, main_data) =
             tracing::info_span!("commit to main traces").in_scope(|| trace.commit_main(pcs));
@@ -197,14 +202,14 @@ impl Machine {
             challenger.observe(main_commit.clone());
         }
 
-        // 3. Sample permutation challenges
+        // 4. Sample permutation challenges
         let perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES] = (0..NUM_PERM_CHALLENGES)
             .map(|_| challenger.sample_ext_element::<SC::Challenge>())
             .collect_vec()
             .try_into()
             .unwrap();
 
-        // 4. Generate and commit to permutation trace
+        // 5. Generate and commit to permutation trace
         tracing::info_span!("generate permutation traces")
             .in_scope(|| trace.generate_permutation(pcs, perm_challenges));
         let (permutation_commit, permutation_data) =
@@ -221,7 +226,7 @@ impl Machine {
         #[cfg(debug_assertions)]
         trace.check_constraints(perm_challenges, &[]);
 
-        // 5. Generate and commit to quotient traces
+        // 6. Generate and commit to quotient traces
         tracing::info_span!("generate quotient trace").in_scope(|| {
             trace.generate_quotient(
                 pcs,
@@ -230,6 +235,7 @@ impl Machine {
                 &permutation_data,
                 perm_challenges,
                 alpha,
+                &public_values,
             )
         });
         // TODO: Panic if this is None
@@ -245,7 +251,7 @@ impl Machine {
             quotient_chunks: quotient_commit,
         };
 
-        // 6. Sample OOD point and generate opening proof
+        // 7. Sample OOD point and generate opening proof
         let zeta: SC::Challenge = challenger.sample_ext_element();
         let rounds = trace.generate_rounds(
             zeta,
@@ -278,9 +284,10 @@ impl Machine {
     fn verify<SC>(
         &self,
         config: &SC,
-        proof: MachineProof<SC>,
-        vk: &VerifyingKey<SC>,
         challenger: &mut SC::Challenger,
+        vk: &VerifyingKey<SC>,
+        proof: MachineProof<SC>,
+        public_values: Vec<Val<SC>>,
     ) -> Result<(), VerificationError>
     where
         SC: StarkGenericConfig,
@@ -345,7 +352,7 @@ impl Machine {
             .map_err(|_| VerificationError::InvalidOpeningArgument)?;
 
         // Verify constraints at zeta
-        trace.verify_constraints(zeta, alpha, perm_challenges)?;
+        trace.verify_constraints(zeta, alpha, perm_challenges, &public_values)?;
 
         // Verify cumulative sum adds to zero
         trace.check_cumulative_sums()?;
@@ -414,9 +421,9 @@ mod tests {
         let config = default_config();
         let mut challenger = default_challenger();
         let traces = generate_machine_trace::<MyConfig>(preimage, digests, leaf_index);
-        let proof = machine.prove(&config, &pk, traces, &mut challenger);
+        let proof = machine.prove(&config, &mut challenger, &pk, traces, vec![]);
 
         let mut challenger = default_challenger();
-        machine.verify(&config, proof, &vk, &mut challenger)
+        machine.verify(&config, &mut challenger, &vk, proof, vec![])
     }
 }

@@ -12,7 +12,7 @@ pub struct ProverConstraintFolder<'a, SC: StarkGenericConfig> {
     pub main: ViewPair<'a, PackedVal<SC>>,
     pub perm: ViewPair<'a, PackedChallenge<SC>>,
     pub perm_challenges: [PackedChallenge<SC>; NUM_PERM_CHALLENGES],
-    pub public_values: &'a Vec<Val<SC>>,
+    pub public_values: &'a [Val<SC>],
     pub cumulative_sum: PackedChallenge<SC>,
     pub is_first_row: PackedVal<SC>,
     pub is_last_row: PackedVal<SC>,
