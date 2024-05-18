@@ -20,12 +20,12 @@ pub trait AirDebug<F: Field, EF: ExtensionField<F>> {
         perm_trace: &Option<RowMajorMatrixView<EF>>,
         num_sends: usize,
         num_receives: usize,
+        cumulative_sum: Option<EF>,
     ) -> Result<(), Box<dyn Error>>
     where
         F: PrimeField32,
     {
         use p3_matrix::Matrix;
-        use std::iter::once;
 
         let perprocessed_headers: Vec<_> =
             (0..preprocessed_trace.as_ref().map_or(0, |t| t.width()))
@@ -43,11 +43,10 @@ pub trait AirDebug<F: Field, EF: ExtensionField<F>> {
             .enumerate()
             .map(|(i, _)| format!("receives[{}]", i))
             .collect();
-        let perm_headers: Vec<_> = h1
-            .into_iter()
-            .chain(h2)
-            .chain(once("cumulative_sum".to_string()))
-            .collect();
+        let mut perm_headers: Vec<_> = h1.into_iter().chain(h2).collect();
+        if num_sends + num_receives > 0 {
+            perm_headers.push("cumulative_sum".to_string());
+        }
 
         let headers: Vec<_> = perprocessed_headers
             .iter()
@@ -93,6 +92,11 @@ pub trait AirDebug<F: Field, EF: ExtensionField<F>> {
                         perm_trace.get(i, j).to_string(),
                     )?;
                 }
+                offset += perm_trace.width() as u16;
+            }
+
+            if let Some(cumulative_sum) = cumulative_sum {
+                ws.write(i as u32, offset, cumulative_sum.to_string())?;
             }
         }
 

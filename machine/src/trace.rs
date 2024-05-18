@@ -512,6 +512,7 @@ where
                 &permutation_trace,
                 num_sends,
                 num_receives,
+                chip_trace.cumulative_sum,
             )?;
         }
 
