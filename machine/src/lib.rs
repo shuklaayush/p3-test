@@ -2,6 +2,7 @@ mod chip;
 mod chips;
 mod config;
 mod error;
+mod keccak_machine;
 mod machine;
 mod proof;
 mod quotient;
