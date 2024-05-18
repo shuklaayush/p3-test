@@ -95,3 +95,105 @@ pub fn aligned_borrow_derive(input: TokenStream) -> TokenStream {
     };
     methods.into()
 }
+
+#[proc_macro_derive(EnumDispatch)]
+pub fn enum_dispatch_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let enum_name = input.ident;
+
+    let variants = match input.data {
+        Data::Enum(data_enum) => data_enum.variants,
+        _ => panic!("EnumDispatch can only be derived for enums"),
+    };
+
+    let trait_impls = generate_trait_impls(&enum_name, &variants);
+
+    TokenStream::from(quote! {
+        #trait_impls
+    })
+}
+
+fn generate_trait_impls(
+    enum_name: &syn::Ident,
+    variants: &syn::punctuated::Punctuated<syn::Variant, syn::token::Comma>,
+) -> proc_macro2::TokenStream {
+    let variant_names: Vec<_> = variants.iter().map(|variant| &variant.ident).collect();
+    let variant_field_types: Vec<_> = variants
+        .iter()
+        .map(|variant| match &variant.fields {
+            Fields::Unnamed(fields) => &fields.unnamed.first().unwrap().ty,
+            _ => panic!("EnumDispatch only supports enum variants with a single unnamed field"),
+        })
+        .collect();
+
+    quote! {
+        use p3_air::{Air, AirBuilder, BaseAir};
+        use p3_field::{AbstractField, ExtensionField, Field, PrimeField32};
+        use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
+        use p3_matrix::dense::RowMajorMatrix;
+        use p3_stark::AirDebug;
+        use p3_uni_stark::{StarkGenericConfig, Val};
+
+        impl std::fmt::Display for #enum_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                match self {
+                    #(#enum_name::#variant_names(_) => write!(f, stringify!(#variant_names)),)*
+                }
+            }
+        }
+
+        impl<F: Field> BaseAir<F> for #enum_name {
+            fn width(&self) -> usize {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as BaseAir<F>>::width(chip),)*
+                }
+            }
+
+            fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as BaseAir<F>>::preprocessed_trace(chip),)*
+                }
+            }
+        }
+
+        impl<AB: AirBuilder> Air<AB> for #enum_name {
+            fn eval(&self, builder: &mut AB) {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as Air<AB>>::eval(chip, builder),)*
+                }
+            }
+        }
+
+        impl<F: AbstractField> InteractionChip<F> for #enum_name {
+            fn sends(&self) -> Vec<Interaction<F>> {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionChip<F>>::sends(chip),)*
+                }
+            }
+
+            fn receives(&self) -> Vec<Interaction<F>> {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionChip<F>>::receives(chip),)*
+                }
+            }
+        }
+
+        impl<AB: InteractionAirBuilder> InteractionAir<AB> for #enum_name {
+            fn preprocessed_width(&self) -> usize {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionAir<AB>>::preprocessed_width(chip),)*
+                }
+            }
+        }
+
+        impl<F: PrimeField32, EF: ExtensionField<F>> AirDebug<F, EF> for #enum_name {
+            fn main_headers(&self) -> Vec<String> {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as AirDebug<F, EF>>::main_headers(chip),)*
+                }
+            }
+        }
+
+        impl<SC: StarkGenericConfig> MachineChip<SC> for #enum_name where Val<SC>: PrimeField32 {}
+    }
+}
