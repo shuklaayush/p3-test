@@ -9,7 +9,7 @@ use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
 
 use crate::{
-    chip::ChipType,
+    chip::MachineChip,
     error::VerificationError,
     proof::{
         MachineProof, ProverPreprocessedData, ProvingKey, VerifierPreprocessedData, VerifyingKey,
@@ -22,16 +22,17 @@ use crate::{
     },
 };
 
-pub trait Machine<SC>
+pub trait Machine<'a, SC, C>
 where
     SC: StarkGenericConfig,
+    C: MachineChip<SC>,
 {
-    fn chips(&self) -> Vec<&ChipType>;
+    fn chips(&self) -> Vec<C>;
 
-    fn setup(&self, config: &SC) -> (ProvingKey<SC>, VerifyingKey<SC>) {
+    fn setup(&self, config: &'a SC) -> (ProvingKey<SC>, VerifyingKey<SC>) {
         let pcs = config.pcs();
         let chips = self.chips();
-        let mut trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
+        let mut trace: MachineTrace<SC, _> = MachineTraceBuilder::new(chips.as_slice());
 
         // 1. Generate and commit to preprocessed traces
         tracing::info_span!("generate preprocessed traces")
@@ -86,9 +87,9 @@ where
 
     fn prove(
         &self,
-        config: &SC,
+        config: &'a SC,
         challenger: &mut SC::Challenger,
-        pk: &ProvingKey<SC>,
+        pk: &'a ProvingKey<SC>,
         main_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
         // TODO: Change to 2d vector?
         public_values: Vec<Val<SC>>,
@@ -106,7 +107,7 @@ where
         // 1. Observe public values
         challenger.observe_slice(&public_values);
 
-        let mut trace: MachineTrace<SC> = MachineTraceBuilder::new(chips);
+        let mut trace: MachineTrace<SC, _> = MachineTraceBuilder::new(&chips);
 
         // 2. Observe preprocessed commitment
         tracing::info_span!("load preprocessed traces")
@@ -204,16 +205,16 @@ where
     #[instrument(skip_all)]
     fn verify(
         &self,
-        config: &SC,
-        challenger: &mut SC::Challenger,
-        vk: &VerifyingKey<SC>,
+        config: &'a SC,
+        challenger: &'a mut SC::Challenger,
+        vk: &'a VerifyingKey<SC>,
         proof: MachineProof<SC>,
         public_values: Vec<Val<SC>>,
     ) -> Result<(), VerificationError> {
         let pcs = config.pcs();
         let chips = self.chips();
 
-        let mut trace: MachineTraceOpening<SC> = MachineTraceOpeningBuilder::new(chips);
+        let mut trace: MachineTraceOpening<SC, _> = MachineTraceOpeningBuilder::new(&chips);
 
         let MachineProof {
             commitments,

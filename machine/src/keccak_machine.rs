@@ -1,24 +1,16 @@
-use p3_commit::Pcs;
 use p3_field::PrimeField32;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
 use crate::{
-    chip::ChipType,
     chips::{
         keccak_permute::KeccakPermuteChip, keccak_sponge::KeccakSpongeChip, memory::MemoryChip,
         merkle_tree::MerkleTreeChip, range_checker::RangeCheckerChip, xor::XorChip,
     },
+    keccak_machine_chips::KeccakMachineChip,
     machine::Machine,
 };
 
-pub struct KeccakMachine {
-    keccak_permute_chip: ChipType,
-    keccak_sponge_chip: ChipType,
-    merkle_tree_chip: ChipType,
-    range_chip: ChipType,
-    xor_chip: ChipType,
-    memory_chip: ChipType,
-}
+pub struct KeccakMachine {}
 
 pub enum KeccakMachineBus {
     KeccakPermuteInput = 0,
@@ -30,8 +22,12 @@ pub enum KeccakMachineBus {
     Memory = 6,
 }
 
-impl KeccakMachine {
-    pub fn new() -> Self {
+impl<'a, SC> Machine<'a, SC, KeccakMachineChip> for KeccakMachine
+where
+    SC: StarkGenericConfig,
+    Val<SC>: PrimeField32,
+{
+    fn chips(&self) -> Vec<KeccakMachineChip> {
         let keccak_permute_chip = KeccakPermuteChip {
             bus_keccak_permute_input: KeccakMachineBus::KeccakPermuteInput as usize,
             bus_keccak_permute_output: KeccakMachineBus::KeccakPermuteOutput as usize,
@@ -61,30 +57,13 @@ impl KeccakMachine {
             bus_range_8: KeccakMachineBus::Range8 as usize,
         };
 
-        Self {
-            keccak_permute_chip: ChipType::KeccakPermute(keccak_permute_chip),
-            keccak_sponge_chip: ChipType::KeccakSponge(keccak_sponge_chip),
-            merkle_tree_chip: ChipType::MerkleTree(merkle_tree_chip),
-            range_chip: ChipType::Range8(range_chip),
-            xor_chip: ChipType::Xor(xor_chip),
-            memory_chip: ChipType::Memory(memory_chip),
-        }
-    }
-}
-
-impl<SC: StarkGenericConfig> Machine<SC> for KeccakMachine
-where
-    SC: StarkGenericConfig,
-    Val<SC>: PrimeField32,
-{
-    fn chips(&self) -> Vec<&ChipType> {
         vec![
-            &self.keccak_permute_chip,
-            &self.keccak_sponge_chip,
-            &self.merkle_tree_chip,
-            &self.range_chip,
-            &self.xor_chip,
-            &self.memory_chip,
+            KeccakMachineChip::KeccakPermute(keccak_permute_chip),
+            KeccakMachineChip::KeccakSponge(keccak_sponge_chip),
+            KeccakMachineChip::MerkleTree(merkle_tree_chip),
+            KeccakMachineChip::Range8(range_chip),
+            KeccakMachineChip::Xor(xor_chip),
+            KeccakMachineChip::Memory(memory_chip),
         ]
     }
 }
@@ -144,7 +123,7 @@ mod tests {
         let digests = generate_digests(&leaf_hashes);
 
         let leaf_index = thread_rng().gen_range(0..leaf_hashes.len());
-        let machine = KeccakMachine::new();
+        let machine = KeccakMachine {};
 
         let (pk, vk) = machine.setup(&default_config());
 
