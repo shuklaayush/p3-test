@@ -1,13 +1,13 @@
 use p3_field::PrimeField32;
+use p3_machine::machine::Machine;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
 use crate::{
+    chips::KeccakMachineChip,
     chips::{
         keccak_permute::KeccakPermuteChip, keccak_sponge::KeccakSpongeChip, memory::MemoryChip,
         merkle_tree::MerkleTreeChip, range_checker::RangeCheckerChip, xor::XorChip,
     },
-    keccak_machine_chips::KeccakMachineChip,
-    machine::Machine,
 };
 
 pub struct KeccakMachine {}
@@ -73,12 +73,12 @@ mod tests {
     use super::*;
     use crate::{
         config::{default_challenger, default_config, MyConfig},
-        error::VerificationError,
         trace::generate_machine_trace,
     };
 
     use itertools::Itertools;
     use p3_keccak::KeccakF;
+    use p3_machine::error::VerificationError;
     use p3_symmetric::{PseudoCompressionFunction, TruncatedPermutation};
     use rand::{random, thread_rng, Rng};
     use tracing_forest::{util::LevelFilter, ForestLayer};

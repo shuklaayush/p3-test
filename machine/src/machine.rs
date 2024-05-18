@@ -14,7 +14,7 @@ use crate::{
     proof::{
         MachineProof, ProverPreprocessedData, ProvingKey, VerifierPreprocessedData, VerifyingKey,
     },
-    trace_util::{
+    trace::{
         MachineTrace, MachineTraceBuilder, MachineTraceChecker, MachineTraceCommiter,
         MachineTraceConstraintVerifier, MachineTraceDebugger, MachineTraceLoader,
         MachineTraceOpener, MachineTraceOpening, MachineTraceOpeningBuilder,

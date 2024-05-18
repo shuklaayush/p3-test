@@ -1,5 +1,5 @@
 [package]
-name = "p3-machine"
+name = "p3-keccak-machine"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,6 +12,7 @@ p3-dft = { workspace = true }
 p3-field = { workspace = true }
 p3-fri = { workspace = true }
 p3-keccak = { workspace = true }
+p3-keccak-air = { workspace = true }
 p3-matrix = { workspace = true }
 p3-maybe-rayon = { workspace = true }
 p3-mds = { workspace = true }
@@ -24,13 +25,22 @@ p3-util = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
 
+p3-derive = { path = "../derive" }
 p3-interaction = { path = "../interaction" }
 p3-stark = { path = "../stark", features = ["debug-trace"] }
+p3-machine = { path = "../machine", features = ["debug-trace"] }
 
 itertools = "0.12.1"
 rand = "0.8.5"
 rust_xlsxwriter = { version = "0.64.1", optional = true }
+tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
+tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }
+tiny-keccak = "2.0.2"
 
 [features]
 default = ["debug-trace"]
-debug-trace = ["dep:rust_xlsxwriter", "p3-stark/debug-trace"]
+debug-trace = [
+    "dep:rust_xlsxwriter",
+    "p3-stark/debug-trace",
+    "p3-machine/debug-trace",
+]

@@ -1,12 +1,16 @@
 use p3_derive::EnumDispatch;
 use std::fmt::Debug;
 
-use crate::{
-    chip::MachineChip,
-    chips::{
-        keccak_permute::KeccakPermuteChip, keccak_sponge::KeccakSpongeChip, memory::MemoryChip,
-        merkle_tree::MerkleTreeChip, range_checker::RangeCheckerChip, xor::XorChip,
-    },
+pub mod keccak_permute;
+pub mod keccak_sponge;
+pub mod memory;
+pub mod merkle_tree;
+pub mod range_checker;
+pub mod xor;
+
+use self::{
+    keccak_permute::KeccakPermuteChip, keccak_sponge::KeccakSpongeChip, memory::MemoryChip,
+    merkle_tree::MerkleTreeChip, range_checker::RangeCheckerChip, xor::XorChip,
 };
 
 #[derive(Clone, Debug, EnumDispatch)]

@@ -130,6 +130,7 @@ fn generate_trait_impls(
         use p3_air::{Air, AirBuilder, BaseAir};
         use p3_field::{AbstractField, ExtensionField, Field, PrimeField32};
         use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
+        use p3_machine::chip::MachineChip;
         use p3_matrix::dense::RowMajorMatrix;
         use p3_stark::AirDebug;
         use p3_uni_stark::{StarkGenericConfig, Val};
