@@ -92,11 +92,6 @@ pub trait AirDebug<F: Field, EF: ExtensionField<F>> {
                         perm_trace.get(i, j).to_string(),
                     )?;
                 }
-                offset += perm_trace.width() as u16;
-            }
-
-            if let Some(cumulative_sum) = cumulative_sum {
-                ws.write(i as u32, offset, cumulative_sum.to_string())?;
             }
         }
 

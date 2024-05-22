@@ -92,7 +92,7 @@ where
         pk: &'a ProvingKey<SC>,
         main_traces: Vec<Option<RowMajorMatrix<Val<SC>>>>,
         // TODO: Change to 2d vector?
-        public_values: Vec<Val<SC>>,
+        public_values: &'a [Val<SC>],
     ) -> MachineProof<SC>
     where
         // TODO: Put behind debug-trace flag
@@ -105,7 +105,7 @@ where
         let pcs = config.pcs();
 
         // 1. Observe public values
-        challenger.observe_slice(&public_values);
+        challenger.observe_slice(public_values);
 
         let mut trace: MachineTrace<SC, _> = MachineTraceBuilder::new(&chips);
 
@@ -208,8 +208,8 @@ where
         config: &'a SC,
         challenger: &'a mut SC::Challenger,
         vk: &'a VerifyingKey<SC>,
-        proof: MachineProof<SC>,
-        public_values: Vec<Val<SC>>,
+        proof: &MachineProof<SC>,
+        public_values: &'a [Val<SC>],
     ) -> Result<(), VerificationError> {
         let pcs = config.pcs();
         let chips = self.chips();
@@ -228,7 +228,8 @@ where
                 preprocessed_degrees[*i] = *degree;
             }
         }
-        trace.load_openings(pcs, chip_proofs, preprocessed_degrees);
+        // TODO: Avoid clone
+        trace.load_openings(pcs, chip_proofs.clone(), preprocessed_degrees);
 
         // Verify proof shape
         trace.verify_shapes()?;

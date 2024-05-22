@@ -262,7 +262,8 @@ where
 
         let mut count = 0;
         for chip_trace in self.iter_mut() {
-            let quotient_degree = get_quotient_degree::<Val<SC>, _>(&chip_trace.chip, 0);
+            let quotient_degree =
+                get_quotient_degree::<Val<SC>, _>(&chip_trace.chip, public_values.len());
             let trace_domain = chip_trace.domain();
 
             if let Some(trace_domain) = trace_domain {
@@ -278,7 +279,7 @@ where
                         )
                         .to_row_major_matrix()
                     } else {
-                        RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
+                        RowMajorMatrix::new(vec![], 0)
                     };
                 let main_trace_on_quotient_domains = if let Some(main) = &chip_trace.main {
                     pcs.get_evaluations_on_domain(
@@ -288,7 +289,7 @@ where
                     )
                     .to_row_major_matrix()
                 } else {
-                    RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
+                    RowMajorMatrix::new(vec![], 0)
                 };
                 let perm_trace_on_quotient_domains =
                     if let Some(permutation) = &chip_trace.permutation {
@@ -299,7 +300,7 @@ where
                         )
                         .to_row_major_matrix()
                     } else {
-                        RowMajorMatrix::new_col(vec![Val::<SC>::zero(); quotient_domain.size()])
+                        RowMajorMatrix::new(vec![], 0)
                     };
 
                 let cumulative_sum = chip_trace
@@ -447,6 +448,24 @@ where
                 public_values,
             )
         }
+        let preprocessed_traces = self
+            .iter()
+            .map(|chip_trace| {
+                chip_trace
+                    .preprocessed
+                    .as_ref()
+                    .map(|preprocessed| preprocessed.trace.value.as_view())
+            })
+            .collect_vec();
+        let main_traces = self
+            .iter()
+            .map(|chip_trace| {
+                chip_trace
+                    .main
+                    .as_ref()
+                    .map(|main| main.trace.value.as_view())
+            })
+            .collect_vec();
         let permutation_traces = self
             .iter()
             .map(|chip_trace| {
@@ -456,7 +475,19 @@ where
                     .map(|permutation| permutation.trace.value.as_view())
             })
             .collect_vec();
-        check_cumulative_sums(permutation_traces.as_slice());
+
+        let airs = self
+            .iter()
+            .map(|chip_trace| chip_trace.chip.clone())
+            .collect_vec();
+        // TODO: Remove hardcode
+        check_cumulative_sums(
+            &airs,
+            preprocessed_traces.as_slice(),
+            main_traces.as_slice(),
+            permutation_traces.as_slice(),
+            10,
+        );
     }
 }
 
@@ -958,6 +989,7 @@ where
                     .map(|values| TraceOpening { values, domain });
                 chip_trace.cumulative_sum = proof.cumulative_sum;
 
+                // TODO: Pub values
                 let quotient_degree = get_quotient_degree::<Val<SC>, _>(&chip_trace.chip, 0);
                 chip_trace.quotient_degree = Some(quotient_degree);
 
@@ -994,6 +1026,7 @@ where
                 }
             }
             if let Some(quotient_chunks) = &chip_trace.quotient_chunks {
+                // TODO: Pub values
                 let quotient_degree = get_quotient_degree::<Val<SC>, _>(&chip_trace.chip, 0);
                 if quotient_chunks.traces.len() != quotient_degree {
                     return Err(VerificationError::InvalidProofShape);

@@ -10,7 +10,7 @@ pub type PcsProverData<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
     <SC as StarkGenericConfig>::Challenger,
 >>::ProverData;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(bound = "SC::Challenge: Serialize + DeserializeOwned")]
 pub struct MachineProof<SC: StarkGenericConfig> {
     pub commitments: Commitments<Com<SC>>,

@@ -130,9 +130,9 @@ mod tests {
         let config = default_config();
         let mut challenger = default_challenger();
         let traces = generate_machine_trace::<MyConfig>(preimage, digests, leaf_index);
-        let proof = machine.prove(&config, &mut challenger, &pk, traces, vec![]);
+        let proof = machine.prove(&config, &mut challenger, &pk, traces, &[]);
 
         let mut challenger = default_challenger();
-        machine.verify(&config, &mut challenger, &vk, proof, vec![])
+        machine.verify(&config, &mut challenger, &vk, &proof, &[])
     }
 }

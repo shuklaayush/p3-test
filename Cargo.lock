@@ -373,7 +373,6 @@ dependencies = [
  "p3-uni-stark",
  "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
  "rand",
- "rust_xlsxwriter",
  "serde",
  "tiny-keccak",
  "tracing",

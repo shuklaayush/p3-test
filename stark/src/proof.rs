@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Commitments<Com> {
     pub main: Option<Com>,
     pub permutation: Option<Com>,
@@ -8,14 +8,14 @@ pub struct Commitments<Com> {
 }
 
 // TODO: Rename
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ChipProof<Challenge> {
     pub degree: usize,
     pub opened_values: OpenedValues<Challenge>,
     pub cumulative_sum: Option<Challenge>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct OpenedValues<Challenge> {
     pub preprocessed: Option<AdjacentOpenedValues<Challenge>>,
     pub main: Option<AdjacentOpenedValues<Challenge>>,

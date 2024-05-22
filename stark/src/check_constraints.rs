@@ -1,5 +1,7 @@
+use std::borrow::Borrow;
+
 use p3_field::{ExtensionField, Field};
-use p3_interaction::InteractionAir;
+use p3_interaction::{InteractionAir, InteractionType};
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use p3_matrix::Matrix;
@@ -88,10 +90,60 @@ pub fn check_constraints<F, EF, A>(
 }
 
 /// Check that the combined cumulative sum across all lookup tables is zero.
-pub fn check_cumulative_sums<F: Field, EF: ExtensionField<F>>(
-    perms: &[Option<RowMajorMatrixView<EF>>],
+pub fn check_cumulative_sums<
+    F: Field,
+    EF: ExtensionField<F>,
+    A: for<'a> InteractionAir<DebugConstraintBuilder<'a, F, EF>>,
+>(
+    airs: &[A],
+    preprocessed: &[Option<RowMajorMatrixView<F>>],
+    main: &[Option<RowMajorMatrixView<F>>],
+    permutation: &[Option<RowMajorMatrixView<EF>>],
+    num_bus: usize,
 ) {
-    let sum: EF = perms
+    for b in 0..num_bus {
+        let mut sum = EF::zero();
+        for (i, air) in airs.iter().enumerate() {
+            for (j, (interaction, interaction_type)) in air.all_interactions().iter().enumerate() {
+                if interaction.argument_index == b {
+                    for (n, perm_row) in permutation[i].unwrap().rows().enumerate() {
+                        let preprocessed_row = preprocessed[i]
+                            .as_ref()
+                            .map(|preprocessed| {
+                                let row = preprocessed.row_slice(n);
+                                let row: &[_] = (*row).borrow();
+                                row.to_vec()
+                            })
+                            .unwrap_or_default();
+                        let main_row = main[i]
+                            .as_ref()
+                            .map(|main| {
+                                let row = main.row_slice(n);
+                                let row: &[_] = (*row).borrow();
+                                row.to_vec()
+                            })
+                            .unwrap_or_default();
+                        let perm_row: Vec<_> = perm_row.collect();
+                        let mult = interaction
+                            .count
+                            .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
+
+                        match interaction_type {
+                            InteractionType::Send => {
+                                sum += perm_row[j] * mult;
+                            }
+                            InteractionType::Receive => {
+                                sum -= perm_row[j] * mult;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(sum, EF::zero(), "Non zero sum {b}");
+    }
+
+    let sum: EF = permutation
         .iter()
         .flatten()
         .map(|perm| *perm.row_slice(perm.height() - 1).last().unwrap())
