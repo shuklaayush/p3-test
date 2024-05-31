@@ -6,6 +6,7 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam, Type};
 
+// TODO: Add recursive struct support
 fn generate_header_expr(field_type: &Type, prefix: &str, depth: u32) -> proc_macro2::TokenStream {
     match field_type {
         Type::Array(array) => {
@@ -56,7 +57,7 @@ pub fn air_columns_derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl #impl_generics  #struct_name #ty_generics #where_clause {
-            pub fn num_cols() -> usize {
+            pub const fn num_cols() -> usize {
                 core::mem::size_of::<#struct_name<usize #(, #non_first_generics)*>>()
             }
 
@@ -165,7 +166,7 @@ fn generate_trait_impls(
 
     quote! {
         use p3_air::{Air, AirBuilder, BaseAir};
-        use p3_field::{AbstractField, ExtensionField, Field, PrimeField32};
+        use p3_field::{ExtensionField, Field, PrimeField32};
         use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
         use p3_machine::chip::MachineChip;
         use p3_matrix::dense::RowMajorMatrix;
@@ -202,7 +203,7 @@ fn generate_trait_impls(
             }
         }
 
-        impl<F: AbstractField> InteractionChip<F> for #enum_name {
+        impl<F: Field> InteractionChip<F> for #enum_name {
             fn sends(&self) -> Vec<Interaction<F>> {
                 match self {
                     #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionChip<F>>::sends(chip),)*
