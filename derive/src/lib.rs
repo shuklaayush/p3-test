@@ -58,7 +58,7 @@ pub fn air_columns_derive(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl #impl_generics  #struct_name #ty_generics #where_clause {
             pub const fn num_cols() -> usize {
-                core::mem::size_of::<#struct_name<usize #(, #non_first_generics)*>>()
+                core::mem::size_of::<#struct_name<u8 #(, #non_first_generics)*>>()
             }
 
             pub fn col_map() -> #struct_name<usize #(, #non_first_generics)*> {
