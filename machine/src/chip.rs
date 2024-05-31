@@ -1,10 +1,11 @@
 use core::fmt::Display;
+use p3_uni_stark::{StarkGenericConfig, Val};
+
 use p3_interaction::InteractionAir;
 use p3_stark::{
     debug::DebugConstraintBuilder, prover::ProverConstraintFolder, symbolic::SymbolicAirBuilder,
     verifier::VerifierConstraintFolder, AirDebug,
 };
-use p3_uni_stark::{StarkGenericConfig, Val};
 
 pub trait MachineChip<SC: StarkGenericConfig>:
 // TODO: Remove clone

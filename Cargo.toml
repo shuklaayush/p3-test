@@ -4,19 +4,11 @@ resolver = "2"
 
 [workspace.dependencies]
 p3-air = { git = "https://github.com/Plonky3/Plonky3.git" }
-p3-baby-bear = { git = "https://github.com/Plonky3/Plonky3.git" }
 p3-challenger = { git = "https://github.com/Plonky3/Plonky3.git" }
 p3-commit = { git = "https://github.com/Plonky3/Plonky3.git" }
-p3-dft = { git = "https://github.com/Plonky3/Plonky3.git" }
 p3-field = { git = "https://github.com/Plonky3/Plonky3.git" }
-p3-fri = { git = "https://github.com/Plonky3/Plonky3.git" }
-p3-keccak = { git = "https://github.com/Plonky3/Plonky3.git" }
 p3-matrix = { git = "https://github.com/Plonky3/Plonky3.git" }
 p3-maybe-rayon = { git = "https://github.com/Plonky3/Plonky3.git" }
-p3-mds = { git = "https://github.com/Plonky3/Plonky3.git" }
-p3-merkle-tree = { git = "https://github.com/Plonky3/Plonky3.git" }
-p3-poseidon2 = { git = "https://github.com/Plonky3/Plonky3.git" }
-p3-symmetric = { git = "https://github.com/Plonky3/Plonky3.git" }
 p3-uni-stark = { git = "https://github.com/Plonky3/Plonky3.git" }
 p3-util = { git = "https://github.com/Plonky3/Plonky3.git" }
 
@@ -25,16 +17,3 @@ serde = { version = "1.0", default-features = false, features = [
     "alloc",
 ] }
 tracing = { version = "0.1.37" }
-
-# [patch."https://github.com/Plonky3/Plonky3"]
-# p3-air = { path = "../Plonky3/air" }
-# p3-challenger = { path = "../Plonky3/challenger" }
-# p3-commit = { path = "../Plonky3/commit" }
-# p3-dft = { path = "../Plonky3/dft" }
-# p3-field = { path = "../Plonky3/field" }
-# p3-fri = { path = "../Plonky3/fri" }
-# p3-keccak = { path = "../Plonky3/keccak" }
-# p3-matrix = { path = "../Plonky3/matrix" }
-# p3-merkle-tree = { path = "../Plonky3/merkle-tree" }
-# p3-symmetric = { path = "../Plonky3/symmetric" }
-# p3-uni-stark = { path = "../Plonky3/uni-stark" }

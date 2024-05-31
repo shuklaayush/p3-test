@@ -9,11 +9,12 @@ use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
 use p3_interaction::{generate_permutation_trace, InteractionChip, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
+use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
+
 use p3_stark::{
     check_constraints, check_cumulative_sums, symbolic::get_quotient_degree, AdjacentOpenedValues,
     ChipProof, OpenedValues,
 };
-use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
 
 #[cfg(feature = "debug-trace")]
 use core::error::Error;

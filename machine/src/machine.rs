@@ -6,9 +6,10 @@ use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::PrimeField32;
 use p3_interaction::NUM_PERM_CHALLENGES;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_stark::Commitments;
 use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
+
+use p3_stark::Commitments;
 
 use crate::{
     chip::MachineChip,

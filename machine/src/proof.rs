@@ -2,10 +2,11 @@ use alloc::vec::Vec;
 
 use p3_commit::Pcs;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_stark::{ChipProof, Commitments};
 use p3_uni_stark::{StarkGenericConfig, Val};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+
+use p3_stark::{ChipProof, Commitments};
 
 pub type Com<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
     <SC as StarkGenericConfig>::Challenge,
