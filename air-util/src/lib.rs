@@ -8,7 +8,9 @@ pub mod folders;
 pub mod proof;
 mod quotient;
 #[cfg(feature = "trace-writer")]
-pub mod trace_writer;
+mod trace_writer;
 
 pub use check_constraints::*;
 pub use quotient::*;
+#[cfg(feature = "trace-writer")]
+pub use trace_writer::*;
