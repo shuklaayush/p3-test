@@ -47,6 +47,7 @@ pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> + InteractionChip<A
     }
 
     fn preprocessed_width(&self) -> usize {
+        debug_assert!(self.preprocessed_trace().is_none());
         0
     }
 
