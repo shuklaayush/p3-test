@@ -160,7 +160,7 @@ where
                 &permutation_data,
                 perm_challenges,
                 alpha,
-                &public_values,
+                public_values,
             )
         });
         // TODO: Panic if this is None
@@ -270,11 +270,11 @@ where
             &commitments.quotient_chunks,
         );
 
-        pcs.verify(rounds, &opening_proof, challenger)
+        pcs.verify(rounds, opening_proof, challenger)
             .map_err(|_| VerificationError::InvalidOpeningArgument)?;
 
         // Verify constraints at zeta
-        trace.verify_constraints(zeta, alpha, perm_challenges, &public_values)?;
+        trace.verify_constraints(zeta, alpha, perm_challenges, public_values)?;
 
         // Verify cumulative sum adds to zero
         trace.check_cumulative_sums()?;

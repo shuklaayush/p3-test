@@ -7,7 +7,7 @@ use itertools::Itertools;
 use p3_air::BaseAir;
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
-use p3_interaction::{generate_permutation_trace, InteractionAir, NUM_PERM_CHALLENGES};
+use p3_interaction::{generate_permutation_trace, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
 
@@ -534,22 +534,13 @@ where
                 .main
                 .as_ref()
                 .map(|main| main.trace.value.as_view());
-            let permutation_trace = chip_trace
-                .permutation
-                .as_ref()
-                .map(|permutation| permutation.trace.value.as_view());
-
-            let num_sends = <C as InteractionAir<Val<SC>>>::sends(chip).len();
-            let num_receives = <C as InteractionAir<Val<SC>>>::receives(chip).len();
 
             chip.write_traces_to_worksheet(
                 worksheet,
                 &preprocessed_trace,
                 &main_trace,
-                &permutation_trace,
-                num_sends,
-                num_receives,
-                chip_trace.cumulative_sum,
+                chip.sends(),
+                chip.receives(),
             )?;
         }
 
