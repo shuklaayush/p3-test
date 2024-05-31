@@ -10,7 +10,7 @@ use core::error::Error;
 use p3_field::PrimeField32;
 use rust_xlsxwriter::Worksheet;
 
-pub trait AirTraceWriter<F: Field, EF: ExtensionField<F>> {
+pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
     fn main_headers(&self) -> Vec<String>;
 
     fn write_traces_to_worksheet(

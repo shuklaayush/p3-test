@@ -2,7 +2,7 @@ use core::fmt::Display;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
 #[cfg(feature = "trace-writer")]
-use p3_air_util::AirTraceWriter;
+use p3_air_util::TraceWriter;
 use p3_air_util::{
     debug::DebugConstraintBuilder, prover::ProverConstraintFolder, symbolic::SymbolicAirBuilder,
     verifier::VerifierConstraintFolder,
@@ -18,6 +18,6 @@ pub trait MachineChip<SC: StarkGenericConfig>:
     + for<'a> Rap<SymbolicAirBuilder<Val<SC>>>
     + for<'a> Rap<DebugConstraintBuilder<'a, Val<SC>, SC::Challenge>>
     // TODO: Put behind flag
-    + AirTraceWriter<Val<SC>, SC::Challenge>
+    + TraceWriter<Val<SC>, SC::Challenge>
 {
 }
