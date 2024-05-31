@@ -1,5 +1,5 @@
 [workspace]
-members = ["machine", "derive", "interaction", "stark", "keccak-machine"]
+members = ["machine", "derive", "interaction", "stark"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -10,9 +10,7 @@ p3-commit = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat
 p3-dft = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
 p3-field = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
 p3-fri = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
-p3-goldilocks = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
 p3-keccak = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
-p3-keccak-air = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
 p3-matrix = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
 p3-maybe-rayon = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
 p3-mds = { git = "https://github.com/shuklaayush/Plonky3.git", branch = "feat/update-visibility" }
@@ -37,7 +35,6 @@ p3-dft = { path = "../Plonky3/dft" }
 p3-field = { path = "../Plonky3/field" }
 p3-fri = { path = "../Plonky3/fri" }
 p3-keccak = { path = "../Plonky3/keccak" }
-p3-keccak-air = { path = "../Plonky3/keccak-air" }
 p3-matrix = { path = "../Plonky3/matrix" }
 p3-merkle-tree = { path = "../Plonky3/merkle-tree" }
 p3-symmetric = { path = "../Plonky3/symmetric" }
