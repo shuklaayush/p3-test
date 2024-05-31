@@ -8,8 +8,8 @@ use p3_matrix::{
     Matrix,
 };
 
-use super::interaction::{Interaction, InteractionType};
-use crate::{batch_multiplicative_inverse_allowing_zero, generate_rlc_elements, reduce_row};
+use crate::interaction::{Interaction, InteractionType};
+use crate::util::{batch_multiplicative_inverse_allowing_zero, generate_rlc_elements, reduce_row};
 
 pub const NUM_PERM_CHALLENGES: usize = 2;
 

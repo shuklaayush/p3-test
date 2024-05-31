@@ -6,9 +6,8 @@ use p3_air::{Air, ExtensionBuilder, PairBuilder, PermutationAirBuilder};
 use p3_field::AbstractField;
 use p3_matrix::Matrix;
 
-use crate::{generate_rlc_elements, reduce_row};
-
-use super::interaction::{Interaction, InteractionType};
+use crate::interaction::{Interaction, InteractionType};
+use crate::util::{generate_rlc_elements, reduce_row};
 
 pub trait InteractionAirBuilder: PermutationAirBuilder + PairBuilder {
     fn cumulative_sum(&self) -> Self::RandomVar;

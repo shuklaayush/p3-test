@@ -3,14 +3,16 @@ use alloc::vec::Vec;
 use p3_air::VirtualPairCol;
 use p3_field::{AbstractExtensionField, AbstractField, Field, Powers};
 
-use crate::InteractionType;
+use crate::interaction::{Interaction, InteractionType};
 
-use super::interaction::Interaction;
-
-pub fn generate_rlc_elements<F: AbstractField, EF: AbstractExtensionField<F>>(
+pub fn generate_rlc_elements<F, EF>(
     interactions: &[(Interaction<F>, InteractionType)],
     random_element: EF,
-) -> Vec<EF> {
+) -> Vec<EF>
+where
+    F: AbstractField,
+    EF: AbstractExtensionField<F>,
+{
     random_element
         .powers()
         .skip(1)
@@ -25,7 +27,7 @@ pub fn generate_rlc_elements<F: AbstractField, EF: AbstractExtensionField<F>>(
         .collect()
 }
 
-pub fn reduce_row<Expr, Var, ExprEF>(
+pub fn reduce_row<Var, Expr, ExprEF>(
     preprocessed_row: &[Var],
     main_row: &[Var],
     fields: &[VirtualPairCol<Expr>],
@@ -33,8 +35,8 @@ pub fn reduce_row<Expr, Var, ExprEF>(
     betas: Powers<ExprEF>,
 ) -> ExprEF
 where
-    Expr: AbstractField,
     Var: Into<Expr> + Copy,
+    Expr: AbstractField,
     ExprEF: AbstractExtensionField<Expr>,
 {
     let mut rlc = ExprEF::zero();
