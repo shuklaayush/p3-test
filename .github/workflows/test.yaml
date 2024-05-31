@@ -16,7 +16,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
       - name: Build
-        run: cargo +nightly build --release
+        run: cargo build --release
       - name: Run tests
-        run: cargo +nightly test --release -- --nocapture --skip bench
+        run: cargo test --release -- --nocapture --skip bench
