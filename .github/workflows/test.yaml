@@ -17,6 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: cargo build --release
+        run: cargo +nightly build --release
       - name: Run tests
-        run: cargo test --release -- --nocapture --skip bench
+        run: cargo +nightly test --release -- --nocapture --skip bench
