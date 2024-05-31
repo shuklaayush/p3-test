@@ -30,11 +30,14 @@ fn generate_header_expr(field_type: &Type, prefix: &str, depth: u32) -> proc_mac
     }
 }
 
-#[proc_macro_derive(Headers)]
-pub fn headers_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(AirColumns)]
+pub fn air_columns_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let struct_name = input.ident;
     let generics = input.generics;
+
+    let non_first_generics = generics.params.iter().skip(1).collect::<Vec<_>>();
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let fields = match input.data {
         Data::Struct(ref data) => match data.fields {
@@ -51,10 +54,25 @@ pub fn headers_derive(input: TokenStream) -> TokenStream {
         header_exprs.push(generate_header_expr(field_type, &field_name.to_string(), 0));
     }
 
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
     let expanded = quote! {
         impl #impl_generics  #struct_name #ty_generics #where_clause {
+            pub fn num_cols() -> usize {
+                core::mem::size_of::<#struct_name<usize #(, #non_first_generics)*>>()
+            }
+
+            pub fn col_map() -> #struct_name<usize #(, #non_first_generics)*> {
+                let num_cols = Self::num_cols();
+                let indices_arr = (0..num_cols).collect::<Vec<usize>>();
+
+                let mut cols = std::mem::MaybeUninit::<#struct_name<usize #(, #non_first_generics)*>>::uninit();
+                let ptr = cols.as_mut_ptr() as *mut usize;
+                unsafe {
+                    ptr.copy_from_nonoverlapping(indices_arr.as_ptr(), num_cols);
+                    cols.assume_init()
+                }
+            }
+
+            // TODO: Put behind debug-trace feature
             pub fn headers() -> Vec<String> {
                 let mut headers = Vec::new();
                 #(#header_exprs)*

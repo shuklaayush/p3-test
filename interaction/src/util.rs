@@ -1,6 +1,5 @@
-use core::ops::Mul;
-
 use alloc::vec::Vec;
+use core::ops::Mul;
 
 use p3_air::VirtualPairCol;
 use p3_field::{AbstractExtensionField, AbstractField, Field, Powers};
