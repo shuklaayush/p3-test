@@ -9,7 +9,7 @@ use p3_matrix::stack::VerticalPair;
 use p3_matrix::Matrix;
 use p3_maybe_rayon::prelude::IntoParallelIterator;
 
-use crate::folders::debug::DebugConstraintBuilder;
+use crate::folders::DebugConstraintBuilder;
 
 /// Check that all constraints vanish on the subgroup.
 pub fn check_constraints<F, EF, A>(

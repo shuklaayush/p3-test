@@ -12,8 +12,8 @@ use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
 
 use p3_air_util::{
-    check_constraints, check_cumulative_sums, symbolic::get_quotient_degree, AdjacentOpenedValues,
-    InteractionAirProof, OpenedValues,
+    check_constraints, check_cumulative_sums, get_quotient_degree,
+    proof::{AdjacentOpenedValues, InteractionAirProof, OpenedValues},
 };
 
 #[cfg(feature = "trace-writer")]

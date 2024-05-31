@@ -9,7 +9,7 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
 
-use p3_air_util::Commitments;
+use p3_air_util::proof::Commitments;
 
 use crate::{
     chip::MachineChip,

@@ -1,1 +1,3 @@
-pub mod sub;
+mod sub;
+
+pub use sub::*;

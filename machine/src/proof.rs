@@ -6,7 +6,7 @@ use p3_uni_stark::{StarkGenericConfig, Val};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use p3_air_util::{Commitments, InteractionAirProof};
+use p3_air_util::proof::{Commitments, InteractionAirProof};
 
 pub type Com<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
     <SC as StarkGenericConfig>::Challenge,

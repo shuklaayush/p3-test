@@ -1,12 +1,11 @@
 use core::fmt::Display;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
-#[cfg(feature = "trace-writer")]
-use p3_air_util::TraceWriter;
-use p3_air_util::{
-    debug::DebugConstraintBuilder, prover::ProverConstraintFolder, symbolic::SymbolicAirBuilder,
-    verifier::VerifierConstraintFolder,
+use p3_air_util::folders::{
+    DebugConstraintBuilder, ProverConstraintFolder, SymbolicAirBuilder, VerifierConstraintFolder,
 };
+#[cfg(feature = "trace-writer")]
+use p3_air_util::trace_writer::TraceWriter;
 use p3_interaction::Rap;
 
 pub trait MachineChip<SC: StarkGenericConfig>:
