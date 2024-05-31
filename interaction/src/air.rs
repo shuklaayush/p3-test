@@ -13,7 +13,7 @@ pub trait InteractionAirBuilder: PermutationAirBuilder + PairBuilder {
     fn cumulative_sum(&self) -> Self::RandomVar;
 }
 
-pub trait InteractionChip<F: Field> {
+pub trait InteractionAir<F: Field> {
     fn sends(&self) -> Vec<Interaction<F>> {
         vec![]
     }
@@ -35,7 +35,12 @@ pub trait InteractionChip<F: Field> {
     }
 }
 
-pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> + InteractionChip<AB::F> {
+pub trait Rap<AB: InteractionAirBuilder>: Air<AB> + InteractionAir<AB::F> {
+    fn preprocessed_width(&self) -> usize {
+        debug_assert!(self.preprocessed_trace().is_none());
+        0
+    }
+
     fn permutation_width(&self) -> Option<usize> {
         let num_interactions = self.sends().len() + self.receives().len();
         if num_interactions > 0 {
@@ -43,11 +48,6 @@ pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> + InteractionChip<A
         } else {
             None
         }
-    }
-
-    fn preprocessed_width(&self) -> usize {
-        debug_assert!(self.preprocessed_trace().is_none());
-        0
     }
 
     fn eval_permutation_constraints(&self, builder: &mut AB) {

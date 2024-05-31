@@ -3,13 +3,13 @@ use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use p3_field::{ExtensionField, Field};
-use p3_interaction::{InteractionAir, InteractionType};
+use p3_interaction::{InteractionType, Rap};
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use p3_matrix::Matrix;
 use p3_maybe_rayon::prelude::IntoParallelIterator;
 
-use crate::air_builders::debug::DebugConstraintBuilder;
+use crate::folders::debug::DebugConstraintBuilder;
 
 /// Check that all constraints vanish on the subgroup.
 pub fn check_constraints<F, EF, A>(
@@ -23,7 +23,7 @@ pub fn check_constraints<F, EF, A>(
 ) where
     F: Field,
     EF: ExtensionField<F>,
-    A: for<'a> InteractionAir<DebugConstraintBuilder<'a, F, EF>>,
+    A: for<'a> Rap<DebugConstraintBuilder<'a, F, EF>>,
 {
     let height = match (main.as_ref(), preprocessed.as_ref()) {
         (Some(main), Some(preprocessed)) => core::cmp::max(main.height(), preprocessed.height()),
@@ -92,10 +92,11 @@ pub fn check_constraints<F, EF, A>(
 }
 
 /// Check that the combined cumulative sum across all lookup tables is zero.
+// TODO: Find exact mismatch
 pub fn check_cumulative_sums<
     F: Field,
     EF: ExtensionField<F>,
-    A: for<'a> InteractionAir<DebugConstraintBuilder<'a, F, EF>>,
+    A: for<'a> Rap<DebugConstraintBuilder<'a, F, EF>>,
 >(
     airs: &[A],
     preprocessed: &[Option<RowMajorMatrixView<F>>],

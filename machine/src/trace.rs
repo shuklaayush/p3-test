@@ -7,18 +7,18 @@ use itertools::Itertools;
 use p3_air::BaseAir;
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
-use p3_interaction::{generate_permutation_trace, InteractionChip, NUM_PERM_CHALLENGES};
+use p3_interaction::{generate_permutation_trace, InteractionAir, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
 
-use p3_stark::{
+use p3_air_util::{
     check_constraints, check_cumulative_sums, symbolic::get_quotient_degree, AdjacentOpenedValues,
-    ChipProof, OpenedValues,
+    InteractionAirProof, OpenedValues,
 };
 
-#[cfg(feature = "debug-trace")]
+#[cfg(feature = "trace-writer")]
 use core::error::Error;
-#[cfg(feature = "debug-trace")]
+#[cfg(feature = "trace-writer")]
 use p3_field::PrimeField32;
 
 use crate::{
@@ -497,7 +497,7 @@ where
     }
 }
 
-#[cfg(feature = "debug-trace")]
+#[cfg(feature = "trace-writer")]
 pub trait MachineTraceDebugger<SC>
 where
     SC: StarkGenericConfig,
@@ -506,7 +506,7 @@ where
     fn write_traces_to_file(&self, path: &str) -> Result<(), Box<dyn Error>>;
 }
 
-#[cfg(feature = "debug-trace")]
+#[cfg(feature = "trace-writer")]
 impl<'a, SC, C> MachineTraceDebugger<SC> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,
@@ -539,8 +539,8 @@ where
                 .as_ref()
                 .map(|permutation| permutation.trace.value.as_view());
 
-            let num_sends = <C as InteractionChip<Val<SC>>>::sends(chip).len();
-            let num_receives = <C as InteractionChip<Val<SC>>>::receives(chip).len();
+            let num_sends = <C as InteractionAir<Val<SC>>>::sends(chip).len();
+            let num_receives = <C as InteractionAir<Val<SC>>>::receives(chip).len();
 
             chip.write_traces_to_worksheet(
                 worksheet,
@@ -584,7 +584,7 @@ where
     fn generate_proofs(
         &self,
         openings: Vec<OpenedValues<SC::Challenge>>,
-    ) -> Vec<Option<ChipProof<SC::Challenge>>>;
+    ) -> Vec<Option<InteractionAirProof<SC::Challenge>>>;
 }
 
 impl<'a, SC, C> MachineTraceOpener<'a, SC> for MachineTrace<SC, C>
@@ -766,7 +766,7 @@ where
     fn generate_proofs(
         &self,
         openings: Vec<OpenedValues<SC::Challenge>>,
-    ) -> Vec<Option<ChipProof<SC::Challenge>>> {
+    ) -> Vec<Option<InteractionAirProof<SC::Challenge>>> {
         self.iter()
             .zip_eq(openings)
             .map(|(chip_trace, opened_values)| {
@@ -774,7 +774,7 @@ where
                     let degree = domain.size();
                     let cumulative_sum = chip_trace.cumulative_sum;
 
-                    ChipProof {
+                    InteractionAirProof {
                         degree,
                         opened_values,
                         cumulative_sum,
@@ -955,7 +955,7 @@ where
     fn load_openings(
         &mut self,
         pcs: &'a SC::Pcs,
-        chip_proofs: Vec<Option<ChipProof<SC::Challenge>>>,
+        chip_proofs: Vec<Option<InteractionAirProof<SC::Challenge>>>,
         preprocessed_degrees: Vec<usize>,
     );
 
@@ -970,7 +970,7 @@ where
     fn load_openings(
         &mut self,
         pcs: &'a SC::Pcs,
-        chip_proofs: Vec<Option<ChipProof<SC::Challenge>>>,
+        chip_proofs: Vec<Option<InteractionAirProof<SC::Challenge>>>,
         preprocessed_degrees: Vec<usize>,
     ) {
         for ((chip_trace, chip_proof), preprocessed_degree) in self

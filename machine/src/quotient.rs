@@ -3,13 +3,13 @@ use alloc::vec::Vec;
 use itertools::Itertools;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, PackedValue};
-use p3_interaction::{InteractionAir, NUM_PERM_CHALLENGES};
+use p3_interaction::{Rap, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrixView, stack::VerticalPair, Matrix};
 use p3_maybe_rayon::prelude::{IntoParallelIterator, ParIterExt};
 use p3_uni_stark::{Domain, PackedChallenge, PackedVal, StarkGenericConfig, Val};
 use p3_util::log2_strict_usize;
 
-use p3_stark::prover::ProverConstraintFolder;
+use p3_air_util::prover::ProverConstraintFolder;
 
 pub fn quotient_values<SC, A, Mat>(
     air: &A,
@@ -25,7 +25,7 @@ pub fn quotient_values<SC, A, Mat>(
 ) -> Vec<SC::Challenge>
 where
     SC: StarkGenericConfig,
-    A: for<'a> InteractionAir<ProverConstraintFolder<'a, SC>>,
+    A: for<'a> Rap<ProverConstraintFolder<'a, SC>>,
     Mat: Matrix<Val<SC>> + Sync,
 {
     let quotient_size = quotient_domain.size();

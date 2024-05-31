@@ -73,7 +73,7 @@ pub fn air_columns_derive(input: TokenStream) -> TokenStream {
                 }
             }
 
-            // TODO: Put behind debug-trace feature
+            // TODO: Put behind trace-writer feature
             pub fn headers() -> Vec<String> {
                 let mut headers = Vec::new();
                 #(#header_exprs)*
@@ -170,7 +170,7 @@ fn generate_trait_impls(
         use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
         use p3_machine::chip::MachineChip;
         use p3_matrix::dense::RowMajorMatrix;
-        use p3_stark::AirDebug;
+        use p3_air_util::TraceWriter;
         use p3_uni_stark::{StarkGenericConfig, Val};
 
         impl std::fmt::Display for #enum_name {
@@ -225,10 +225,10 @@ fn generate_trait_impls(
             }
         }
 
-        impl<F: PrimeField32, EF: ExtensionField<F>> AirDebug<F, EF> for #enum_name {
+        impl<F: PrimeField32, EF: ExtensionField<F>> TraceWriter<F, EF> for #enum_name {
             fn main_headers(&self) -> Vec<String> {
                 match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as AirDebug<F, EF>>::main_headers(chip),)*
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::main_headers(chip),)*
                 }
             }
         }

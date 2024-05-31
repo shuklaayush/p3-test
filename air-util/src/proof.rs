@@ -9,9 +9,8 @@ pub struct Commitments<Com> {
     pub quotient_chunks: Option<Com>,
 }
 
-// TODO: Rename
 #[derive(Serialize, Deserialize, Clone)]
-pub struct ChipProof<Challenge> {
+pub struct InteractionAirProof<Challenge> {
     pub degree: usize,
     pub opened_values: OpenedValues<Challenge>,
     pub cumulative_sum: Option<Challenge>,

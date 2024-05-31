@@ -2,14 +2,14 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use itertools::Itertools;
+use p3_air_util::verifier::VerifierConstraintFolder;
+use p3_air_util::OpenedValues;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, Field};
-use p3_interaction::InteractionAir;
+use p3_interaction::Rap;
 use p3_interaction::NUM_PERM_CHALLENGES;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_stark::verifier::VerifierConstraintFolder;
-use p3_stark::OpenedValues;
 use p3_uni_stark::Domain;
 use p3_uni_stark::StarkGenericConfig;
 use p3_uni_stark::Val;
@@ -29,7 +29,7 @@ pub fn verify_constraints<SC, A>(
 ) -> Result<(), VerificationError>
 where
     SC: StarkGenericConfig,
-    A: for<'a> InteractionAir<VerifierConstraintFolder<'a, SC>>,
+    A: for<'a> Rap<VerifierConstraintFolder<'a, SC>>,
 {
     let zps = qc_domains
         .iter()

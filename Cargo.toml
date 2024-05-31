@@ -1,5 +1,5 @@
 [workspace]
-members = ["machine", "derive", "interaction", "stark"]
+members = ["air-util", "derive", "interaction", "machine"]
 resolver = "2"
 
 [workspace.dependencies]

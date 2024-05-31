@@ -5,7 +5,7 @@ use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
 use p3_field::Field;
-use p3_interaction::{InteractionAir, InteractionAirBuilder};
+use p3_interaction::{InteractionAirBuilder, Rap};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{Entry, SymbolicExpression, SymbolicVariable};
 use p3_util::log2_ceil_usize;
@@ -17,7 +17,7 @@ const NUM_PERM_CHALLENGES: usize = 2;
 pub fn get_quotient_degree<F, A>(air: &A, num_public_values: usize) -> usize
 where
     F: Field,
-    A: InteractionAir<SymbolicAirBuilder<F>>,
+    A: Rap<SymbolicAirBuilder<F>>,
 {
     // We pad to at least degree 2, since a quotient argument doesn't make sense with smaller degrees.
     let constraint_degree = get_max_constraint_degree(air, num_public_values).max(2);
@@ -33,7 +33,7 @@ where
 pub fn get_max_constraint_degree<F, A>(air: &A, num_public_values: usize) -> usize
 where
     F: Field,
-    A: InteractionAir<SymbolicAirBuilder<F>>,
+    A: Rap<SymbolicAirBuilder<F>>,
 {
     get_symbolic_constraints(air, num_public_values)
         .iter()
@@ -49,7 +49,7 @@ pub fn get_symbolic_constraints<F, A>(
 ) -> Vec<SymbolicExpression<F>>
 where
     F: Field,
-    A: InteractionAir<SymbolicAirBuilder<F>>,
+    A: Rap<SymbolicAirBuilder<F>>,
 {
     let mut builder = SymbolicAirBuilder::new(
         air.preprocessed_width(),

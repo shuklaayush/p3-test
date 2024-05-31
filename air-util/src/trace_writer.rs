@@ -1,4 +1,3 @@
-// TODO: MOve to separate crate and add proper feature flags
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -7,15 +6,11 @@ use alloc::vec::Vec;
 use p3_field::{ExtensionField, Field};
 use p3_matrix::dense::RowMajorMatrixView;
 
-#[cfg(feature = "debug-trace")]
 use core::error::Error;
-#[cfg(feature = "debug-trace")]
 use p3_field::PrimeField32;
-#[cfg(feature = "debug-trace")]
 use rust_xlsxwriter::Worksheet;
 
-#[cfg(feature = "debug-trace")]
-pub trait AirDebug<F: Field, EF: ExtensionField<F>> {
+pub trait AirTraceWriter<F: Field, EF: ExtensionField<F>> {
     fn main_headers(&self) -> Vec<String>;
 
     fn write_traces_to_worksheet(

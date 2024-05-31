@@ -17,12 +17,13 @@ serde = { workspace = true }
 tracing = { workspace = true }
 
 p3-interaction = { path = "../interaction" }
-p3-stark = { path = "../stark", features = ["debug-trace"] }
+p3-air-util = { path = "../air-util" }
 
 itertools = "0.12.1"
 rand = "0.8.5"
+
 rust_xlsxwriter = { version = "0.64.1", optional = true }
 
 [features]
-default = ["debug-trace"]
-debug-trace = ["dep:rust_xlsxwriter", "p3-stark/debug-trace"]
+default = ["trace-writer"]
+trace-writer = ["dep:rust_xlsxwriter", "p3-air-util/trace-writer"]

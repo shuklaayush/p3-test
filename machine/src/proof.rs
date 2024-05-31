@@ -6,7 +6,7 @@ use p3_uni_stark::{StarkGenericConfig, Val};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use p3_stark::{ChipProof, Commitments};
+use p3_air_util::{Commitments, InteractionAirProof};
 
 pub type Com<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
     <SC as StarkGenericConfig>::Challenge,
@@ -27,7 +27,7 @@ pub type PcsProverData<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
 pub struct MachineProof<SC: StarkGenericConfig> {
     pub commitments: Commitments<Com<SC>>,
     pub opening_proof: PcsProof<SC>,
-    pub chip_proofs: Vec<Option<ChipProof<SC::Challenge>>>,
+    pub chip_proofs: Vec<Option<InteractionAirProof<SC::Challenge>>>,
 }
 
 pub struct ProverPreprocessedData<SC: StarkGenericConfig> {

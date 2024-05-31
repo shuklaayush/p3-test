@@ -9,7 +9,7 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
 
-use p3_stark::Commitments;
+use p3_air_util::Commitments;
 
 use crate::{
     chip::MachineChip,
@@ -98,7 +98,7 @@ where
         public_values: &'a [Val<SC>],
     ) -> MachineProof<SC>
     where
-        // TODO: Put behind debug-trace flag
+        // TODO: Put behind trace-writer flag
         Val<SC>: PrimeField32,
     {
         // TODO: Use fixed size array instead of Vecs
@@ -146,7 +146,7 @@ where
         let alpha: SC::Challenge = challenger.sample_ext_element();
 
         // Verify constraints
-        #[cfg(feature = "debug-trace")]
+        #[cfg(feature = "trace-writer")]
         let _ = trace.write_traces_to_file("trace.xlsx");
         #[cfg(debug_assertions)]
         trace.check_constraints(perm_challenges, &[]);
