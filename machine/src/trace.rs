@@ -13,7 +13,7 @@ use p3_stark::{
     check_constraints, check_cumulative_sums, symbolic::get_quotient_degree, AdjacentOpenedValues,
     ChipProof, OpenedValues,
 };
-use p3_uni_stark::{Com, Domain, PackedChallenge, StarkGenericConfig, Val};
+use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
 
 #[cfg(feature = "debug-trace")]
 use core::error::Error;
@@ -21,8 +21,8 @@ use core::error::Error;
 use p3_field::PrimeField32;
 
 use crate::{
-    chip::MachineChip, error::VerificationError, proof::PcsProverData, quotient::quotient_values,
-    verify::verify_constraints,
+    chip::MachineChip, error::VerificationError, proof::Com, proof::PcsProverData,
+    quotient::quotient_values, verify::verify_constraints,
 };
 
 #[derive(Clone)]

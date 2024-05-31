@@ -3,9 +3,18 @@ use alloc::vec::Vec;
 use p3_commit::Pcs;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_stark::{ChipProof, Commitments};
-use p3_uni_stark::{Com, PcsProof, StarkGenericConfig, Val};
+use p3_uni_stark::{StarkGenericConfig, Val};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+
+pub type Com<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
+    <SC as StarkGenericConfig>::Challenge,
+    <SC as StarkGenericConfig>::Challenger,
+>>::Commitment;
+pub type PcsProof<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
+    <SC as StarkGenericConfig>::Challenge,
+    <SC as StarkGenericConfig>::Challenger,
+>>::Proof;
 
 pub type PcsProverData<SC> = <<SC as StarkGenericConfig>::Pcs as Pcs<
     <SC as StarkGenericConfig>::Challenge,

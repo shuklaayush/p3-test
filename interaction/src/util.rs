@@ -1,3 +1,5 @@
+use core::ops::Mul;
+
 use alloc::vec::Vec;
 
 use p3_air::VirtualPairCol;
@@ -10,8 +12,8 @@ pub fn generate_rlc_elements<F, EF>(
     random_element: EF,
 ) -> Vec<EF>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: AbstractField,
 {
     random_element
         .powers()
@@ -27,16 +29,17 @@ where
         .collect()
 }
 
-pub fn reduce_row<Var, Expr, ExprEF>(
+pub fn reduce_row<F, Var, Expr, ExprEF>(
     preprocessed_row: &[Var],
     main_row: &[Var],
-    fields: &[VirtualPairCol<Expr>],
+    fields: &[VirtualPairCol<F>],
     alpha: ExprEF,
     betas: Powers<ExprEF>,
 ) -> ExprEF
 where
+    F: Field,
     Var: Into<Expr> + Copy,
-    Expr: AbstractField,
+    Expr: AbstractField + From<F> + Mul<F, Output = Expr>,
     ExprEF: AbstractExtensionField<Expr>,
 {
     let mut rlc = ExprEF::zero();

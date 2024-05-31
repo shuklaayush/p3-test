@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use p3_air::VirtualPairCol;
-use p3_field::AbstractField;
+use p3_field::Field;
 
 #[derive(Clone, Debug)]
 pub enum InteractionType {
@@ -10,7 +10,7 @@ pub enum InteractionType {
 }
 
 #[derive(Clone, Debug)]
-pub struct Interaction<F: AbstractField> {
+pub struct Interaction<F: Field> {
     pub fields: Vec<VirtualPairCol<F>>,
     pub count: VirtualPairCol<F>,
     pub argument_index: usize,

@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use p3_air::{Air, ExtensionBuilder, PairBuilder, PermutationAirBuilder};
-use p3_field::AbstractField;
+use p3_field::{AbstractField, Field};
 use p3_matrix::Matrix;
 
 use crate::interaction::{Interaction, InteractionType};
@@ -13,7 +13,7 @@ pub trait InteractionAirBuilder: PermutationAirBuilder + PairBuilder {
     fn cumulative_sum(&self) -> Self::RandomVar;
 }
 
-pub trait InteractionChip<F: AbstractField> {
+pub trait InteractionChip<F: Field> {
     fn sends(&self) -> Vec<Interaction<F>> {
         vec![]
     }
@@ -35,7 +35,7 @@ pub trait InteractionChip<F: AbstractField> {
     }
 }
 
-pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> + InteractionChip<AB::Expr> {
+pub trait InteractionAir<AB: InteractionAirBuilder>: Air<AB> + InteractionChip<AB::F> {
     fn permutation_width(&self) -> Option<usize> {
         let num_interactions = self.sends().len() + self.receives().len();
         if num_interactions > 0 {
