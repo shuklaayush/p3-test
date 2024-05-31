@@ -1,12 +1,11 @@
+use core::fmt::{Debug, Display};
+use p3_air::BaseAir;
 use p3_interaction::{InteractionAir, InteractionChip};
 use p3_stark::{
     debug::DebugConstraintBuilder, prover::ProverConstraintFolder, symbolic::SymbolicAirBuilder,
     verifier::VerifierConstraintFolder, AirDebug,
 };
-
-use p3_air::BaseAir;
 use p3_uni_stark::{StarkGenericConfig, Val};
-use std::fmt::{Debug, Display};
 
 pub trait MachineChip<SC: StarkGenericConfig>:
     BaseAir<Val<SC>>

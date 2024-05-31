@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use itertools::Itertools;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};

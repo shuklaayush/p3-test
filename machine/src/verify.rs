@@ -1,3 +1,6 @@
+use alloc::vec;
+use alloc::vec::Vec;
+
 use itertools::Itertools;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, Field};

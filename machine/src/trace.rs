@@ -1,3 +1,8 @@
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::vec;
+use alloc::vec::Vec;
+
 use itertools::Itertools;
 use p3_air::BaseAir;
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
@@ -11,9 +16,9 @@ use p3_stark::{
 use p3_uni_stark::{Com, Domain, PackedChallenge, StarkGenericConfig, Val};
 
 #[cfg(feature = "debug-trace")]
-use p3_field::PrimeField32;
+use core::error::Error;
 #[cfg(feature = "debug-trace")]
-use std::error::Error;
+use p3_field::PrimeField32;
 
 use crate::{
     chip::MachineChip, error::VerificationError, proof::PcsProverData, quotient::quotient_values,

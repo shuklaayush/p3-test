@@ -1,4 +1,4 @@
-use std::cmp::min;
+use alloc::vec::Vec;
 
 use itertools::Itertools;
 use p3_commit::PolynomialSpace;
@@ -123,7 +123,7 @@ where
             let quotient = folder.accumulator * inv_zeroifier;
 
             // "Transpose" D packed base coefficients into WIDTH scalar extension coefficients.
-            let width = min(PackedVal::<SC>::WIDTH, quotient_size);
+            let width = core::cmp::min(PackedVal::<SC>::WIDTH, quotient_size);
             (0..width).map(move |idx_in_packing| {
                 let quotient_value = (0..<SC::Challenge as AbstractExtensionField<Val<SC>>>::D)
                     .map(|coeff_idx| quotient.as_base_slice()[coeff_idx].as_slice()[idx_in_packing])
