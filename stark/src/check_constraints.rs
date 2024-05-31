@@ -1,4 +1,6 @@
-use std::borrow::Borrow;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::borrow::Borrow;
 
 use p3_field::{ExtensionField, Field};
 use p3_interaction::{InteractionAir, InteractionType};
@@ -24,7 +26,7 @@ pub fn check_constraints<F, EF, A>(
     A: for<'a> InteractionAir<DebugConstraintBuilder<'a, F, EF>>,
 {
     let height = match (main.as_ref(), preprocessed.as_ref()) {
-        (Some(main), Some(preprocessed)) => std::cmp::max(main.height(), preprocessed.height()),
+        (Some(main), Some(preprocessed)) => core::cmp::max(main.height(), preprocessed.height()),
         (Some(main), None) => main.height(),
         (None, Some(preprocessed)) => preprocessed.height(),
         (None, None) => 0,

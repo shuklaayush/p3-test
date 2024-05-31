@@ -1,3 +1,6 @@
+#![no_std]
+extern crate alloc;
+
 mod air_builders;
 mod air_debug;
 mod check_constraints;

@@ -192,7 +192,7 @@ dependencies = [
 [[package]]
 name = "p3-baby-bear"
 version = "0.1.0"
-source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#488564c0d18ed09b4a373967b6d6d4b4a02c5a74"
+source = "git+https://github.com/Plonky3/Plonky3.git#ed21a5e11cb20effadaab606598ccad4e70e1a3e"
 dependencies = [
  "num-bigint",
  "p3-field",
@@ -318,14 +318,14 @@ dependencies = [
  "p3-interaction",
  "p3-keccak",
  "p3-matrix",
- "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-maybe-rayon 0.1.0 (git+https://github.com/Plonky3/Plonky3.git)",
  "p3-mds",
  "p3-merkle-tree",
  "p3-poseidon2",
  "p3-stark",
  "p3-symmetric",
  "p3-uni-stark",
- "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-util 0.1.0 (git+https://github.com/Plonky3/Plonky3.git)",
  "rand",
  "rust_xlsxwriter",
  "serde",
@@ -352,19 +352,19 @@ version = "0.1.0"
 [[package]]
 name = "p3-maybe-rayon"
 version = "0.1.0"
-source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#488564c0d18ed09b4a373967b6d6d4b4a02c5a74"
+source = "git+https://github.com/Plonky3/Plonky3.git#ed21a5e11cb20effadaab606598ccad4e70e1a3e"
 
 [[package]]
 name = "p3-mds"
 version = "0.1.0"
-source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#488564c0d18ed09b4a373967b6d6d4b4a02c5a74"
+source = "git+https://github.com/Plonky3/Plonky3.git#ed21a5e11cb20effadaab606598ccad4e70e1a3e"
 dependencies = [
  "itertools 0.12.1",
  "p3-dft",
  "p3-field",
  "p3-matrix",
  "p3-symmetric",
- "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-util 0.1.0 (git+https://github.com/Plonky3/Plonky3.git)",
  "rand",
 ]
 
@@ -386,7 +386,7 @@ dependencies = [
 [[package]]
 name = "p3-poseidon2"
 version = "0.1.0"
-source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#488564c0d18ed09b4a373967b6d6d4b4a02c5a74"
+source = "git+https://github.com/Plonky3/Plonky3.git#ed21a5e11cb20effadaab606598ccad4e70e1a3e"
 dependencies = [
  "gcd",
  "p3-field",
@@ -403,9 +403,9 @@ dependencies = [
  "p3-field",
  "p3-interaction",
  "p3-matrix",
- "p3-maybe-rayon 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-maybe-rayon 0.1.0 (git+https://github.com/Plonky3/Plonky3.git)",
  "p3-uni-stark",
- "p3-util 0.1.0 (git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility)",
+ "p3-util 0.1.0 (git+https://github.com/Plonky3/Plonky3.git)",
  "rust_xlsxwriter",
  "serde",
  "tracing",
@@ -447,7 +447,7 @@ dependencies = [
 [[package]]
 name = "p3-util"
 version = "0.1.0"
-source = "git+https://github.com/shuklaayush/Plonky3.git?branch=feat/update-visibility#488564c0d18ed09b4a373967b6d6d4b4a02c5a74"
+source = "git+https://github.com/Plonky3/Plonky3.git#ed21a5e11cb20effadaab606598ccad4e70e1a3e"
 dependencies = [
  "serde",
 ]
