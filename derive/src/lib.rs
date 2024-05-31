@@ -167,7 +167,7 @@ fn generate_trait_impls(
     quote! {
         use p3_air::{Air, AirBuilder, BaseAir};
         use p3_field::{ExtensionField, Field, PrimeField32};
-        use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, InteractionChip};
+        use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, Rap};
         use p3_machine::chip::MachineChip;
         use p3_matrix::dense::RowMajorMatrix;
         use p3_air_util::TraceWriter;
@@ -203,24 +203,24 @@ fn generate_trait_impls(
             }
         }
 
-        impl<F: Field> InteractionChip<F> for #enum_name {
+        impl<F: Field> InteractionAir<F> for #enum_name {
             fn sends(&self) -> Vec<Interaction<F>> {
                 match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionChip<F>>::sends(chip),)*
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionAir<F>>::sends(chip),)*
                 }
             }
 
             fn receives(&self) -> Vec<Interaction<F>> {
                 match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionChip<F>>::receives(chip),)*
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionAir<F>>::receives(chip),)*
                 }
             }
         }
 
-        impl<AB: InteractionAirBuilder> InteractionAir<AB> for #enum_name {
+        impl<AB: InteractionAirBuilder> Rap<AB> for #enum_name {
             fn preprocessed_width(&self) -> usize {
                 match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionAir<AB>>::preprocessed_width(chip),)*
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as Rap<AB>>::preprocessed_width(chip),)*
                 }
             }
         }
