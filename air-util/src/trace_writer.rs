@@ -1,11 +1,11 @@
 use alloc::boxed::Box;
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
-use core::borrow::Borrow;
 use core::error::Error;
+use core::{borrow::Borrow, iter::once};
 
 use p3_field::{ExtensionField, Field, PrimeField32};
 use p3_interaction::Interaction;
@@ -33,36 +33,44 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
         let perprocessed_headers = self.preprocessed_headers();
         let main_headers = self.main_headers();
 
-        let h1: Vec<_> = sends
+        let send_headers: Vec<_> = sends
             .iter()
             .enumerate()
             .flat_map(|(i, interaction)| {
-                interaction
-                    .fields
-                    .iter()
-                    .enumerate()
-                    .map(|(j, _)| format!("sends[{}][{}]", i, j))
+                once("".to_string())
+                    .chain(once("count".to_string()))
+                    .chain(
+                        interaction
+                            .fields
+                            .iter()
+                            .enumerate()
+                            .map(|(j, _)| format!("sends[{}][{}]", i, j)),
+                    )
                     .collect::<Vec<_>>()
             })
             .collect();
-        let h2: Vec<_> = receives
+        let receive_headers: Vec<_> = receives
             .iter()
             .enumerate()
             .flat_map(|(i, interaction)| {
-                interaction
-                    .fields
-                    .iter()
-                    .enumerate()
-                    .map(|(j, _)| format!("receives[{}][{}]", i, j))
+                once("".to_string())
+                    .chain(once("count".to_string()))
+                    .chain(
+                        interaction
+                            .fields
+                            .iter()
+                            .enumerate()
+                            .map(|(j, _)| format!("receives[{}][{}]", i, j)),
+                    )
                     .collect::<Vec<_>>()
             })
             .collect();
-        let perm_headers: Vec<_> = h1.into_iter().chain(h2).collect();
 
         let headers: Vec<_> = perprocessed_headers
             .iter()
             .chain(main_headers.iter())
-            .chain(perm_headers.iter())
+            .chain(send_headers.iter())
+            .chain(receive_headers.iter())
             .collect();
         ws.write_row(0, 0, headers)?;
 
@@ -112,17 +120,29 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
                 .unwrap_or_default();
 
             for interaction in sends.iter() {
-                for virtual_col in interaction.fields.iter() {
-                    let val =
-                        virtual_col.apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
+                // Blank column
+                offset += 1;
+                let count = interaction
+                    .count
+                    .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
+                ws.write_number(i as u32 + 1, offset, count.as_canonical_u32() as f64)?;
+                offset += 1;
+                for field in interaction.fields.iter() {
+                    let val = field.apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
                     ws.write_number(i as u32 + 1, offset, val.as_canonical_u32() as f64)?;
                     offset += 1;
                 }
             }
             for interaction in receives.iter() {
-                for virtual_col in interaction.fields.iter() {
-                    let val =
-                        virtual_col.apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
+                // Blank column
+                offset += 1;
+                let count = interaction
+                    .count
+                    .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
+                ws.write_number(i as u32 + 1, offset, count.as_canonical_u32() as f64)?;
+                offset += 1;
+                for field in interaction.fields.iter() {
+                    let val = field.apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
                     ws.write_number(i as u32 + 1, offset, val.as_canonical_u32() as f64)?;
                     offset += 1;
                 }

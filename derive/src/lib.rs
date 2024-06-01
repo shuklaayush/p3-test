@@ -3,17 +3,28 @@ extern crate quote;
 extern crate syn;
 
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam, Type};
+#[cfg(feature = "trace-writer")]
+use quote::format_ident;
+use quote::quote;
+#[cfg(feature = "trace-writer")]
+use syn::Type;
+use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam, Ident};
 
-// TODO: Add recursive struct support
-fn generate_header_expr(field_type: &Type, prefix: &str, depth: u32) -> proc_macro2::TokenStream {
+// TODO: Check if serde_json is easier
+#[cfg(feature = "trace-writer")]
+fn generate_header_expr(
+    base_generic: &Ident,
+    field_type: &Type,
+    prefix: &str,
+    depth: u32,
+) -> proc_macro2::TokenStream {
+    dbg!(field_type);
     match field_type {
         Type::Array(array) => {
             let elem_type = &array.elem;
             let len_expr = &array.len;
 
-            let inner_expr = generate_header_expr(elem_type, prefix, depth + 1);
+            let inner_expr = generate_header_expr(base_generic, elem_type, prefix, depth + 1);
             let idepth = format_ident!("i{}", depth);
             quote! {
                 for #idepth in 0..#len_expr {
@@ -21,77 +32,35 @@ fn generate_header_expr(field_type: &Type, prefix: &str, depth: u32) -> proc_mac
                 }
             }
         }
-        _ => {
-            let expr = (0..depth).fold(prefix.to_string(), |acc, _| format!("{}[{{}}]", acc));
-            let is = (0..depth).map(|i| format_ident!("i{}", i));
-            quote! {
-                headers.push(format!(#expr, #(#is),*));
+        Type::Path(type_path) => {
+            let last_segment = type_path.path.segments.last().unwrap();
+            if last_segment.ident == *base_generic {
+                let expr = (0..depth).fold(prefix.to_string(), |acc, _| format!("{}[{{}}]", acc));
+                let is = (0..depth).map(|i| format_ident!("i{}", i));
+                quote! {
+                    headers.push(format!(#expr, #(#is),*));
+                }
+            } else {
+                // Assuming it's a struct with a headers() method
+                let name = &last_segment.ident;
+                let generic_args = &last_segment.arguments;
+                quote! {
+                    for header in #name::#generic_args::headers() {
+                        headers.push(format!("{}.{}", #prefix, header));
+                    }
+                }
             }
         }
+        _ => unreachable!(),
     }
 }
 
 #[proc_macro_derive(AirColumns)]
 pub fn air_columns_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let struct_name = input.ident;
-    let generics = input.generics;
+    let name = input.ident;
 
-    let non_first_generics = generics.params.iter().skip(1).collect::<Vec<_>>();
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let fields = match input.data {
-        Data::Struct(ref data) => match data.fields {
-            Fields::Named(ref fields) => fields.named.iter(),
-            _ => panic!("Unsupported struct fields"),
-        },
-        _ => panic!("Unsupported data type"),
-    };
-
-    let mut header_exprs = Vec::new();
-    for field in fields {
-        let field_name = field.ident.as_ref().unwrap();
-        let field_type = &field.ty;
-        header_exprs.push(generate_header_expr(field_type, &field_name.to_string(), 0));
-    }
-
-    let expanded = quote! {
-        impl #impl_generics  #struct_name #ty_generics #where_clause {
-            pub const fn num_cols() -> usize {
-                core::mem::size_of::<#struct_name<u8 #(, #non_first_generics)*>>()
-            }
-
-            pub fn col_map() -> #struct_name<usize #(, #non_first_generics)*> {
-                let num_cols = Self::num_cols();
-                let indices_arr = (0..num_cols).collect::<Vec<usize>>();
-
-                let mut cols = std::mem::MaybeUninit::<#struct_name<usize #(, #non_first_generics)*>>::uninit();
-                let ptr = cols.as_mut_ptr() as *mut usize;
-                unsafe {
-                    ptr.copy_from_nonoverlapping(indices_arr.as_ptr(), num_cols);
-                    cols.assume_init()
-                }
-            }
-
-            // TODO: Put behind trace-writer feature
-            pub fn headers() -> Vec<String> {
-                let mut headers = Vec::new();
-                #(#header_exprs)*
-                headers
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
-}
-
-#[proc_macro_derive(AlignedBorrow)]
-pub fn aligned_borrow_derive(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as DeriveInput);
-    let name = &ast.ident;
-
-    // Get first generic which must be type (ex. `T`) for input <T, N: NumLimbs, const M: usize>
-    let type_generic = ast
+    let type_generic = input
         .generics
         .params
         .iter()
@@ -101,15 +70,50 @@ pub fn aligned_borrow_derive(input: TokenStream) -> TokenStream {
         })
         .next()
         .expect("Expected at least one generic");
+    let non_first_generics = input.generics.params.iter().skip(1).collect::<Vec<_>>();
+    let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
 
-    // Get generics after the first (ex. `N: NumLimbs, const M: usize`)
-    // We need this because when we assert the size, we want to substitute u8 for T.
-    let non_first_generics = ast.generics.params.iter().skip(1).collect::<Vec<_>>();
+    #[cfg(feature = "trace-writer")]
+    let fields = match input.data {
+        Data::Struct(ref data) => match data.fields {
+            Fields::Named(ref fields) => fields.named.iter(),
+            _ => panic!("Unsupported struct fields"),
+        },
+        _ => panic!("Unsupported data type"),
+    };
+    #[cfg(feature = "trace-writer")]
+    let mut header_exprs = Vec::new();
+    #[cfg(feature = "trace-writer")]
+    for field in fields {
+        let field_name = field.ident.as_ref().unwrap();
+        let field_type = &field.ty;
+        header_exprs.push(generate_header_expr(
+            type_generic,
+            field_type,
+            &field_name.to_string(),
+            0,
+        ));
+    }
 
-    // Get impl generics (`<T, N: NumLimbs, const M: usize>`), type generics (`<T, N>`), where clause (`where T: Clone`)
-    let (impl_generics, type_generics, where_clause) = ast.generics.split_for_impl();
+    let col_stream = quote! {
+        impl #impl_generics  #name #type_generics #where_clause {
+            pub const fn num_cols() -> usize {
+                core::mem::size_of::<#name<u8 #(, #non_first_generics)*>>()
+            }
 
-    let methods = quote! {
+            pub fn col_map() -> #name<usize #(, #non_first_generics)*> {
+                let num_cols = Self::num_cols();
+                let indices_arr = (0..num_cols).collect::<Vec<usize>>();
+
+                let mut cols = std::mem::MaybeUninit::<#name<usize #(, #non_first_generics)*>>::uninit();
+                let ptr = cols.as_mut_ptr() as *mut usize;
+                unsafe {
+                    ptr.copy_from_nonoverlapping(indices_arr.as_ptr(), num_cols);
+                    cols.assume_init()
+                }
+            }
+        }
+
         impl #impl_generics core::borrow::Borrow<#name #type_generics> for [#type_generic] #where_clause {
             fn borrow(&self) -> &#name #type_generics {
                 debug_assert_eq!(self.len(), std::mem::size_of::<#name<u8 #(, #non_first_generics)*>>());
@@ -131,7 +135,28 @@ pub fn aligned_borrow_derive(input: TokenStream) -> TokenStream {
         }
     };
 
-    TokenStream::from(methods)
+    #[cfg(feature = "trace-writer")]
+    let header_stream = quote! {
+        #[cfg(feature = "trace-writer")]
+        impl #impl_generics  #name #type_generics #where_clause {
+            pub fn headers() -> Vec<String> {
+                let mut headers = Vec::new();
+                #(#header_exprs)*
+                headers
+            }
+        }
+    };
+
+    #[cfg(feature = "trace-writer")]
+    let out = {
+        let mut stream = TokenStream::from(col_stream);
+        stream.extend(TokenStream::from(header_stream));
+        stream
+    };
+    #[cfg(not(feature = "trace-writer"))]
+    let out = TokenStream::from(col_stream);
+
+    out
 }
 
 #[proc_macro_derive(EnumDispatch)]
@@ -226,6 +251,12 @@ fn generate_trait_impls(
         }
 
         impl<F: PrimeField32, EF: ExtensionField<F>> TraceWriter<F, EF> for #enum_name {
+            fn preprocessed_headers(&self) -> Vec<String> {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::preprocessed_headers(chip),)*
+                }
+            }
+
             fn main_headers(&self) -> Vec<String> {
                 match self {
                     #(#enum_name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::main_headers(chip),)*

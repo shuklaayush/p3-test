@@ -428,7 +428,7 @@ where
     fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]);
 }
 
-impl<'a, SC, C> MachineTraceChecker<SC> for MachineTrace<SC, C>
+impl<SC, C> MachineTraceChecker<SC> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,
     C: MachineChip<SC>,
@@ -507,7 +507,7 @@ where
 }
 
 #[cfg(feature = "trace-writer")]
-impl<'a, SC, C> MachineTraceDebugger<SC> for MachineTrace<SC, C>
+impl<SC, C> MachineTraceDebugger<SC> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,
     Val<SC>: PrimeField32,
@@ -880,7 +880,7 @@ where
     pub quotient_degree: Option<usize>,
 }
 
-impl<'a, SC, C> ChipTraceOpening<SC, C>
+impl<SC, C> ChipTraceOpening<SC, C>
 where
     SC: StarkGenericConfig,
     C: MachineChip<SC>,
