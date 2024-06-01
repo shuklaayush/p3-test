@@ -76,9 +76,8 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
 
         let preprocessed_height = preprocessed_trace.as_ref().map_or(0, |t| t.height());
         let main_height = main_trace.as_ref().map_or(0, |t| t.height());
-        let max_height = preprocessed_height.max(main_height);
-
-        for i in 0..max_height {
+        let height = preprocessed_height.max(main_height);
+        for i in 0..height {
             let mut offset = 0;
             if let Some(preprocessed_trace) = preprocessed_trace {
                 for j in 0..preprocessed_trace.width() {

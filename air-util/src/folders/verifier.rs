@@ -101,7 +101,7 @@ where
 impl<'a, SC: StarkGenericConfig> AirBuilderWithPublicValues for VerifierConstraintFolder<'a, SC> {
     type PublicVar = Self::F;
 
-    fn public_values(&self) -> &[Self::F] {
+    fn public_values(&self) -> &[Self::PublicVar] {
         self.public_values
     }
 }

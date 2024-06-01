@@ -12,7 +12,7 @@ use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
 
 use p3_air_util::{
-    check_constraints, check_cumulative_sums, get_quotient_degree,
+    check_constraints, check_constraints_and_track, check_cumulative_sums, get_quotient_degree,
     proof::{AdjacentOpenedValues, InteractionAirProof, OpenedValues},
 };
 
@@ -426,6 +426,10 @@ where
     SC: StarkGenericConfig,
 {
     fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]);
+
+    fn check_constraints_and_track(&self, public_values: &[Val<SC>]) -> Vec<Vec<(usize, usize)>>
+    where
+        Val<SC>: PrimeField32;
 }
 
 impl<SC, C> MachineTraceChecker<SC> for MachineTrace<SC, C>
@@ -435,24 +439,27 @@ where
 {
     fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]) {
         for chip_trace in self.iter() {
+            let preprocessed = chip_trace
+                .preprocessed
+                .as_ref()
+                .map(|preprocessed| preprocessed.trace.value.as_view());
+            let main = chip_trace
+                .main
+                .as_ref()
+                .map(|main| main.trace.value.as_view());
+            let permutation = chip_trace
+                .permutation
+                .as_ref()
+                .map(|permutation| permutation.trace.value.as_view());
             check_constraints(
                 &chip_trace.chip,
-                &chip_trace
-                    .preprocessed
-                    .as_ref()
-                    .map(|preprocessed| preprocessed.trace.value.as_view()),
-                &chip_trace
-                    .main
-                    .as_ref()
-                    .map(|main| main.trace.value.as_view()),
-                &chip_trace
-                    .permutation
-                    .as_ref()
-                    .map(|permutation| permutation.trace.value.as_view()),
+                &preprocessed,
+                &main,
+                &permutation,
                 perm_challenges,
                 chip_trace.cumulative_sum,
                 public_values,
-            )
+            );
         }
         let preprocessed_traces = self
             .iter()
@@ -486,14 +493,34 @@ where
             .iter()
             .map(|chip_trace| chip_trace.chip.clone())
             .collect_vec();
-        // TODO: Remove hardcode
+
         check_cumulative_sums(
             &airs,
             preprocessed_traces.as_slice(),
             main_traces.as_slice(),
             permutation_traces.as_slice(),
-            10,
         );
+    }
+
+    fn check_constraints_and_track(&self, public_values: &[Val<SC>]) -> Vec<Vec<(usize, usize)>>
+    where
+        Val<SC>: PrimeField32,
+    {
+        let mut chip_indices = Vec::new();
+        for chip_trace in self.iter() {
+            let preprocessed = chip_trace
+                .preprocessed
+                .as_ref()
+                .map(|preprocessed| preprocessed.trace.value.as_view());
+            let main = chip_trace
+                .main
+                .as_ref()
+                .map(|main| main.trace.value.as_view());
+            let indices =
+                check_constraints_and_track(&chip_trace.chip, &preprocessed, &main, public_values);
+            chip_indices.push(indices);
+        }
+        chip_indices
     }
 }
 
@@ -1175,7 +1202,7 @@ where
         public_values: &[Val<SC>],
     ) -> Result<(), VerificationError>;
 
-    fn check_cumulative_sums(&self) -> Result<(), VerificationError>;
+    fn verify_cumulative_sums(&self) -> Result<(), VerificationError>;
 }
 
 impl<SC, C> MachineTraceConstraintVerifier<SC> for MachineTraceOpening<SC, C>
@@ -1235,7 +1262,7 @@ where
         Ok(())
     }
 
-    fn check_cumulative_sums(&self) -> Result<(), VerificationError> {
+    fn verify_cumulative_sums(&self) -> Result<(), VerificationError> {
         let sum: SC::Challenge = self
             .iter()
             .flat_map(|chip_trace| chip_trace.cumulative_sum)

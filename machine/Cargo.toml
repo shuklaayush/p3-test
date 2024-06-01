@@ -22,7 +22,8 @@ p3-air-util = { path = "../air-util" }
 itertools = "0.12.1"
 rand = "0.8.5"
 
-rust_xlsxwriter = { version = "0.64.1", optional = true }
+rust_xlsxwriter = { workspace = true, optional = true }
+cfg-if = "1.0.0"
 
 [features]
 default = ["trace-writer"]

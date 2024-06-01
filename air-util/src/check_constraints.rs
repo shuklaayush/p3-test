@@ -1,15 +1,21 @@
+use alloc::collections::BTreeMap;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
+use p3_air::Air;
 
-use p3_field::{ExtensionField, Field};
+use hashbrown::HashMap;
+use p3_field::{ExtensionField, Field, PrimeField32};
 use p3_interaction::{InteractionType, Rap};
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use p3_matrix::Matrix;
 use p3_maybe_rayon::prelude::IntoParallelIterator;
 
-use crate::folders::DebugConstraintBuilder;
+use crate::{
+    folders::{DebugConstraintBuilder, TrackingConstraintBuilder},
+    util::tracked_field::TrackedField,
+};
 
 /// Check that all constraints vanish on the subgroup.
 pub fn check_constraints<F, EF, A>(
@@ -91,61 +97,55 @@ pub fn check_constraints<F, EF, A>(
     });
 }
 
-/// Check that the combined cumulative sum across all lookup tables is zero.
-// TODO: Find exact mismatch
-pub fn check_cumulative_sums<
-    F: Field,
-    EF: ExtensionField<F>,
-    A: for<'a> Rap<DebugConstraintBuilder<'a, F, EF>>,
->(
+pub fn check_cumulative_sums<F, EF, A>(
     airs: &[A],
     preprocessed: &[Option<RowMajorMatrixView<F>>],
     main: &[Option<RowMajorMatrixView<F>>],
     permutation: &[Option<RowMajorMatrixView<EF>>],
-    num_bus: usize,
-) {
-    for b in 0..num_bus {
-        let mut sum = EF::zero();
-        for (i, air) in airs.iter().enumerate() {
-            for (j, (interaction, interaction_type)) in air.all_interactions().iter().enumerate() {
-                if interaction.argument_index == b {
-                    for (n, perm_row) in permutation[i].unwrap().rows().enumerate() {
-                        let preprocessed_row = preprocessed[i]
-                            .as_ref()
-                            .map(|preprocessed| {
-                                let row = preprocessed.row_slice(n);
-                                let row: &[_] = (*row).borrow();
-                                row.to_vec()
-                            })
-                            .unwrap_or_default();
-                        let main_row = main[i]
-                            .as_ref()
-                            .map(|main| {
-                                let row = main.row_slice(n);
-                                let row: &[_] = (*row).borrow();
-                                row.to_vec()
-                            })
-                            .unwrap_or_default();
-                        let perm_row: Vec<_> = perm_row.collect();
-                        let mult = interaction
-                            .count
-                            .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
-
-                        match interaction_type {
-                            InteractionType::Send => {
-                                sum += perm_row[j] * mult;
-                            }
-                            InteractionType::Receive => {
-                                sum -= perm_row[j] * mult;
-                            }
-                        }
-                    }
-                }
+) where
+    F: Field,
+    EF: ExtensionField<F>,
+    A: for<'a> Rap<DebugConstraintBuilder<'a, F, EF>>,
+{
+    let mut sums = BTreeMap::new();
+    for (i, air) in airs.iter().enumerate() {
+        for (j, (interaction, interaction_type)) in air.all_interactions().iter().enumerate() {
+            for (n, perm_row) in permutation[i].unwrap().rows().enumerate() {
+                let preprocessed_row = preprocessed[i]
+                    .as_ref()
+                    .map(|preprocessed| {
+                        let row = preprocessed.row_slice(n);
+                        let row: &[_] = (*row).borrow();
+                        row.to_vec()
+                    })
+                    .unwrap_or_default();
+                let main_row = main[i]
+                    .as_ref()
+                    .map(|main| {
+                        let row = main.row_slice(n);
+                        let row: &[_] = (*row).borrow();
+                        row.to_vec()
+                    })
+                    .unwrap_or_default();
+                let perm_row: Vec<_> = perm_row.collect();
+                let mult = interaction
+                    .count
+                    .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
+                let val = match interaction_type {
+                    InteractionType::Send => perm_row[j] * mult,
+                    InteractionType::Receive => -perm_row[j] * mult,
+                };
+                sums.entry(interaction.argument_index)
+                    .and_modify(|c| *c += val)
+                    .or_insert(val);
             }
         }
-        assert_eq!(sum, EF::zero(), "Non zero sum {b}");
+    }
+    for (i, sum) in sums {
+        assert_eq!(sum, EF::zero(), "Non zero sum at bus {i}");
     }
 
+    // Check cumulative sums
     let sum: EF = permutation
         .iter()
         .flatten()
@@ -153,3 +153,176 @@ pub fn check_cumulative_sums<
         .sum();
     assert_eq!(sum, EF::zero());
 }
+
+pub fn check_constraints_and_track<F, A, const SET_SIZE: usize>(
+    air: &A,
+    preprocessed: &Option<RowMajorMatrixView<F>>,
+    main: &Option<RowMajorMatrixView<F>>,
+    public_values: &[F],
+) -> Vec<(usize, usize)>
+where
+    F: PrimeField32,
+    A: for<'a> Air<TrackingConstraintBuilder<'a, F, SET_SIZE>>,
+{
+    let height = match (main.as_ref(), preprocessed.as_ref()) {
+        (Some(main), Some(preprocessed)) => core::cmp::max(main.height(), preprocessed.height()),
+        (Some(main), None) => main.height(),
+        (None, Some(preprocessed)) => preprocessed.height(),
+        (None, None) => 0,
+    };
+
+    let mut indices = vec![];
+    (0..height).into_par_iter().for_each(|i| {
+        let i_next = (i + 1) % height;
+
+        let (preprocessed_local, preprocessed_next) = preprocessed
+            .as_ref()
+            .map(|preprocessed| {
+                (
+                    preprocessed
+                        .row_slice(i)
+                        .iter()
+                        .enumerate()
+                        .map(|(i, x)| TrackedField::new_single(*x, i))
+                        .collect::<Vec<_>>(),
+                    preprocessed
+                        .row_slice(i_next)
+                        .iter()
+                        .enumerate()
+                        .map(|(i, x)| TrackedField::new_single(*x, i))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .unwrap_or((vec![], vec![]));
+        let (main_local, main_next) = main
+            .as_ref()
+            .map(|main| {
+                (
+                    main.row_slice(i)
+                        .iter()
+                        .enumerate()
+                        .map(|(i, x)| TrackedField::new_single(*x, i))
+                        .collect::<Vec<_>>(),
+                    main.row_slice(i_next)
+                        .iter()
+                        .enumerate()
+                        .map(|(i, x)| TrackedField::new_single(*x, i))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .unwrap_or((vec![], vec![]));
+        let public_values = public_values
+            .iter()
+            .map(|x| TrackedField::from(*x))
+            .collect::<Vec<_>>();
+
+        let mut builder = TrackingConstraintBuilder {
+            row_index: i,
+            col_indices: vec![],
+            preprocessed: VerticalPair::new(
+                RowMajorMatrixView::new_row(preprocessed_local.as_slice()),
+                RowMajorMatrixView::new_row(preprocessed_next.as_slice()),
+            ),
+            main: VerticalPair::new(
+                RowMajorMatrixView::new_row(&*main_local),
+                RowMajorMatrixView::new_row(&*main_next),
+            ),
+            public_values: public_values.as_slice(),
+            is_first_row: F::zero(),
+            is_last_row: F::zero(),
+            is_transition: F::one(),
+        };
+        if i == 0 {
+            builder.is_first_row = F::one();
+        }
+        if i == height - 1 {
+            builder.is_last_row = F::one();
+            builder.is_transition = F::zero();
+        }
+
+        air.eval(&mut builder);
+        indices.extend(builder.col_indices.iter().map(|&col| (i, col)));
+    });
+
+    indices
+}
+
+// pub fn check_lookups<F, EF, A, const SET_SIZE: usize>(
+//     airs: &[A],
+//     preprocessed: &[Option<RowMajorMatrixView<F>>],
+//     main: &[Option<RowMajorMatrixView<F>>],
+// ) where
+//     F: PrimeField32,
+//     EF: ExtensionField<TrackedField<F, SET_SIZE>>,
+//     A: for<'a> Rap<TrackingConstraintBuilder<'a, F, EF, SET_SIZE>>,
+// {
+//     let mut bus_counts = BTreeMap::new();
+//     for (i, air) in airs.iter().enumerate() {
+//         let preprocessed_i = preprocessed[i].as_ref();
+//         let main_i = main[i].as_ref();
+//         for (interaction, interaction_type) in air.all_interactions().iter() {
+//             let preprocessed_height = preprocessed_i.map_or(0, |t| t.height());
+//             let main_height = main_i.map_or(0, |t| t.height());
+//             let height = preprocessed_height.max(main_height);
+
+//             for n in 0..height {
+//                 let preprocessed_row = preprocessed_i
+//                     .map(|preprocessed| {
+//                         let row = preprocessed.row_slice(n);
+//                         let row: &[_] = (*row).borrow();
+//                         row.iter()
+//                             .enumerate()
+//                             .map(|(i, x)| TrackedField::new_single(*x, i))
+//                             .collect::<Vec<_>>()
+//                     })
+//                     .unwrap_or_default();
+//                 let main_row = main_i
+//                     .map(|main| {
+//                         let row = main.row_slice(n);
+//                         let row: &[_] = (*row).borrow();
+//                         row.iter()
+//                             .enumerate()
+//                             .map(|(i, x)| TrackedField::new_single(*x, i))
+//                             .collect::<Vec<_>>()
+//                     })
+//                     .unwrap_or_default();
+
+//                 let fields = interaction
+//                     .fields
+//                     .iter()
+//                     .map(|f| {
+//                         f.apply::<TrackedField<F, SET_SIZE>, TrackedField<F, SET_SIZE>>(
+//                             preprocessed_row.as_slice(),
+//                             main_row.as_slice(),
+//                         )
+//                     })
+//                     .collect::<Vec<_>>();
+//                 let mult = interaction
+//                     .count
+//                     .apply::<TrackedField<F, SET_SIZE>, TrackedField<F, SET_SIZE>>(
+//                         preprocessed_row.as_slice(),
+//                         main_row.as_slice(),
+//                     );
+//                 let val = match interaction_type {
+//                     InteractionType::Send => mult,
+//                     InteractionType::Receive => -mult,
+//                 };
+//                 bus_counts
+//                     .entry(interaction.argument_index)
+//                     .or_insert_with(HashMap::new)
+//                     .entry(fields)
+//                     .and_modify(|c| *c += val)
+//                     .or_insert(val);
+//             }
+//         }
+//         for (i, counts) in &bus_counts {
+//             for (fields, sum) in counts {
+//                 assert_eq!(
+//                     *sum,
+//                     F::zero().into(),
+//                     "Non zero sum at bus {i} for fields {fields:?}"
+//                 );
+//             }
+//         }
+//     }
+// }

@@ -18,7 +18,6 @@ fn generate_header_expr(
     prefix: &str,
     depth: u32,
 ) -> proc_macro2::TokenStream {
-    dbg!(field_type);
     match field_type {
         Type::Array(array) => {
             let elem_type = &array.elem;

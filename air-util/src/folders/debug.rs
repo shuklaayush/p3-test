@@ -3,8 +3,6 @@ use p3_air::{
 };
 use p3_field::{ExtensionField, Field};
 use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
-use p3_matrix::dense::RowMajorMatrixView;
-use p3_matrix::stack::VerticalPair;
 
 use super::ViewPair;
 
@@ -27,7 +25,7 @@ impl<'a, F: Field, EF: ExtensionField<F>> AirBuilder for DebugConstraintBuilder<
     type F = F;
     type Expr = F;
     type Var = F;
-    type M = VerticalPair<RowMajorMatrixView<'a, F>, RowMajorMatrixView<'a, F>>;
+    type M = ViewPair<'a, F>;
 
     fn main(&self) -> Self::M {
         self.main
@@ -110,7 +108,7 @@ impl<'a, F: Field, EF: ExtensionField<F>> ExtensionBuilder for DebugConstraintBu
 impl<'a, F: Field, EF: ExtensionField<F>> PermutationAirBuilder
     for DebugConstraintBuilder<'a, F, EF>
 {
-    type MP = VerticalPair<RowMajorMatrixView<'a, EF>, RowMajorMatrixView<'a, EF>>;
+    type MP = ViewPair<'a, EF>;
 
     type RandomVar = EF;
 
@@ -128,7 +126,7 @@ impl<'a, F: Field, EF: ExtensionField<F>> AirBuilderWithPublicValues
 {
     type PublicVar = F;
 
-    fn public_values(&self) -> &[Self::F] {
+    fn public_values(&self) -> &[Self::PublicVar] {
         self.public_values
     }
 }

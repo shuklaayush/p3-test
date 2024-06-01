@@ -98,7 +98,7 @@ where
         public_values: &'a [Val<SC>],
     ) -> MachineProof<SC>
     where
-        // TODO: Put behind trace-writer flag
+        // TODO: Put behind trace-writer feature
         Val<SC>: PrimeField32,
     {
         // TODO: Use fixed size array instead of Vecs
@@ -148,6 +148,11 @@ where
         // Verify constraints
         #[cfg(feature = "trace-writer")]
         let _ = trace.write_traces_to_file("trace.xlsx");
+        #[cfg(feature = "trace-writer")]
+        let indices = trace.check_constraints_and_track(&[]);
+        #[cfg(feature = "trace-writer")]
+        dbg!(indices);
+
         #[cfg(debug_assertions)]
         trace.check_constraints(perm_challenges, &[]);
 
@@ -214,8 +219,8 @@ where
         proof: &MachineProof<SC>,
         public_values: &'a [Val<SC>],
     ) -> Result<(), VerificationError> {
-        let pcs = config.pcs();
         let chips = self.chips();
+        let pcs = config.pcs();
 
         let mut trace: MachineTraceOpening<SC, _> = MachineTraceOpeningBuilder::new(&chips);
 
@@ -277,7 +282,7 @@ where
         trace.verify_constraints(zeta, alpha, perm_challenges, public_values)?;
 
         // Verify cumulative sum adds to zero
-        trace.check_cumulative_sums()?;
+        trace.verify_cumulative_sums()?;
 
         Ok(())
     }

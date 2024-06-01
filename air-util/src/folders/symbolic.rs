@@ -111,6 +111,7 @@ impl<F: Field> AirBuilder for SymbolicAirBuilder<F> {
 
 impl<F: Field> AirBuilderWithPublicValues for SymbolicAirBuilder<F> {
     type PublicVar = SymbolicVariable<F>;
+
     fn public_values(&self) -> &[Self::PublicVar] {
         &self.public_values
     }

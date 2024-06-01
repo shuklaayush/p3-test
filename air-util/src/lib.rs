@@ -9,6 +9,7 @@ pub mod proof;
 mod quotient;
 #[cfg(feature = "trace-writer")]
 mod trace_writer;
+mod util;
 
 pub use check_constraints::*;
 pub use quotient::*;
