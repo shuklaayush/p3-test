@@ -539,8 +539,8 @@ where
                 worksheet,
                 &preprocessed_trace,
                 &main_trace,
-                chip.sends(),
                 chip.receives(),
+                chip.sends(),
             )?;
         }
 

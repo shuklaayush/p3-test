@@ -14,23 +14,19 @@ pub trait InteractionAirBuilder: PermutationAirBuilder + PairBuilder {
 }
 
 pub trait InteractionAir<F: Field> {
-    fn sends(&self) -> Vec<Interaction<F>> {
-        vec![]
-    }
-
     fn receives(&self) -> Vec<Interaction<F>> {
         vec![]
     }
 
+    fn sends(&self) -> Vec<Interaction<F>> {
+        vec![]
+    }
+
     fn all_interactions(&self) -> Vec<(Interaction<F>, InteractionType)> {
-        self.sends()
+        self.receives()
             .into_iter()
-            .map(|i| (i, InteractionType::Send))
-            .chain(
-                self.receives()
-                    .into_iter()
-                    .map(|i| (i, InteractionType::Receive)),
-            )
+            .map(|i| (i, InteractionType::Receive))
+            .chain(self.sends().into_iter().map(|i| (i, InteractionType::Send)))
             .collect()
     }
 }
@@ -42,7 +38,7 @@ pub trait Rap<AB: InteractionAirBuilder>: Air<AB> + InteractionAir<AB::F> {
     }
 
     fn permutation_width(&self) -> Option<usize> {
-        let num_interactions = self.sends().len() + self.receives().len();
+        let num_interactions = self.receives().len() + self.sends().len();
         if num_interactions > 0 {
             Some(num_interactions + 1)
         } else {

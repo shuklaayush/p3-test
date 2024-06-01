@@ -24,8 +24,8 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
         ws: &mut Worksheet,
         preprocessed_trace: &Option<RowMajorMatrixView<F>>,
         main_trace: &Option<RowMajorMatrixView<F>>,
-        sends: Vec<Interaction<F>>,
         receives: Vec<Interaction<F>>,
+        sends: Vec<Interaction<F>>,
     ) -> Result<(), Box<dyn Error>>
     where
         F: PrimeField32,
@@ -33,22 +33,6 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
         let perprocessed_headers = self.preprocessed_headers();
         let main_headers = self.main_headers();
 
-        let send_headers: Vec<_> = sends
-            .iter()
-            .enumerate()
-            .flat_map(|(i, interaction)| {
-                once("".to_string())
-                    .chain(once("count".to_string()))
-                    .chain(
-                        interaction
-                            .fields
-                            .iter()
-                            .enumerate()
-                            .map(|(j, _)| format!("sends[{}][{}]", i, j)),
-                    )
-                    .collect::<Vec<_>>()
-            })
-            .collect();
         let receive_headers: Vec<_> = receives
             .iter()
             .enumerate()
@@ -65,12 +49,28 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
                     .collect::<Vec<_>>()
             })
             .collect();
+        let send_headers: Vec<_> = sends
+            .iter()
+            .enumerate()
+            .flat_map(|(i, interaction)| {
+                once("".to_string())
+                    .chain(once("count".to_string()))
+                    .chain(
+                        interaction
+                            .fields
+                            .iter()
+                            .enumerate()
+                            .map(|(j, _)| format!("sends[{}][{}]", i, j)),
+                    )
+                    .collect::<Vec<_>>()
+            })
+            .collect();
 
         let headers: Vec<_> = perprocessed_headers
             .iter()
             .chain(main_headers.iter())
-            .chain(send_headers.iter())
             .chain(receive_headers.iter())
+            .chain(send_headers.iter())
             .collect();
         ws.write_row(0, 0, headers)?;
 
@@ -119,7 +119,7 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
                 })
                 .unwrap_or_default();
 
-            for interaction in sends.iter() {
+            for interaction in receives.iter() {
                 // Blank column
                 offset += 1;
                 let count = interaction
@@ -133,7 +133,7 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
                     offset += 1;
                 }
             }
-            for interaction in receives.iter() {
+            for interaction in sends.iter() {
                 // Blank column
                 offset += 1;
                 let count = interaction

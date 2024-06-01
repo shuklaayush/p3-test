@@ -229,15 +229,15 @@ fn generate_trait_impls(
         }
 
         impl<F: Field> InteractionAir<F> for #enum_name {
-            fn sends(&self) -> Vec<Interaction<F>> {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionAir<F>>::sends(chip),)*
-                }
-            }
-
             fn receives(&self) -> Vec<Interaction<F>> {
                 match self {
                     #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionAir<F>>::receives(chip),)*
+                }
+            }
+
+            fn sends(&self) -> Vec<Interaction<F>> {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionAir<F>>::sends(chip),)*
                 }
             }
         }
