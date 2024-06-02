@@ -189,8 +189,6 @@ fn generate_trait_impls(
         use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, Rap};
         use p3_machine::chip::MachineChip;
         use p3_matrix::dense::RowMajorMatrix;
-        #[cfg(feature = "trace-writer")]
-        use p3_air_util::TraceWriter;
         use p3_uni_stark::{StarkGenericConfig, Val};
 
         impl std::fmt::Display for #enum_name {
@@ -237,28 +235,7 @@ fn generate_trait_impls(
             }
         }
 
-        impl<AB: InteractionAirBuilder> Rap<AB> for #enum_name {
-            fn preprocessed_width(&self) -> usize {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as Rap<AB>>::preprocessed_width(chip),)*
-                }
-            }
-        }
-
-        #[cfg(feature = "trace-writer")]
-        impl<F: PrimeField32, EF: ExtensionField<F>> TraceWriter<F, EF> for #enum_name {
-            fn preprocessed_headers(&self) -> Vec<String> {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::preprocessed_headers(chip),)*
-                }
-            }
-
-            fn main_headers(&self) -> Vec<String> {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::main_headers(chip),)*
-                }
-            }
-        }
+        impl<AB: InteractionAirBuilder> Rap<AB> for #enum_name {}
 
         impl<SC: StarkGenericConfig> MachineChip<SC> for #enum_name where Val<SC>: PrimeField32 {}
     }
