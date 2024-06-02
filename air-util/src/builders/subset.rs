@@ -9,8 +9,8 @@ use p3_air::{
 };
 use p3_matrix::Matrix;
 
-/// A subsequence of a matrix. The matrix will contain a subset of the elements of `self.inner`.
-pub struct SubMatrixElementFilter<T, M>
+/// A subset of a matrix. The matrix will contain a subset of the elements of `self.inner`.
+pub struct SubMatrix<T, M>
 where
     T: Send + Sync,
     M: Matrix<T>,
@@ -20,7 +20,7 @@ where
     _phantom: PhantomData<T>,
 }
 
-impl<T, M> SubMatrixElementFilter<T, M>
+impl<T, M> SubMatrix<T, M>
 where
     T: Send + Sync,
     M: Matrix<T>,
@@ -58,8 +58,8 @@ where
     }
 }
 
-/// Implement `Matrix` for `SubMatrixElementFilter`.
-impl<T, M> Matrix<T> for SubMatrixElementFilter<T, M>
+/// Implement `Matrix` for `SubMatrix`.
+impl<T, M> Matrix<T> for SubMatrix<T, M>
 where
     T: Send + Sync,
     M: Matrix<T>,
@@ -94,14 +94,14 @@ where
 
 /// A builder used to eval a sub-air. This will handle enforcing constraints for a subset of elements
 /// of a trace matrix. E.g., if a particular air needs to be enforced for a subset of the elements
-/// of the trace, then the SubSequenceAirBuilder can be used.
-pub struct SubSequenceAirBuilder<'a, AB: AirBuilder> {
+/// of the trace, then the SubsetAirBuilder can be used.
+pub struct SubsetAirBuilder<'a, AB: AirBuilder> {
     inner: &'a mut AB,
     preprocessed_indices: Vec<usize>,
     main_indices: Vec<usize>,
 }
 
-impl<'a, AB: AirBuilder> SubSequenceAirBuilder<'a, AB> {
+impl<'a, AB: AirBuilder> SubsetAirBuilder<'a, AB> {
     pub fn new(
         inner: &'a mut AB,
         preprocessed_indices: Vec<usize>,
@@ -115,15 +115,15 @@ impl<'a, AB: AirBuilder> SubSequenceAirBuilder<'a, AB> {
     }
 }
 
-impl<'a, AB: AirBuilder> AirBuilder for SubSequenceAirBuilder<'a, AB> {
+impl<'a, AB: AirBuilder> AirBuilder for SubsetAirBuilder<'a, AB> {
     type F = AB::F;
     type Expr = AB::Expr;
     type Var = AB::Var;
-    type M = SubMatrixElementFilter<Self::Var, AB::M>;
+    type M = SubMatrix<Self::Var, AB::M>;
 
     fn main(&self) -> Self::M {
         let matrix = self.inner.main();
-        SubMatrixElementFilter::new(matrix, self.main_indices.clone())
+        SubMatrix::new(matrix, self.main_indices.clone())
     }
 
     fn is_first_row(&self) -> Self::Expr {
@@ -143,16 +143,14 @@ impl<'a, AB: AirBuilder> AirBuilder for SubSequenceAirBuilder<'a, AB> {
     }
 }
 
-impl<'a, AB: PairBuilder> PairBuilder for SubSequenceAirBuilder<'a, AB> {
+impl<'a, AB: PairBuilder> PairBuilder for SubsetAirBuilder<'a, AB> {
     fn preprocessed(&self) -> Self::M {
         let matrix = self.inner.main();
-        SubMatrixElementFilter::new(matrix, self.preprocessed_indices.clone())
+        SubMatrix::new(matrix, self.preprocessed_indices.clone())
     }
 }
 
-impl<'a, AB: AirBuilderWithPublicValues> AirBuilderWithPublicValues
-    for SubSequenceAirBuilder<'a, AB>
-{
+impl<'a, AB: AirBuilderWithPublicValues> AirBuilderWithPublicValues for SubsetAirBuilder<'a, AB> {
     type PublicVar = AB::PublicVar;
 
     fn public_values(&self) -> &[Self::PublicVar] {
@@ -160,7 +158,7 @@ impl<'a, AB: AirBuilderWithPublicValues> AirBuilderWithPublicValues
     }
 }
 
-impl<'a, AB: ExtensionBuilder> ExtensionBuilder for SubSequenceAirBuilder<'a, AB> {
+impl<'a, AB: ExtensionBuilder> ExtensionBuilder for SubsetAirBuilder<'a, AB> {
     type EF = AB::EF;
     type ExprEF = AB::ExprEF;
     type VarEF = AB::VarEF;
@@ -173,7 +171,7 @@ impl<'a, AB: ExtensionBuilder> ExtensionBuilder for SubSequenceAirBuilder<'a, AB
     }
 }
 
-impl<'a, AB: PermutationAirBuilder> PermutationAirBuilder for SubSequenceAirBuilder<'a, AB> {
+impl<'a, AB: PermutationAirBuilder> PermutationAirBuilder for SubsetAirBuilder<'a, AB> {
     type MP = AB::MP;
 
     type RandomVar = AB::RandomVar;

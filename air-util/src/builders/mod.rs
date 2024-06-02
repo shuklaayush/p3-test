@@ -1,5 +1,5 @@
 mod sub;
-mod sub_sequence;
+mod subset;
 
 pub use sub::*;
-pub use sub_sequence::*;
+pub use subset::*;
