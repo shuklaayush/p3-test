@@ -107,9 +107,7 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
     let header_impl = quote! {};
 
     let stream = quote! {
-        use p3_interaction::{AirColumns};
-
-        impl #impl_generics AirColumns for #name #type_generics #where_clause {
+        impl #impl_generics p3_interaction::AirColumns for #name #type_generics #where_clause {
             type ColumnMap = #name<usize #(, #non_first_generics)*>;
 
             fn num_cols() -> usize {
