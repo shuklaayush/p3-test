@@ -14,7 +14,7 @@ use rust_xlsxwriter::{Color, Format, Worksheet};
 
 use crate::util::TraceEntry;
 
-pub trait TraceWriter<F: Field, EF: ExtensionField<F>>: PairWithColumnTypes {
+pub trait TraceWriter<F: Field, EF: ExtensionField<F>>: PairWithColumnTypes<F> {
     fn write_traces_to_worksheet(
         &self,
         ws: &mut Worksheet,
@@ -164,3 +164,5 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>>: PairWithColumnTypes {
         Ok(())
     }
 }
+
+impl<F: Field, EF: ExtensionField<F>, A: PairWithColumnTypes<F>> TraceWriter<F, EF> for A {}
