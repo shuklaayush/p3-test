@@ -8,13 +8,16 @@ use core::error::Error;
 use core::{borrow::Borrow, iter::once};
 
 use p3_field::{ExtensionField, Field, PrimeField32};
-use p3_interaction::{AirColumns, Interaction, PairWithColumnTypes};
+use p3_interaction::Interaction;
 use p3_matrix::{dense::RowMajorMatrixView, Matrix};
 use rust_xlsxwriter::{Color, Format, Worksheet};
 
 use crate::util::TraceEntry;
 
-pub trait TraceWriter<F: Field, EF: ExtensionField<F>>: PairWithColumnTypes<F> {
+pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
+    fn preprocessed_headers() -> Vec<String>;
+    fn main_headers() -> Vec<String>;
+
     fn write_traces_to_worksheet(
         &self,
         ws: &mut Worksheet,
@@ -27,8 +30,8 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>>: PairWithColumnTypes<F> {
     where
         F: PrimeField32,
     {
-        let perprocessed_headers = Self::PreprocessedColumns::headers();
-        let main_headers = Self::MainColumns::headers();
+        let perprocessed_headers = Self::preprocessed_headers();
+        let main_headers = Self::main_headers();
 
         let receive_headers: Vec<_> = receives
             .iter()
@@ -164,5 +167,3 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>>: PairWithColumnTypes<F> {
         Ok(())
     }
 }
-
-impl<F: Field, EF: ExtensionField<F>, A: PairWithColumnTypes<F>> TraceWriter<F, EF> for A {}

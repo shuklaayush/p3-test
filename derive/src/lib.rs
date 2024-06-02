@@ -107,14 +107,12 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
     let header_impl = quote! {};
 
     let stream = quote! {
-        impl #impl_generics p3_interaction::AirColumns for #name #type_generics #where_clause {
-            type ColumnMap = #name<usize #(, #non_first_generics)*>;
-
+        impl #impl_generics #name #type_generics #where_clause {
             fn num_cols() -> usize {
                 core::mem::size_of::<#name<u8 #(, #non_first_generics)*>>()
             }
 
-            fn col_map() -> Self::ColumnMap {
+            fn col_map() -> #name<usize #(, #non_first_generics)*> {
                 let num_cols = Self::num_cols();
                 let indices_arr = (0..num_cols).collect::<Vec<usize>>();
 

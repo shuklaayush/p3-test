@@ -1,5 +1,3 @@
-#[cfg(feature = "trace-writer")]
-use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
@@ -10,24 +8,6 @@ use p3_matrix::Matrix;
 
 use crate::interaction::{Interaction, InteractionType};
 use crate::util::{generate_rlc_elements, reduce_row};
-
-pub trait AirColumns {
-    type ColumnMap;
-
-    fn num_cols() -> usize;
-    fn col_map() -> Self::ColumnMap;
-    #[cfg(feature = "trace-writer")]
-    fn headers() -> Vec<String>;
-}
-
-pub trait PairWithColumnTypes<F> {
-    type PreprocessedColumns: AirColumns;
-    type MainColumns: AirColumns;
-
-    fn preprocessed_width(&self) -> usize {
-        Self::PreprocessedColumns::num_cols()
-    }
-}
 
 pub trait InteractionAirBuilder: PermutationAirBuilder + PairBuilder {
     fn cumulative_sum(&self) -> Self::VarEF;
@@ -51,9 +31,12 @@ pub trait InteractionAir<F: Field> {
     }
 }
 
-pub trait Rap<AB: InteractionAirBuilder>:
-    Air<AB> + InteractionAir<AB::F> + PairWithColumnTypes<AB::F>
-{
+pub trait Rap<AB: InteractionAirBuilder>: Air<AB> + InteractionAir<AB::F> {
+    fn preprocessed_width(&self) -> usize {
+        debug_assert!(self.preprocessed_trace().is_none());
+        0
+    }
+
     fn permutation_width(&self) -> Option<usize> {
         let num_interactions = self.receives().len() + self.sends().len();
         if num_interactions > 0 {

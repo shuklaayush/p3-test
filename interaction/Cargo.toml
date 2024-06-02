@@ -7,7 +7,3 @@ edition = "2021"
 p3-air = { workspace = true }
 p3-field = { workspace = true }
 p3-matrix = { workspace = true }
-
-[features]
-default = []
-trace-writer = []
