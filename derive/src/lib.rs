@@ -183,6 +183,7 @@ fn generate_trait_impls(
 
     quote! {
         use p3_air::{Air, AirBuilder, BaseAir};
+        #[cfg(feature = "trace-writer")]
         use p3_air_util::TraceWriter;
         use p3_field::{ExtensionField, Field, PrimeField32};
         use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, Rap};
@@ -236,6 +237,7 @@ fn generate_trait_impls(
 
         impl<AB: InteractionAirBuilder> Rap<AB> for #enum_name {}
 
+        #[cfg(feature = "trace-writer")]
         impl<F: PrimeField32, EF: ExtensionField<F>> TraceWriter<F, EF> for #enum_name {
             fn preprocessed_headers(&self) -> Vec<String> {
                 match self {
