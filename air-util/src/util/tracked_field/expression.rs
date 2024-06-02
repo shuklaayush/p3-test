@@ -5,15 +5,21 @@ use std::collections::BTreeSet;
 
 use p3_field::AbstractField;
 
-use super::variable::Entry;
-
 #[derive(Clone, Debug)]
-pub struct TrackedFieldExpression<F: AbstractField> {
+pub struct TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     pub value: F,
-    pub origin: BTreeSet<Entry>,
+    pub origin: BTreeSet<E>,
 }
 
-impl<F: AbstractField> Default for TrackedFieldExpression<F> {
+impl<F, E> Default for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn default() -> Self {
         Self {
             value: F::zero(),
@@ -22,7 +28,11 @@ impl<F: AbstractField> Default for TrackedFieldExpression<F> {
     }
 }
 
-impl<F: AbstractField> From<F> for TrackedFieldExpression<F> {
+impl<F, E> From<F> for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn from(value: F) -> Self {
         Self {
             value,
@@ -31,7 +41,11 @@ impl<F: AbstractField> From<F> for TrackedFieldExpression<F> {
     }
 }
 
-impl<F: AbstractField> Add for TrackedFieldExpression<F> {
+impl<F, E> Add for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
@@ -42,7 +56,11 @@ impl<F: AbstractField> Add for TrackedFieldExpression<F> {
     }
 }
 
-impl<F: AbstractField> Add<F> for TrackedFieldExpression<F> {
+impl<F, E> Add<F> for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     type Output = Self;
 
     fn add(self, rhs: F) -> Self {
@@ -50,31 +68,51 @@ impl<F: AbstractField> Add<F> for TrackedFieldExpression<F> {
     }
 }
 
-impl<F: AbstractField> AddAssign for TrackedFieldExpression<F> {
+impl<F, E> AddAssign for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn add_assign(&mut self, rhs: Self) {
         *self = self.clone() + rhs;
     }
 }
 
-impl<F: AbstractField> AddAssign<F> for TrackedFieldExpression<F> {
+impl<F, E> AddAssign<F> for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn add_assign(&mut self, rhs: F) {
         *self += Self::from(rhs);
     }
 }
 
-impl<F: AbstractField> Sum for TrackedFieldExpression<F> {
+impl<F, E> Sum for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.reduce(|x, y| x + y).unwrap_or(Self::zero())
     }
 }
 
-impl<F: AbstractField> Sum<F> for TrackedFieldExpression<F> {
+impl<F, E> Sum<F> for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn sum<I: Iterator<Item = F>>(iter: I) -> Self {
         iter.map(|x| Self::from(x)).sum()
     }
 }
 
-impl<F: AbstractField> Sub for TrackedFieldExpression<F> {
+impl<F, E> Sub for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self {
@@ -85,7 +123,11 @@ impl<F: AbstractField> Sub for TrackedFieldExpression<F> {
     }
 }
 
-impl<F: AbstractField> Sub<F> for TrackedFieldExpression<F> {
+impl<F, E> Sub<F> for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     type Output = Self;
 
     fn sub(self, rhs: F) -> Self {
@@ -93,19 +135,31 @@ impl<F: AbstractField> Sub<F> for TrackedFieldExpression<F> {
     }
 }
 
-impl<F: AbstractField> SubAssign for TrackedFieldExpression<F> {
+impl<F, E> SubAssign for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn sub_assign(&mut self, rhs: Self) {
         *self = self.clone() - rhs;
     }
 }
 
-impl<F: AbstractField> SubAssign<F> for TrackedFieldExpression<F> {
+impl<F, E> SubAssign<F> for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn sub_assign(&mut self, rhs: F) {
         *self -= Self::from(rhs);
     }
 }
 
-impl<F: AbstractField> Neg for TrackedFieldExpression<F> {
+impl<F, E> Neg for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     type Output = Self;
 
     fn neg(self) -> Self {
@@ -116,7 +170,11 @@ impl<F: AbstractField> Neg for TrackedFieldExpression<F> {
     }
 }
 
-impl<F: AbstractField> Mul for TrackedFieldExpression<F> {
+impl<F, E> Mul for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self {
@@ -127,7 +185,11 @@ impl<F: AbstractField> Mul for TrackedFieldExpression<F> {
     }
 }
 
-impl<F: AbstractField> Mul<F> for TrackedFieldExpression<F> {
+impl<F, E> Mul<F> for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     type Output = Self;
 
     fn mul(self, rhs: F) -> Self {
@@ -135,31 +197,51 @@ impl<F: AbstractField> Mul<F> for TrackedFieldExpression<F> {
     }
 }
 
-impl<F: AbstractField> MulAssign for TrackedFieldExpression<F> {
+impl<F, E> MulAssign for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn mul_assign(&mut self, rhs: Self) {
         *self = self.clone() * rhs;
     }
 }
 
-impl<F: AbstractField> MulAssign<F> for TrackedFieldExpression<F> {
+impl<F, E> MulAssign<F> for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn mul_assign(&mut self, rhs: F) {
         *self *= Self::from(rhs);
     }
 }
 
-impl<F: AbstractField> Product for TrackedFieldExpression<F> {
+impl<F, E> Product for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.reduce(|x, y| x * y).unwrap_or(Self::one())
     }
 }
 
-impl<F: AbstractField> Product<F> for TrackedFieldExpression<F> {
+impl<F, E> Product<F> for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     fn product<I: Iterator<Item = F>>(iter: I) -> Self {
         iter.map(|x| Self::from(x)).product()
     }
 }
 
-impl<F: AbstractField> AbstractField for TrackedFieldExpression<F> {
+impl<F, E> AbstractField for TrackedFieldExpression<F, E>
+where
+    F: AbstractField,
+    E: Default + Clone + Debug + Ord,
+{
     type F = F::F;
 
     fn zero() -> Self {

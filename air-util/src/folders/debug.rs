@@ -48,9 +48,8 @@ impl<'a, F: Field, EF: ExtensionField<F>> AirBuilder for DebugConstraintBuilder<
     }
 
     fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) {
-        assert_eq!(
-            x.into(),
-            F::zero(),
+        assert!(
+            x.into().is_zero(),
             "constraints had nonzero value on row {}",
             self.row_index
         );
@@ -92,9 +91,8 @@ impl<'a, F: Field, EF: ExtensionField<F>> ExtensionBuilder for DebugConstraintBu
     where
         I: Into<Self::ExprEF>,
     {
-        assert_eq!(
-            x.into(),
-            EF::zero(),
+        assert!(
+            x.into().is_zero(),
             "constraints had nonzero value on row {}",
             self.row_index
         );

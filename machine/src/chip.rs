@@ -1,5 +1,6 @@
 use core::fmt::Display;
 use p3_uni_stark::{StarkGenericConfig, Val};
+use std::fmt::Debug;
 
 use p3_air_util::folders::{
     DebugConstraintBuilder, ProverConstraintFolder, SymbolicAirBuilder, TrackingConstraintBuilder,
@@ -12,6 +13,7 @@ use p3_interaction::Rap;
 pub trait MachineChip<SC: StarkGenericConfig>:
 // TODO: Remove clone
     Clone
+    + Debug
     + Display
     + for<'a> Rap<ProverConstraintFolder<'a, SC>>
     + for<'a> Rap<VerifierConstraintFolder<'a, SC>>

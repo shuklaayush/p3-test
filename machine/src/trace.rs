@@ -5,10 +5,12 @@ use alloc::vec::Vec;
 
 use itertools::Itertools;
 use p3_air::BaseAir;
-use p3_air_util::util::Entry;
+use p3_air_util::track_failing_interactions;
+use p3_air_util::util::{MultiTraceEntry, TraceEntry};
 use p3_air_util::{
-    check_constraints, check_constraints_and_track, check_cumulative_sums, get_quotient_degree,
+    check_constraints, check_cumulative_sums, get_quotient_degree,
     proof::{AdjacentOpenedValues, InteractionAirProof, OpenedValues},
+    track_failing_constraints,
 };
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
@@ -20,6 +22,7 @@ use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
 use core::error::Error;
 #[cfg(feature = "trace-writer")]
 use p3_field::PrimeField32;
+use std::collections::BTreeSet;
 
 use crate::{
     chip::MachineChip, error::VerificationError, proof::Com, proof::PcsProverData,
@@ -427,13 +430,14 @@ where
 {
     fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]);
 
-    fn check_constraints_and_track(
+    // TODO: Move to separate trait
+    fn track_failing_constraints(
         &self,
         perm_challenges: [SC::Challenge; 2],
         public_values: &[Val<SC>],
-    ) -> Vec<Vec<Entry>>
-    where
-        Val<SC>: PrimeField32;
+    ) -> Vec<BTreeSet<TraceEntry>>;
+
+    fn track_failing_interactions(&self) -> Vec<BTreeSet<TraceEntry>>;
 }
 
 impl<SC, C> MachineTraceChecker<SC> for MachineTrace<SC, C>
@@ -506,14 +510,11 @@ where
         );
     }
 
-    fn check_constraints_and_track(
+    fn track_failing_constraints(
         &self,
         perm_challenges: [SC::Challenge; 2],
         public_values: &[Val<SC>],
-    ) -> Vec<Vec<Entry>>
-    where
-        Val<SC>: PrimeField32,
-    {
+    ) -> Vec<BTreeSet<TraceEntry>> {
         let mut chip_indices = Vec::new();
         for chip_trace in self.iter() {
             let preprocessed = chip_trace
@@ -528,7 +529,7 @@ where
                 .permutation
                 .as_ref()
                 .map(|permutation| permutation.trace.value.as_view());
-            let indices = check_constraints_and_track(
+            let indices = track_failing_constraints(
                 &chip_trace.chip,
                 &preprocessed,
                 &main,
@@ -541,6 +542,34 @@ where
         }
         chip_indices
     }
+
+    fn track_failing_interactions(&self) -> Vec<BTreeSet<TraceEntry>> {
+        let preprocessed_traces = self
+            .iter()
+            .map(|chip_trace| {
+                chip_trace
+                    .preprocessed
+                    .as_ref()
+                    .map(|preprocessed| preprocessed.trace.value.as_view())
+            })
+            .collect_vec();
+        let main_traces = self
+            .iter()
+            .map(|chip_trace| {
+                chip_trace
+                    .main
+                    .as_ref()
+                    .map(|main| main.trace.value.as_view())
+            })
+            .collect_vec();
+
+        let airs = self
+            .iter()
+            .map(|chip_trace| chip_trace.chip.clone())
+            .collect_vec();
+
+        track_failing_interactions(&airs, &preprocessed_traces, &main_traces)
+    }
 }
 
 #[cfg(feature = "trace-writer")]
@@ -549,7 +578,11 @@ where
     SC: StarkGenericConfig,
     Val<SC>: PrimeField32,
 {
-    fn write_traces_to_file(&self, path: &str) -> Result<(), Box<dyn Error>>;
+    fn write_traces_to_file(
+        &self,
+        path: &str,
+        perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
+    ) -> Result<(), Box<dyn Error>>;
 }
 
 #[cfg(feature = "trace-writer")]
@@ -559,14 +592,30 @@ where
     Val<SC>: PrimeField32,
     C: MachineChip<SC>,
 {
-    fn write_traces_to_file(&self, path: &str) -> Result<(), Box<dyn Error>>
+    fn write_traces_to_file(
+        &self,
+        path: &str,
+        perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
+    ) -> Result<(), Box<dyn Error>>
     where
         Val<SC>: PrimeField32,
     {
         use rust_xlsxwriter::Workbook;
 
         let mut workbook = Workbook::new();
-        for chip_trace in self.iter() {
+
+        // TODO: Account for public values
+        let mut entries = vec![BTreeSet::new(); self.len()];
+        self.track_failing_constraints(perm_challenges, &[])
+            .iter()
+            .zip(&mut entries)
+            .for_each(|(entry, set)| set.extend(entry));
+        self.track_failing_interactions()
+            .iter()
+            .zip(&mut entries)
+            .for_each(|(entry, set)| set.extend(entry));
+
+        for (chip_trace, chip_entries) in self.iter().zip(entries) {
             let chip = &chip_trace.chip;
 
             let worksheet = workbook.add_worksheet();
@@ -587,6 +636,7 @@ where
                 &main_trace,
                 chip.receives(),
                 chip.sends(),
+                chip_entries,
             )?;
         }
 

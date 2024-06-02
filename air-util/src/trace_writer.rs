@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
@@ -10,7 +11,9 @@ use core::{borrow::Borrow, iter::once};
 use p3_field::{ExtensionField, Field, PrimeField32};
 use p3_interaction::Interaction;
 use p3_matrix::{dense::RowMajorMatrixView, Matrix};
-use rust_xlsxwriter::Worksheet;
+use rust_xlsxwriter::{Color, Format, Worksheet};
+
+use crate::util::TraceEntry;
 
 pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
     fn main_headers(&self) -> Vec<String>;
@@ -26,6 +29,7 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
         main_trace: &Option<RowMajorMatrixView<F>>,
         receives: Vec<Interaction<F>>,
         sends: Vec<Interaction<F>>,
+        entries: BTreeSet<TraceEntry>,
     ) -> Result<(), Box<dyn Error>>
     where
         F: PrimeField32,
@@ -81,10 +85,18 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
             let mut offset = 0;
             if let Some(preprocessed_trace) = preprocessed_trace {
                 for j in 0..preprocessed_trace.width() {
-                    ws.write_number(
+                    let format = {
+                        if entries.contains(&TraceEntry::Preprocessed { row: i, col: j }) {
+                            Format::new().set_background_color(Color::Red)
+                        } else {
+                            Format::new()
+                        }
+                    };
+                    ws.write_number_with_format(
                         i as u32 + 1,
                         offset + j as u16,
                         preprocessed_trace.get(i, j).as_canonical_u32() as f64,
+                        &format,
                     )?;
                 }
                 offset += preprocessed_trace.width() as u16;
@@ -92,10 +104,18 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
 
             if let Some(main_trace) = main_trace {
                 for j in 0..main_trace.width() {
-                    ws.write_number(
+                    let format = {
+                        if entries.contains(&TraceEntry::Main { row: i, col: j }) {
+                            Format::new().set_background_color(Color::Red)
+                        } else {
+                            Format::new()
+                        }
+                    };
+                    ws.write_number_with_format(
                         i as u32 + 1,
                         offset + j as u16,
                         main_trace.get(i, j).as_canonical_u32() as f64,
+                        &format,
                     )?;
                 }
                 offset += main_trace.width() as u16;

@@ -1,56 +1,62 @@
 use core::iter::{Product, Sum};
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use p3_field::{AbstractExtensionField, AbstractField};
 
 use super::TrackedFieldExpression;
 
-// TODO: Ideally we don't need this struct and can just use TrackedFieldExpression<EF>
+// TODO: Ideally we don't need this struct and can just use TrackedFieldExpression<EF, E>
 //       but running into trait bounds issues
 #[derive(Clone, Debug)]
-pub struct TrackedExtensionFieldExpression<F, EF>(
-    pub TrackedFieldExpression<EF>,
+pub struct TrackedExtensionFieldExpression<F, EF, E>(
+    pub TrackedFieldExpression<EF, E>,
     pub PhantomData<F>,
 )
 where
     F: AbstractField,
-    EF: AbstractExtensionField<F>;
+    EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord;
 
-impl<F, EF> Default for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Default for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     fn default() -> Self {
-        Self::from(TrackedFieldExpression::<F>::default())
+        Self::from(TrackedFieldExpression::<F, E>::default())
     }
 }
 
-impl<F, EF> From<F> for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> From<F> for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     fn from(value: F) -> Self {
         Self(TrackedFieldExpression::from(EF::from(value)), PhantomData)
     }
 }
 
-impl<F, EF> From<TrackedFieldExpression<F>> for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> From<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
-    fn from(value: TrackedFieldExpression<F>) -> Self {
+    fn from(value: TrackedFieldExpression<F, E>) -> Self {
         Self::from(value.value)
     }
 }
 
-impl<F, EF> Add for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Add for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
@@ -59,52 +65,57 @@ where
     }
 }
 
-impl<F, EF> Add<TrackedFieldExpression<F>> for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Add<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
-    fn add(self, rhs: TrackedFieldExpression<F>) -> Self::Output {
+    fn add(self, rhs: TrackedFieldExpression<F, E>) -> Self::Output {
         self + Self::from(rhs)
     }
 }
 
-impl<F, EF> AddAssign for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> AddAssign for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     fn add_assign(&mut self, rhs: Self) {
         *self = self.clone() + rhs;
     }
 }
 
-impl<F, EF> AddAssign<TrackedFieldExpression<F>> for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> AddAssign<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
-    fn add_assign(&mut self, rhs: TrackedFieldExpression<F>) {
+    fn add_assign(&mut self, rhs: TrackedFieldExpression<F, E>) {
         *self = self.clone() + rhs;
     }
 }
 
-impl<F, EF> Sum for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Sum for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.reduce(|x, y| x + y).unwrap_or(Self::zero())
     }
 }
 
-impl<F, EF> Sub for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Sub for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
@@ -113,42 +124,46 @@ where
     }
 }
 
-impl<F, EF> Sub<TrackedFieldExpression<F>> for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Sub<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
-    fn sub(self, rhs: TrackedFieldExpression<F>) -> Self::Output {
+    fn sub(self, rhs: TrackedFieldExpression<F, E>) -> Self::Output {
         self - Self::from(rhs)
     }
 }
 
-impl<F, EF> SubAssign for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> SubAssign for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     fn sub_assign(&mut self, rhs: Self) {
         *self = self.clone() - rhs;
     }
 }
 
-impl<F, EF> SubAssign<TrackedFieldExpression<F>> for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> SubAssign<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
-    fn sub_assign(&mut self, rhs: TrackedFieldExpression<F>) {
+    fn sub_assign(&mut self, rhs: TrackedFieldExpression<F, E>) {
         *self = self.clone() - rhs;
     }
 }
 
-impl<F, EF> Neg for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Neg for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
@@ -157,10 +172,11 @@ where
     }
 }
 
-impl<F, EF> Mul for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Mul for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
@@ -169,51 +185,56 @@ where
     }
 }
 
-impl<F, EF> Mul<TrackedFieldExpression<F>> for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Mul<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
-    fn mul(self, rhs: TrackedFieldExpression<F>) -> Self::Output {
+    fn mul(self, rhs: TrackedFieldExpression<F, E>) -> Self::Output {
         self * Self::from(rhs)
     }
 }
 
-impl<F, EF> MulAssign for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> MulAssign for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     fn mul_assign(&mut self, rhs: Self) {
         *self = self.clone() * rhs;
     }
 }
 
-impl<F, EF> MulAssign<TrackedFieldExpression<F>> for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> MulAssign<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
-    fn mul_assign(&mut self, rhs: TrackedFieldExpression<F>) {
+    fn mul_assign(&mut self, rhs: TrackedFieldExpression<F, E>) {
         *self = self.clone() * rhs;
     }
 }
 
-impl<F, EF> Product for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> Product for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.reduce(|x, y| x * y).unwrap_or(Self::one())
     }
 }
-impl<F, EF> AbstractField for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> AbstractField for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     type F = EF::F;
 
@@ -274,30 +295,31 @@ where
     }
 }
 
-impl<F, EF> AbstractExtensionField<TrackedFieldExpression<F>>
-    for TrackedExtensionFieldExpression<F, EF>
+impl<F, EF, E> AbstractExtensionField<TrackedFieldExpression<F, E>>
+    for TrackedExtensionFieldExpression<F, EF, E>
 where
     F: AbstractField,
     EF: AbstractExtensionField<F>,
+    E: Default + Clone + Debug + Ord,
 {
     const D: usize = EF::D;
 
-    fn from_base(b: TrackedFieldExpression<F>) -> Self {
+    fn from_base(b: TrackedFieldExpression<F, E>) -> Self {
         Self::from(b)
     }
 
-    fn from_base_slice(bs: &[TrackedFieldExpression<F>]) -> Self {
+    fn from_base_slice(bs: &[TrackedFieldExpression<F, E>]) -> Self {
         let bs = bs.iter().map(|b| b.value.clone()).collect::<Vec<_>>();
         let value = EF::from_base_slice(&bs);
         Self(TrackedFieldExpression::from(value), PhantomData)
     }
 
-    fn from_base_fn<FN: FnMut(usize) -> TrackedFieldExpression<F>>(mut f: FN) -> Self {
+    fn from_base_fn<FN: FnMut(usize) -> TrackedFieldExpression<F, E>>(mut f: FN) -> Self {
         let value = EF::from_base_fn(|i| f(i).value.clone());
         Self(TrackedFieldExpression::from(value), PhantomData)
     }
 
-    fn as_base_slice(&self) -> &[TrackedFieldExpression<F>] {
+    fn as_base_slice(&self) -> &[TrackedFieldExpression<F, E>] {
         unimplemented!("TrackedExtensionFieldExpression::as_base_slice")
     }
 }

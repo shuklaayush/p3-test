@@ -8,7 +8,7 @@ use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
 
 use super::ViewPair;
 use crate::util::{
-    Entry, TrackedExtensionFieldExpression, TrackedFieldExpression, TrackedFieldVariable,
+    TraceEntry, TrackedExtensionFieldExpression, TrackedFieldExpression, TrackedFieldVariable,
 };
 
 pub struct TrackingConstraintBuilder<'a, F, EF>
@@ -16,13 +16,13 @@ where
     F: Field,
     EF: ExtensionField<F>,
 {
-    pub entries: BTreeSet<Entry>,
-    pub preprocessed: ViewPair<'a, TrackedFieldVariable<F>>,
-    pub main: ViewPair<'a, TrackedFieldVariable<F>>,
-    pub permutation: ViewPair<'a, TrackedFieldVariable<EF>>,
-    pub perm_challenges: [TrackedFieldVariable<EF>; NUM_PERM_CHALLENGES],
-    pub public_values: &'a [TrackedFieldVariable<F>],
-    pub cumulative_sum: TrackedFieldVariable<EF>,
+    pub entries: BTreeSet<TraceEntry>,
+    pub preprocessed: ViewPair<'a, TrackedFieldVariable<F, TraceEntry>>,
+    pub main: ViewPair<'a, TrackedFieldVariable<F, TraceEntry>>,
+    pub permutation: ViewPair<'a, TrackedFieldVariable<EF, TraceEntry>>,
+    pub perm_challenges: [TrackedFieldVariable<EF, TraceEntry>; NUM_PERM_CHALLENGES],
+    pub public_values: &'a [TrackedFieldVariable<F, TraceEntry>],
+    pub cumulative_sum: TrackedFieldVariable<EF, TraceEntry>,
     pub is_first_row: F,
     pub is_last_row: F,
     pub is_transition: F,
@@ -34,9 +34,9 @@ where
     EF: ExtensionField<F>,
 {
     type F = F;
-    type Expr = TrackedFieldExpression<F>;
-    type Var = TrackedFieldVariable<F>;
-    type M = ViewPair<'a, TrackedFieldVariable<F>>;
+    type Expr = TrackedFieldExpression<F, TraceEntry>;
+    type Var = TrackedFieldVariable<F, TraceEntry>;
+    type M = ViewPair<'a, TrackedFieldVariable<F, TraceEntry>>;
 
     fn main(&self) -> Self::M {
         self.main
@@ -60,7 +60,7 @@ where
 
     fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) {
         let x = x.into();
-        if x.value != F::zero() {
+        if !x.value.is_zero() {
             self.entries.extend(x.origin);
         }
     }
@@ -81,7 +81,7 @@ where
     F: Field,
     EF: ExtensionField<F>,
 {
-    type PublicVar = TrackedFieldVariable<F>;
+    type PublicVar = TrackedFieldVariable<F, TraceEntry>;
 
     fn public_values(&self) -> &[Self::PublicVar] {
         self.public_values
@@ -94,15 +94,15 @@ where
     EF: ExtensionField<F>,
 {
     type EF = EF;
-    type ExprEF = TrackedExtensionFieldExpression<F, EF>;
-    type VarEF = TrackedFieldVariable<EF>;
+    type ExprEF = TrackedExtensionFieldExpression<F, EF, TraceEntry>;
+    type VarEF = TrackedFieldVariable<EF, TraceEntry>;
 
     fn assert_zero_ext<I>(&mut self, x: I)
     where
         I: Into<Self::ExprEF>,
     {
         let x = x.into();
-        if x.0.value != EF::zero() {
+        if !x.0.value.is_zero() {
             self.entries.extend(x.0.origin);
         }
     }
