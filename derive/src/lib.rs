@@ -97,7 +97,7 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
     #[cfg(feature = "trace-writer")]
     let header_impl = quote! {
         #[cfg(feature = "trace-writer")]
-        fn headers() -> Vec<String> {
+        pub fn headers() -> Vec<String> {
             let mut headers = Vec::new();
             #(#header_exprs)*
             headers
@@ -108,11 +108,11 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
 
     let stream = quote! {
         impl #impl_generics #name #type_generics #where_clause {
-            fn num_cols() -> usize {
+            pub fn num_cols() -> usize {
                 core::mem::size_of::<#name<u8 #(, #non_first_generics)*>>()
             }
 
-            fn col_map() -> #name<usize #(, #non_first_generics)*> {
+            pub fn col_map() -> #name<usize #(, #non_first_generics)*> {
                 let num_cols = Self::num_cols();
                 let indices_arr = (0..num_cols).collect::<Vec<usize>>();
 
