@@ -15,8 +15,11 @@ use rust_xlsxwriter::{Color, Format, Worksheet};
 use crate::util::TraceEntry;
 
 pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
-    fn preprocessed_headers() -> Vec<String>;
-    fn main_headers() -> Vec<String>;
+    fn preprocessed_headers(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn headers(&self) -> Vec<String>;
 
     fn write_traces_to_worksheet(
         &self,
@@ -30,8 +33,8 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
     where
         F: PrimeField32,
     {
-        let perprocessed_headers = Self::preprocessed_headers();
-        let main_headers = Self::main_headers();
+        let perprocessed_headers = self.preprocessed_headers();
+        let main_headers = self.headers();
 
         let receive_headers: Vec<_> = receives
             .iter()

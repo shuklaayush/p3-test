@@ -108,7 +108,7 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
 
     let stream = quote! {
         impl #impl_generics #name #type_generics #where_clause {
-            pub fn num_cols() -> usize {
+            pub const fn num_cols() -> usize {
                 core::mem::size_of::<#name<u8 #(, #non_first_generics)*>>()
             }
 
@@ -183,6 +183,7 @@ fn generate_trait_impls(
 
     quote! {
         use p3_air::{Air, AirBuilder, BaseAir};
+        use p3_air_util::TraceWriter;
         use p3_field::{ExtensionField, Field, PrimeField32};
         use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, Rap};
         use p3_machine::chip::MachineChip;
@@ -234,6 +235,20 @@ fn generate_trait_impls(
         }
 
         impl<AB: InteractionAirBuilder> Rap<AB> for #enum_name {}
+
+        impl<F: PrimeField32, EF: ExtensionField<F>> TraceWriter<F, EF> for #enum_name {
+            fn preprocessed_headers(&self) -> Vec<String> {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::preprocessed_headers(chip),)*
+                }
+            }
+
+            fn headers(&self) -> Vec<String> {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::headers(chip),)*
+                }
+            }
+        }
 
         impl<SC: StarkGenericConfig> MachineChip<SC> for #enum_name where Val<SC>: PrimeField32 {}
     }
