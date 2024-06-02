@@ -20,7 +20,7 @@ pub trait AirColumns {
     fn headers() -> Vec<String>;
 }
 
-pub trait PairWithColumnTypes {
+pub trait PairWithColumnTypes<F> {
     type PreprocessedColumns: AirColumns;
     type MainColumns: AirColumns;
 
@@ -52,7 +52,7 @@ pub trait InteractionAir<F: Field> {
 }
 
 pub trait Rap<AB: InteractionAirBuilder>:
-    Air<AB> + InteractionAir<AB::F> + PairWithColumnTypes
+    Air<AB> + InteractionAir<AB::F> + PairWithColumnTypes<AB::F>
 {
     fn permutation_width(&self) -> Option<usize> {
         let num_interactions = self.receives().len() + self.sends().len();
