@@ -195,6 +195,7 @@ fn generate_trait_impls(
         use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, Rap};
         use p3_machine::chip::MachineChip;
         use p3_matrix::dense::RowMajorMatrix;
+        #[cfg(feature = "trace-writer")]
         use p3_air_util::TraceWriter;
         use p3_uni_stark::{StarkGenericConfig, Val};
 
