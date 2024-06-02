@@ -69,7 +69,17 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
         })
         .next()
         .expect("Expected at least one generic");
-    let non_first_generics = input.generics.params.iter().skip(1).collect::<Vec<_>>();
+    let non_first_generics = input
+        .generics
+        .params
+        .iter()
+        .skip(1)
+        .filter_map(|param| match param {
+            GenericParam::Type(type_param) => Some(&type_param.ident),
+            GenericParam::Const(const_param) => Some(&const_param.ident),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
     let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
 
     #[cfg(feature = "trace-writer")]
