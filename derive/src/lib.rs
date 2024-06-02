@@ -54,8 +54,8 @@ fn generate_header_expr(
     }
 }
 
-#[proc_macro_derive(AirColumns)]
-pub fn air_columns_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Columns)]
+pub fn columns_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = input.ident;
 
@@ -94,14 +94,29 @@ pub fn air_columns_derive(input: TokenStream) -> TokenStream {
         ));
     }
 
+    #[cfg(feature = "trace-writer")]
+    let header_impl = quote! {
+        #[cfg(feature = "trace-writer")]
+        fn headers() -> Vec<String> {
+            let mut headers = Vec::new();
+            #(#header_exprs)*
+            headers
+        }
+    };
+    #[cfg(not(feature = "trace-writer"))]
+    let header_impl = quote! {};
+
     let stream = quote! {
-        impl #impl_generics  #name #type_generics #where_clause {
-            pub const fn num_cols() -> usize {
+        use p3_interaction::{AirColumns};
+
+        impl #impl_generics AirColumns for #name #type_generics #where_clause {
+            type ColumnMap = #name<usize #(, #non_first_generics)*>;
+
+            fn num_cols() -> usize {
                 core::mem::size_of::<#name<u8 #(, #non_first_generics)*>>()
             }
 
-            // TODO: Ideally const
-            pub fn col_map() -> #name<usize #(, #non_first_generics)*> {
+            fn col_map() -> Self::ColumnMap {
                 let num_cols = Self::num_cols();
                 let indices_arr = (0..num_cols).collect::<Vec<usize>>();
 
@@ -112,6 +127,8 @@ pub fn air_columns_derive(input: TokenStream) -> TokenStream {
                     cols.assume_init()
                 }
             }
+
+            #header_impl
         }
 
         impl #impl_generics core::borrow::Borrow<#name #type_generics> for [#type_generic] #where_clause {
@@ -135,28 +152,7 @@ pub fn air_columns_derive(input: TokenStream) -> TokenStream {
         }
     };
 
-    #[cfg(feature = "trace-writer")]
-    let header_stream = quote! {
-        #[cfg(feature = "trace-writer")]
-        impl #impl_generics  #name #type_generics #where_clause {
-            pub fn headers() -> Vec<String> {
-                let mut headers = Vec::new();
-                #(#header_exprs)*
-                headers
-            }
-        }
-    };
-
-    #[cfg(feature = "trace-writer")]
-    let out = {
-        let mut stream = TokenStream::from(stream);
-        stream.extend(TokenStream::from(header_stream));
-        stream
-    };
-    #[cfg(not(feature = "trace-writer"))]
-    let out = TokenStream::from(stream);
-
-    out
+    TokenStream::from(stream)
 }
 
 #[proc_macro_derive(EnumDispatch)]

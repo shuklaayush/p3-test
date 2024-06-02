@@ -1,10 +1,10 @@
 #[cfg(feature = "trace-writer")]
-use p3_derive::AirColumns;
+use p3_derive::Columns;
 
 #[test]
 #[cfg(feature = "trace-writer")]
 fn test_generics() {
-    #[derive(AirColumns)]
+    #[derive(Columns)]
     struct A<T> {
         _a: T,
     }
@@ -14,7 +14,7 @@ fn test_generics() {
 #[test]
 #[cfg(feature = "trace-writer")]
 fn test_generic_array() {
-    #[derive(AirColumns)]
+    #[derive(Columns)]
     struct A<T> {
         _a: [T; 1],
     }
@@ -25,7 +25,7 @@ fn test_generic_array() {
 #[test]
 #[cfg(feature = "trace-writer")]
 fn test_generic_nested_array() {
-    #[derive(AirColumns)]
+    #[derive(Columns)]
     struct A<T> {
         _a: [[T; 1]; 1],
     }
@@ -38,7 +38,7 @@ fn test_generic_nested_array() {
 fn test_array_variable_length() {
     const N: usize = 1;
 
-    #[derive(AirColumns)]
+    #[derive(Columns)]
     struct A<T> {
         _a: [T; N],
     }
@@ -51,7 +51,7 @@ fn test_array_variable_length() {
 fn test_nested_array_variable_length() {
     const N: usize = 1;
 
-    #[derive(AirColumns)]
+    #[derive(Columns)]
     struct A<T> {
         _a: [[T; N]; N],
     }

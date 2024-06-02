@@ -11,6 +11,8 @@ use tracing::instrument;
 
 use p3_air_util::proof::Commitments;
 
+#[cfg(debug_assertions)]
+use crate::trace::MachineTraceChecker;
 #[cfg(feature = "trace-writer")]
 use crate::trace::MachineTraceDebugger;
 use crate::{
@@ -20,10 +22,9 @@ use crate::{
         MachineProof, ProverPreprocessedData, ProvingKey, VerifierPreprocessedData, VerifyingKey,
     },
     trace::{
-        MachineTrace, MachineTraceBuilder, MachineTraceChecker, MachineTraceCommiter,
-        MachineTraceConstraintVerifier, MachineTraceLoader, MachineTraceOpener,
-        MachineTraceOpening, MachineTraceOpeningBuilder, MachineTraceOpeningLoader,
-        MachineTraceOpeningVerifier,
+        MachineTrace, MachineTraceBuilder, MachineTraceCommiter, MachineTraceConstraintVerifier,
+        MachineTraceLoader, MachineTraceOpener, MachineTraceOpening, MachineTraceOpeningBuilder,
+        MachineTraceOpeningLoader, MachineTraceOpeningVerifier,
     },
 };
 

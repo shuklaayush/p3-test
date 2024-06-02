@@ -253,6 +253,7 @@ dependencies = [
 name = "p3-derive"
 version = "0.1.0"
 dependencies = [
+ "p3-interaction",
  "proc-macro2",
  "quote",
  "syn",
