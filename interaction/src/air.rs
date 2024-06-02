@@ -10,7 +10,7 @@ use crate::interaction::{Interaction, InteractionType};
 use crate::util::{generate_rlc_elements, reduce_row};
 
 pub trait InteractionAirBuilder: PermutationAirBuilder + PairBuilder {
-    fn cumulative_sum(&self) -> Self::RandomVar;
+    fn cumulative_sum(&self) -> Self::VarEF;
 }
 
 pub trait InteractionAir<F: Field> {

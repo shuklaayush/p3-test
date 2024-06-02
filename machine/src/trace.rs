@@ -5,16 +5,16 @@ use alloc::vec::Vec;
 
 use itertools::Itertools;
 use p3_air::BaseAir;
+use p3_air_util::util::Entry;
+use p3_air_util::{
+    check_constraints, check_constraints_and_track, check_cumulative_sums, get_quotient_degree,
+    proof::{AdjacentOpenedValues, InteractionAirProof, OpenedValues},
+};
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
 use p3_interaction::{generate_permutation_trace, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
-
-use p3_air_util::{
-    check_constraints, check_constraints_and_track, check_cumulative_sums, get_quotient_degree,
-    proof::{AdjacentOpenedValues, InteractionAirProof, OpenedValues},
-};
 
 #[cfg(feature = "trace-writer")]
 use core::error::Error;
@@ -427,7 +427,11 @@ where
 {
     fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]);
 
-    fn check_constraints_and_track(&self, public_values: &[Val<SC>]) -> Vec<Vec<(usize, usize)>>
+    fn check_constraints_and_track(
+        &self,
+        perm_challenges: [SC::Challenge; 2],
+        public_values: &[Val<SC>],
+    ) -> Vec<Vec<Entry>>
     where
         Val<SC>: PrimeField32;
 }
@@ -502,7 +506,11 @@ where
         );
     }
 
-    fn check_constraints_and_track(&self, public_values: &[Val<SC>]) -> Vec<Vec<(usize, usize)>>
+    fn check_constraints_and_track(
+        &self,
+        perm_challenges: [SC::Challenge; 2],
+        public_values: &[Val<SC>],
+    ) -> Vec<Vec<Entry>>
     where
         Val<SC>: PrimeField32,
     {
@@ -516,8 +524,19 @@ where
                 .main
                 .as_ref()
                 .map(|main| main.trace.value.as_view());
-            let indices =
-                check_constraints_and_track(&chip_trace.chip, &preprocessed, &main, public_values);
+            let permutation = chip_trace
+                .permutation
+                .as_ref()
+                .map(|permutation| permutation.trace.value.as_view());
+            let indices = check_constraints_and_track(
+                &chip_trace.chip,
+                &preprocessed,
+                &main,
+                &permutation,
+                perm_challenges,
+                chip_trace.cumulative_sum,
+                public_values,
+            );
             chip_indices.push(indices);
         }
         chip_indices

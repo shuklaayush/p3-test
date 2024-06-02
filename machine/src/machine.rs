@@ -149,7 +149,7 @@ where
         #[cfg(feature = "trace-writer")]
         let _ = trace.write_traces_to_file("trace.xlsx");
         #[cfg(feature = "trace-writer")]
-        let indices = trace.check_constraints_and_track(&[]);
+        let indices = trace.check_constraints_and_track(perm_challenges, &[]);
         #[cfg(feature = "trace-writer")]
         dbg!(indices);
 

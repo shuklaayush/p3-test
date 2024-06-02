@@ -1,31 +1,42 @@
-use p3_air::{AirBuilder, AirBuilderWithPublicValues, PairBuilder};
-use p3_field::{Field, PrimeField32};
+use alloc::collections::BTreeSet;
+
+use p3_air::{
+    AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
+};
+use p3_field::{ExtensionField, Field};
+use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
 
 use super::ViewPair;
-use crate::util::tracked_field::TrackedField;
+use crate::util::{
+    Entry, TrackedExtensionFieldExpression, TrackedFieldExpression, TrackedFieldVariable,
+};
 
-pub struct TrackingConstraintBuilder<'a, F, const SET_SIZE: usize>
+pub struct TrackingConstraintBuilder<'a, F, EF>
 where
     F: Field,
+    EF: ExtensionField<F>,
 {
-    pub row_index: usize,
-    pub col_indices: Vec<usize>,
-    pub preprocessed: ViewPair<'a, TrackedField<F, SET_SIZE>>,
-    pub main: ViewPair<'a, TrackedField<F, SET_SIZE>>,
-    pub public_values: &'a [TrackedField<F, SET_SIZE>],
+    pub entries: BTreeSet<Entry>,
+    pub preprocessed: ViewPair<'a, TrackedFieldVariable<F>>,
+    pub main: ViewPair<'a, TrackedFieldVariable<F>>,
+    pub permutation: ViewPair<'a, TrackedFieldVariable<EF>>,
+    pub perm_challenges: [TrackedFieldVariable<EF>; NUM_PERM_CHALLENGES],
+    pub public_values: &'a [TrackedFieldVariable<F>],
+    pub cumulative_sum: TrackedFieldVariable<EF>,
     pub is_first_row: F,
     pub is_last_row: F,
     pub is_transition: F,
 }
 
-impl<'a, F, const SET_SIZE: usize> AirBuilder for TrackingConstraintBuilder<'a, F, SET_SIZE>
+impl<'a, F, EF> AirBuilder for TrackingConstraintBuilder<'a, F, EF>
 where
     F: Field,
+    EF: ExtensionField<F>,
 {
-    type F = TrackedField<F, SET_SIZE>;
-    type Expr = TrackedField<F, SET_SIZE>;
-    type Var = TrackedField<F, SET_SIZE>;
-    type M = ViewPair<'a, TrackedField<F, SET_SIZE>>;
+    type F = F;
+    type Expr = TrackedFieldExpression<F>;
+    type Var = TrackedFieldVariable<F>;
+    type M = ViewPair<'a, TrackedFieldVariable<F>>;
 
     fn main(&self) -> Self::M {
         self.main
@@ -49,39 +60,77 @@ where
 
     fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) {
         let x = x.into();
-        if x != F::zero().into() {
-            let indices = x.origin.iter().collect::<Vec<_>>();
-            self.col_indices.extend(indices);
-        }
-    }
-
-    fn assert_eq<I1: Into<Self::Expr>, I2: Into<Self::Expr>>(&mut self, x: I1, y: I2) {
-        let x = x.into();
-        let y = y.into();
-        if x != y {
-            let indices = x.origin.iter().chain(y.origin.iter()).collect::<Vec<_>>();
-            self.col_indices.extend(indices);
+        if x.value != F::zero() {
+            self.entries.extend(x.origin);
         }
     }
 }
 
-impl<'a, F, const SET_SIZE: usize> PairBuilder for TrackingConstraintBuilder<'a, F, SET_SIZE>
+impl<'a, F, EF> PairBuilder for TrackingConstraintBuilder<'a, F, EF>
 where
-    F: PrimeField32,
+    F: Field,
+    EF: ExtensionField<F>,
 {
     fn preprocessed(&self) -> Self::M {
         self.preprocessed
     }
 }
 
-impl<'a, F, const SET_SIZE: usize> AirBuilderWithPublicValues
-    for TrackingConstraintBuilder<'a, F, SET_SIZE>
+impl<'a, F, EF> AirBuilderWithPublicValues for TrackingConstraintBuilder<'a, F, EF>
 where
-    F: PrimeField32,
+    F: Field,
+    EF: ExtensionField<F>,
 {
-    type PublicVar = TrackedField<F, SET_SIZE>;
+    type PublicVar = TrackedFieldVariable<F>;
 
     fn public_values(&self) -> &[Self::PublicVar] {
         self.public_values
+    }
+}
+
+impl<'a, F, EF> ExtensionBuilder for TrackingConstraintBuilder<'a, F, EF>
+where
+    F: Field,
+    EF: ExtensionField<F>,
+{
+    type EF = EF;
+    type ExprEF = TrackedExtensionFieldExpression<F, EF>;
+    type VarEF = TrackedFieldVariable<EF>;
+
+    fn assert_zero_ext<I>(&mut self, x: I)
+    where
+        I: Into<Self::ExprEF>,
+    {
+        let x = x.into();
+        if x.0.value != EF::zero() {
+            self.entries.extend(x.0.origin);
+        }
+    }
+}
+
+impl<'a, F, EF> PermutationAirBuilder for TrackingConstraintBuilder<'a, F, EF>
+where
+    F: Field,
+    EF: ExtensionField<F>,
+{
+    type MP = ViewPair<'a, Self::VarEF>;
+    type RandomVar = Self::VarEF;
+
+    fn permutation(&self) -> Self::MP {
+        self.permutation
+    }
+
+    fn permutation_randomness(&self) -> &[Self::RandomVar] {
+        &self.perm_challenges
+    }
+}
+
+impl<'a, F, EF> InteractionAirBuilder for TrackingConstraintBuilder<'a, F, EF>
+where
+    F: Field,
+    EF: ExtensionField<F>,
+{
+    fn cumulative_sum(&self) -> Self::VarEF {
+        self.cumulative_sum
     }
 }

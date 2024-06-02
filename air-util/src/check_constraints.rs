@@ -1,11 +1,10 @@
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
-use p3_air::Air;
 
 use hashbrown::HashMap;
-use p3_field::{ExtensionField, Field, PrimeField32};
+use p3_field::{ExtensionField, Field};
 use p3_interaction::{InteractionType, Rap};
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
@@ -14,7 +13,7 @@ use p3_maybe_rayon::prelude::IntoParallelIterator;
 
 use crate::{
     folders::{DebugConstraintBuilder, TrackingConstraintBuilder},
-    util::tracked_field::TrackedField,
+    util::{Entry, TrackedFieldVariable},
 };
 
 /// Check that all constraints vanish on the subgroup.
@@ -154,15 +153,19 @@ pub fn check_cumulative_sums<F, EF, A>(
     assert_eq!(sum, EF::zero());
 }
 
-pub fn check_constraints_and_track<F, A, const SET_SIZE: usize>(
+pub fn check_constraints_and_track<F, EF, A>(
     air: &A,
     preprocessed: &Option<RowMajorMatrixView<F>>,
     main: &Option<RowMajorMatrixView<F>>,
+    permutation: &Option<RowMajorMatrixView<EF>>,
+    perm_challenges: [EF; 2],
+    cumulative_sum: Option<EF>,
     public_values: &[F],
-) -> Vec<(usize, usize)>
+) -> Vec<Entry>
 where
-    F: PrimeField32,
-    A: for<'a> Air<TrackingConstraintBuilder<'a, F, SET_SIZE>>,
+    F: Field,
+    EF: ExtensionField<F>,
+    A: for<'a> Rap<TrackingConstraintBuilder<'a, F, EF>>,
 {
     let height = match (main.as_ref(), preprocessed.as_ref()) {
         (Some(main), Some(preprocessed)) => core::cmp::max(main.height(), preprocessed.height()),
@@ -170,8 +173,11 @@ where
         (None, Some(preprocessed)) => preprocessed.height(),
         (None, None) => 0,
     };
+    if let Some(perm) = permutation {
+        assert_eq!(perm.height(), height);
+    }
 
-    let mut indices = vec![];
+    let mut indices = BTreeSet::new();
     (0..height).into_par_iter().for_each(|i| {
         let i_next = (i + 1) % height;
 
@@ -183,13 +189,17 @@ where
                         .row_slice(i)
                         .iter()
                         .enumerate()
-                        .map(|(i, x)| TrackedField::new_single(*x, i))
+                        .map(|(j, x)| {
+                            TrackedFieldVariable::new(*x, Entry::Preprocessed { row: i, col: j })
+                        })
                         .collect::<Vec<_>>(),
                     preprocessed
                         .row_slice(i_next)
                         .iter()
                         .enumerate()
-                        .map(|(i, x)| TrackedField::new_single(*x, i))
+                        .map(|(j, x)| {
+                            TrackedFieldVariable::new(*x, Entry::Preprocessed { row: i, col: j })
+                        })
                         .collect::<Vec<_>>(),
                 )
             })
@@ -201,24 +211,50 @@ where
                     main.row_slice(i)
                         .iter()
                         .enumerate()
-                        .map(|(i, x)| TrackedField::new_single(*x, i))
+                        .map(|(j, x)| TrackedFieldVariable::new(*x, Entry::Main { row: i, col: j }))
                         .collect::<Vec<_>>(),
                     main.row_slice(i_next)
                         .iter()
                         .enumerate()
-                        .map(|(i, x)| TrackedField::new_single(*x, i))
+                        .map(|(j, x)| TrackedFieldVariable::new(*x, Entry::Main { row: i, col: j }))
                         .collect::<Vec<_>>(),
                 )
             })
             .unwrap_or((vec![], vec![]));
+        let (permutation_local, permutation_next) = permutation
+            .as_ref()
+            .map(|permutation| {
+                (
+                    permutation
+                        .row_slice(i)
+                        .iter()
+                        .enumerate()
+                        .map(|(j, x)| {
+                            TrackedFieldVariable::new(*x, Entry::Permutation { row: i, col: j })
+                        })
+                        .collect::<Vec<_>>(),
+                    permutation
+                        .row_slice(i_next)
+                        .iter()
+                        .enumerate()
+                        .map(|(j, x)| {
+                            TrackedFieldVariable::new(*x, Entry::Permutation { row: i, col: j })
+                        })
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .unwrap_or((vec![], vec![]));
+
         let public_values = public_values
             .iter()
-            .map(|x| TrackedField::from(*x))
+            .enumerate()
+            .map(|(j, x)| TrackedFieldVariable::new(*x, Entry::Public { index: j }))
             .collect::<Vec<_>>();
+        let perm_challenges = perm_challenges.map(|x| TrackedFieldVariable::new_untracked(x));
+        let cumulative_sum = cumulative_sum.map(|x| TrackedFieldVariable::new_untracked(x));
 
         let mut builder = TrackingConstraintBuilder {
-            row_index: i,
-            col_indices: vec![],
+            entries: BTreeSet::new(),
             preprocessed: VerticalPair::new(
                 RowMajorMatrixView::new_row(preprocessed_local.as_slice()),
                 RowMajorMatrixView::new_row(preprocessed_next.as_slice()),
@@ -227,7 +263,13 @@ where
                 RowMajorMatrixView::new_row(&*main_local),
                 RowMajorMatrixView::new_row(&*main_next),
             ),
+            permutation: VerticalPair::new(
+                RowMajorMatrixView::new_row(&*permutation_local),
+                RowMajorMatrixView::new_row(&*permutation_next),
+            ),
             public_values: public_values.as_slice(),
+            perm_challenges,
+            cumulative_sum: cumulative_sum.unwrap_or_default(),
             is_first_row: F::zero(),
             is_last_row: F::zero(),
             is_transition: F::one(),
@@ -241,10 +283,10 @@ where
         }
 
         air.eval(&mut builder);
-        indices.extend(builder.col_indices.iter().map(|&col| (i, col)));
+        indices.extend(builder.entries);
     });
 
-    indices
+    indices.into_iter().collect()
 }
 
 // pub fn check_lookups<F, EF, A, const SET_SIZE: usize>(

@@ -1,5 +1,4 @@
 use core::fmt::Display;
-use p3_air::Air;
 use p3_uni_stark::{StarkGenericConfig, Val};
 
 use p3_air_util::folders::{
@@ -20,6 +19,6 @@ pub trait MachineChip<SC: StarkGenericConfig>:
     + for<'a> Rap<DebugConstraintBuilder<'a, Val<SC>, SC::Challenge>>
     // TODO: Put behind trace-writer flag
     + TraceWriter<Val<SC>, SC::Challenge>
-    + for<'a> Air<TrackingConstraintBuilder<'a, Val<SC>, 64>>
+    + for<'a> Rap<TrackingConstraintBuilder<'a, Val<SC>, SC::Challenge>>
 {
 }

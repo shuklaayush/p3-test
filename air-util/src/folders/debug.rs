@@ -73,6 +73,16 @@ impl<'a, F: Field, EF: ExtensionField<F>> PairBuilder for DebugConstraintBuilder
     }
 }
 
+impl<'a, F: Field, EF: ExtensionField<F>> AirBuilderWithPublicValues
+    for DebugConstraintBuilder<'a, F, EF>
+{
+    type PublicVar = F;
+
+    fn public_values(&self) -> &[Self::PublicVar] {
+        self.public_values
+    }
+}
+
 impl<'a, F: Field, EF: ExtensionField<F>> ExtensionBuilder for DebugConstraintBuilder<'a, F, EF> {
     type EF = EF;
     type ExprEF = EF;
@@ -118,16 +128,6 @@ impl<'a, F: Field, EF: ExtensionField<F>> PermutationAirBuilder
 
     fn permutation_randomness(&self) -> &[Self::EF] {
         &self.perm_challenges
-    }
-}
-
-impl<'a, F: Field, EF: ExtensionField<F>> AirBuilderWithPublicValues
-    for DebugConstraintBuilder<'a, F, EF>
-{
-    type PublicVar = F;
-
-    fn public_values(&self) -> &[Self::PublicVar] {
-        self.public_values
     }
 }
 
