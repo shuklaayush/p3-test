@@ -17,5 +17,5 @@ quote = { version = "1.0" }
 proc-macro2 = "1.0.79"
 
 [features]
-default = ["trace-writer"]
+default = []
 trace-writer = []

@@ -11,6 +11,7 @@ use crate::util::{
     TraceEntry, TrackedExtensionFieldExpression, TrackedFieldExpression, TrackedFieldVariable,
 };
 
+// TODO: Remove permutations?
 pub struct TrackingConstraintBuilder<'a, F, EF>
 where
     F: Field,

@@ -26,5 +26,5 @@ rust_xlsxwriter = { workspace = true, optional = true }
 cfg-if = "1.0.0"
 
 [features]
-default = ["trace-writer"]
+default = []
 trace-writer = ["dep:rust_xlsxwriter", "p3-air-util/trace-writer"]

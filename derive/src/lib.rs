@@ -94,12 +94,13 @@ pub fn air_columns_derive(input: TokenStream) -> TokenStream {
         ));
     }
 
-    let col_stream = quote! {
+    let stream = quote! {
         impl #impl_generics  #name #type_generics #where_clause {
             pub const fn num_cols() -> usize {
                 core::mem::size_of::<#name<u8 #(, #non_first_generics)*>>()
             }
 
+            // TODO: Ideally const
             pub fn col_map() -> #name<usize #(, #non_first_generics)*> {
                 let num_cols = Self::num_cols();
                 let indices_arr = (0..num_cols).collect::<Vec<usize>>();
@@ -148,12 +149,12 @@ pub fn air_columns_derive(input: TokenStream) -> TokenStream {
 
     #[cfg(feature = "trace-writer")]
     let out = {
-        let mut stream = TokenStream::from(col_stream);
+        let mut stream = TokenStream::from(stream);
         stream.extend(TokenStream::from(header_stream));
         stream
     };
     #[cfg(not(feature = "trace-writer"))]
-    let out = TokenStream::from(col_stream);
+    let out = TokenStream::from(stream);
 
     out
 }
@@ -249,6 +250,7 @@ fn generate_trait_impls(
             }
         }
 
+        #[cfg(feature = "trace-writer")]
         impl<F: PrimeField32, EF: ExtensionField<F>> TraceWriter<F, EF> for #enum_name {
             fn preprocessed_headers(&self) -> Vec<String> {
                 match self {
