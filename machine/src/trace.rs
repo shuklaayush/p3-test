@@ -635,8 +635,7 @@ where
                 worksheet,
                 &preprocessed_trace,
                 &main_trace,
-                chip.receives(),
-                chip.sends(),
+                chip.all_interactions(),
                 chip_entries,
             )?;
         }

@@ -321,7 +321,7 @@ where
     for (i, air) in airs.iter().enumerate() {
         let preprocessed_i = preprocessed[i].as_ref();
         let main_i = main[i].as_ref();
-        for (interaction, interaction_type) in air.all_interactions().iter() {
+        for (j, (interaction, interaction_type)) in air.all_interactions().iter().enumerate() {
             let preprocessed_height = preprocessed_i.map_or(0, |t| t.height());
             let main_height = main_i.map_or(0, |t| t.height());
             let height = preprocessed_height.max(main_height);
@@ -333,13 +333,13 @@ where
                         let row: &[_] = (*row).borrow();
                         row.iter()
                             .enumerate()
-                            .map(|(j, x)| {
+                            .map(|(k, x)| {
                                 TrackedFieldVariable::new(
                                     *x,
                                     MultiTraceEntry::Preprocessed {
                                         trace: i,
                                         row: n,
-                                        col: j,
+                                        col: k,
                                     },
                                 )
                             })
@@ -352,13 +352,13 @@ where
                         let row: &[_] = (*row).borrow();
                         row.iter()
                             .enumerate()
-                            .map(|(j, x)| {
+                            .map(|(k, x)| {
                                 TrackedFieldVariable::new(
                                     *x,
                                     MultiTraceEntry::Main {
                                         trace: i,
                                         row: n,
-                                        col: j,
+                                        col: k,
                                     },
                                 )
                             })
@@ -369,19 +369,32 @@ where
                 let fields = interaction
                     .fields
                     .iter()
-                    .map(|f| {
-                        f.apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
+                    .enumerate()
+                    .map(|(k, f)| {
+                        let mut expr = f.apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
                             preprocessed_row.as_slice(),
                             main_row.as_slice(),
-                        )
+                        );
+                        expr.origin.insert(MultiTraceEntry::VirtualColumnField {
+                            trace: i,
+                            row: n,
+                            interaction: j,
+                            field: k,
+                        });
+                        expr
                     })
                     .collect::<Vec<_>>();
-                let mult = interaction
+                let mut mult = interaction
                     .count
                     .apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
                         preprocessed_row.as_slice(),
                         main_row.as_slice(),
                     );
+                mult.origin.insert(MultiTraceEntry::VirtualColumnCount {
+                    trace: i,
+                    row: n,
+                    interaction: j,
+                });
                 let val = match interaction_type {
                     InteractionType::Send => mult,
                     InteractionType::Receive => -mult,
@@ -407,6 +420,26 @@ where
                         }
                         MultiTraceEntry::Main { trace, row, col } => {
                             entries[trace].insert(TraceEntry::Main { row, col });
+                        }
+                        MultiTraceEntry::VirtualColumnCount {
+                            trace,
+                            row,
+                            interaction,
+                        } => {
+                            entries[trace]
+                                .insert(TraceEntry::VirtualColumnCount { row, interaction });
+                        }
+                        MultiTraceEntry::VirtualColumnField {
+                            trace,
+                            row,
+                            interaction,
+                            field,
+                        } => {
+                            entries[trace].insert(TraceEntry::VirtualColumnField {
+                                row,
+                                interaction,
+                                field,
+                            });
                         }
                         _ => {}
                     }

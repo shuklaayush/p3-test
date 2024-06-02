@@ -1,18 +1,17 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
 use alloc::format;
-use alloc::string::ToString;
 use alloc::vec::Vec;
 
+use core::borrow::Borrow;
 use core::error::Error;
-use core::{borrow::Borrow, iter::once};
 
 use p3_field::{ExtensionField, Field, PrimeField32};
-use p3_interaction::Interaction;
+use p3_interaction::{Interaction, InteractionType};
 use p3_matrix::{dense::RowMajorMatrixView, Matrix};
 use rust_xlsxwriter::{Color, Format, Worksheet};
 
-use crate::util::TraceEntry;
+use crate::util::{ColumnEntry, TraceEntry};
 
 pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
     fn preprocessed_headers(&self) -> Vec<String> {
@@ -26,56 +25,108 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
         ws: &mut Worksheet,
         preprocessed_trace: &Option<RowMajorMatrixView<F>>,
         main_trace: &Option<RowMajorMatrixView<F>>,
-        receives: Vec<Interaction<F>>,
-        sends: Vec<Interaction<F>>,
+        interactions: Vec<(Interaction<F>, InteractionType)>,
         entries: BTreeSet<TraceEntry>,
     ) -> Result<(), Box<dyn Error>>
     where
         F: PrimeField32,
     {
-        let perprocessed_headers = self.preprocessed_headers();
+        let column_entries = BTreeSet::from_iter(entries.iter().map(|entry| match entry {
+            TraceEntry::None => ColumnEntry::None,
+            TraceEntry::Preprocessed { col, .. } => ColumnEntry::Preprocessed { col: *col },
+            TraceEntry::Main { col, .. } => ColumnEntry::Main { col: *col },
+            TraceEntry::Permutation { col, .. } => ColumnEntry::Permutation { col: *col },
+            TraceEntry::VirtualColumnCount { interaction, .. } => ColumnEntry::VirtualColumnCount {
+                interaction: *interaction,
+            },
+            TraceEntry::VirtualColumnField {
+                interaction, field, ..
+            } => ColumnEntry::VirtualColumnField {
+                interaction: *interaction,
+                field: *field,
+            },
+            TraceEntry::Public { index } => ColumnEntry::Public { index: *index },
+        }));
+
+        let mut offset = 0;
+        let preprocessed_headers = self.preprocessed_headers();
+        if !preprocessed_headers.is_empty() {
+            for (j, header) in preprocessed_headers.iter().enumerate() {
+                let format = {
+                    if column_entries.contains(&ColumnEntry::Preprocessed { col: j }) {
+                        Format::new().set_background_color(Color::Red)
+                    } else {
+                        Format::new()
+                    }
+                };
+                ws.write_with_format(0, offset, header, &format)?;
+                offset += 1;
+            }
+            // Blank column
+            offset += 1;
+        }
+
         let main_headers = self.headers();
+        if !main_headers.is_empty() {
+            for (j, header) in self.headers().iter().enumerate() {
+                let format = {
+                    if column_entries.contains(&ColumnEntry::Main { col: j }) {
+                        Format::new().set_background_color(Color::Red)
+                    } else {
+                        Format::new()
+                    }
+                };
+                ws.write_with_format(0, offset, header, &format)?;
+                offset += 1;
+            }
+            // Blank column
+            offset += 1;
+        }
 
-        let receive_headers: Vec<_> = receives
-            .iter()
-            .enumerate()
-            .flat_map(|(i, interaction)| {
-                once("".to_string())
-                    .chain(once("count".to_string()))
-                    .chain(
-                        interaction
-                            .fields
-                            .iter()
-                            .enumerate()
-                            .map(|(j, _)| format!("receives[{}][{}]", i, j)),
-                    )
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-        let send_headers: Vec<_> = sends
-            .iter()
-            .enumerate()
-            .flat_map(|(i, interaction)| {
-                once("".to_string())
-                    .chain(once("count".to_string()))
-                    .chain(
-                        interaction
-                            .fields
-                            .iter()
-                            .enumerate()
-                            .map(|(j, _)| format!("sends[{}][{}]", i, j)),
-                    )
-                    .collect::<Vec<_>>()
-            })
-            .collect();
+        let mut num_receives = 0;
+        let mut num_sends = 0;
+        for (j, interaction) in interactions.iter().enumerate() {
+            let format = {
+                if column_entries.contains(&ColumnEntry::VirtualColumnCount { interaction: j }) {
+                    Format::new().set_background_color(Color::Red)
+                } else {
+                    Format::new()
+                }
+            };
+            let (ty, ty_offset) = match interaction.1 {
+                InteractionType::Receive => {
+                    let out = ("receive", num_receives);
+                    num_receives += 1;
+                    out
+                }
+                InteractionType::Send => {
+                    let out = ("send", num_sends);
+                    num_sends += 1;
+                    out
+                }
+            };
 
-        let headers: Vec<_> = perprocessed_headers
-            .iter()
-            .chain(main_headers.iter())
-            .chain(receive_headers.iter())
-            .chain(send_headers.iter())
-            .collect();
-        ws.write_row(0, 0, headers)?;
+            let prefix = format!("{}[{}]", ty, ty_offset);
+            ws.write_with_format(0, offset, format!("{prefix}.count"), &format)?;
+            offset += 1;
+
+            for k in 0..interaction.0.fields.len() {
+                let format = {
+                    if column_entries.contains(&ColumnEntry::VirtualColumnField {
+                        interaction: j,
+                        field: k,
+                    }) {
+                        Format::new().set_background_color(Color::Red)
+                    } else {
+                        Format::new()
+                    }
+                };
+                ws.write_with_format(0, offset, format!("{prefix}[{k}]"), &format)?;
+                offset += 1;
+            }
+            // Blank column
+            offset += 1;
+        }
 
         let preprocessed_height = preprocessed_trace.as_ref().map_or(0, |t| t.height());
         let main_height = main_trace.as_ref().map_or(0, |t| t.height());
@@ -93,12 +144,14 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
                     };
                     ws.write_number_with_format(
                         i as u32 + 1,
-                        offset + j as u16,
+                        offset,
                         preprocessed_trace.get(i, j).as_canonical_u32() as f64,
                         &format,
                     )?;
+                    offset += 1;
                 }
-                offset += preprocessed_trace.width() as u16;
+                // Blank column
+                offset += 1;
             }
 
             if let Some(main_trace) = main_trace {
@@ -112,12 +165,14 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
                     };
                     ws.write_number_with_format(
                         i as u32 + 1,
-                        offset + j as u16,
+                        offset,
                         main_trace.get(i, j).as_canonical_u32() as f64,
                         &format,
                     )?;
+                    offset += 1;
                 }
-                offset += main_trace.width() as u16;
+                // Blank column
+                offset += 1;
             }
 
             let preprocessed_row = preprocessed_trace
@@ -137,33 +192,51 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
                 })
                 .unwrap_or_default();
 
-            for interaction in receives.iter() {
-                // Blank column
-                offset += 1;
+            for (j, (interaction, _)) in interactions.iter().enumerate() {
                 let count = interaction
                     .count
                     .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
-                ws.write_number(i as u32 + 1, offset, count.as_canonical_u32() as f64)?;
+                let format = {
+                    if entries.contains(&TraceEntry::VirtualColumnCount {
+                        row: i,
+                        interaction: j,
+                    }) {
+                        Format::new().set_background_color(Color::Red)
+                    } else {
+                        Format::new()
+                    }
+                };
+                ws.write_number_with_format(
+                    i as u32 + 1,
+                    offset,
+                    count.as_canonical_u32() as f64,
+                    &format,
+                )?;
                 offset += 1;
-                for field in interaction.fields.iter() {
+                for (k, field) in interaction.fields.iter().enumerate() {
                     let val = field.apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
-                    ws.write_number(i as u32 + 1, offset, val.as_canonical_u32() as f64)?;
+                    let format = {
+                        if entries.contains(&TraceEntry::VirtualColumnField {
+                            row: i,
+                            interaction: j,
+                            field: k,
+                        }) {
+                            Format::new().set_background_color(Color::Red)
+                        } else {
+                            Format::new()
+                        }
+                    };
+
+                    ws.write_number_with_format(
+                        i as u32 + 1,
+                        offset,
+                        val.as_canonical_u32() as f64,
+                        &format,
+                    )?;
                     offset += 1;
                 }
-            }
-            for interaction in sends.iter() {
                 // Blank column
                 offset += 1;
-                let count = interaction
-                    .count
-                    .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
-                ws.write_number(i as u32 + 1, offset, count.as_canonical_u32() as f64)?;
-                offset += 1;
-                for field in interaction.fields.iter() {
-                    let val = field.apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
-                    ws.write_number(i as u32 + 1, offset, val.as_canonical_u32() as f64)?;
-                    offset += 1;
-                }
             }
         }
 
