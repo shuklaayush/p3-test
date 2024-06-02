@@ -11,6 +11,8 @@ use tracing::instrument;
 
 use p3_air_util::proof::Commitments;
 
+#[cfg(feature = "trace-writer")]
+use crate::trace::MachineTraceDebugger;
 use crate::{
     chip::MachineChip,
     error::VerificationError,
@@ -19,9 +21,9 @@ use crate::{
     },
     trace::{
         MachineTrace, MachineTraceBuilder, MachineTraceChecker, MachineTraceCommiter,
-        MachineTraceConstraintVerifier, MachineTraceDebugger, MachineTraceLoader,
-        MachineTraceOpener, MachineTraceOpening, MachineTraceOpeningBuilder,
-        MachineTraceOpeningLoader, MachineTraceOpeningVerifier,
+        MachineTraceConstraintVerifier, MachineTraceLoader, MachineTraceOpener,
+        MachineTraceOpening, MachineTraceOpeningBuilder, MachineTraceOpeningLoader,
+        MachineTraceOpeningVerifier,
     },
 };
 

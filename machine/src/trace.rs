@@ -1,28 +1,29 @@
+#[cfg(feature = "trace-writer")]
 use alloc::boxed::Box;
+#[cfg(feature = "trace-writer")]
+use alloc::collections::BTreeSet;
+#[cfg(feature = "trace-writer")]
 use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
+#[cfg(feature = "trace-writer")]
+use core::error::Error;
 
 use itertools::Itertools;
 use p3_air::BaseAir;
-use p3_air_util::track_failing_interactions;
-use p3_air_util::util::{MultiTraceEntry, TraceEntry};
 use p3_air_util::{
     check_constraints, check_cumulative_sums, get_quotient_degree,
     proof::{AdjacentOpenedValues, InteractionAirProof, OpenedValues},
-    track_failing_constraints,
 };
+#[cfg(feature = "trace-writer")]
+use p3_air_util::{track_failing_constraints, track_failing_interactions, util::TraceEntry};
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
+#[cfg(feature = "trace-writer")]
+use p3_field::PrimeField32;
 use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
 use p3_interaction::{generate_permutation_trace, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
-
-#[cfg(feature = "trace-writer")]
-use core::error::Error;
-#[cfg(feature = "trace-writer")]
-use p3_field::PrimeField32;
-use std::collections::BTreeSet;
 
 use crate::{
     chip::MachineChip, error::VerificationError, proof::Com, proof::PcsProverData,
@@ -429,15 +430,6 @@ where
     SC: StarkGenericConfig,
 {
     fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]);
-
-    // TODO: Move to separate trait
-    fn track_failing_constraints(
-        &self,
-        perm_challenges: [SC::Challenge; 2],
-        public_values: &[Val<SC>],
-    ) -> Vec<BTreeSet<TraceEntry>>;
-
-    fn track_failing_interactions(&self) -> Vec<BTreeSet<TraceEntry>>;
 }
 
 impl<SC, C> MachineTraceChecker<SC> for MachineTrace<SC, C>
@@ -509,7 +501,37 @@ where
             permutation_traces.as_slice(),
         );
     }
+}
 
+#[cfg(feature = "trace-writer")]
+pub trait MachineTraceDebugger<SC>
+where
+    SC: StarkGenericConfig,
+    Val<SC>: PrimeField32,
+{
+    // TODO: Move to separate trait
+    fn track_failing_constraints(
+        &self,
+        perm_challenges: [SC::Challenge; 2],
+        public_values: &[Val<SC>],
+    ) -> Vec<BTreeSet<TraceEntry>>;
+
+    fn track_failing_interactions(&self) -> Vec<BTreeSet<TraceEntry>>;
+
+    fn write_traces_to_file(
+        &self,
+        path: &str,
+        perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
+    ) -> Result<(), Box<dyn Error>>;
+}
+
+#[cfg(feature = "trace-writer")]
+impl<SC, C> MachineTraceDebugger<SC> for MachineTrace<SC, C>
+where
+    SC: StarkGenericConfig,
+    Val<SC>: PrimeField32,
+    C: MachineChip<SC>,
+{
     fn track_failing_constraints(
         &self,
         perm_challenges: [SC::Challenge; 2],
@@ -570,28 +592,7 @@ where
 
         track_failing_interactions(&airs, &preprocessed_traces, &main_traces)
     }
-}
 
-#[cfg(feature = "trace-writer")]
-pub trait MachineTraceDebugger<SC>
-where
-    SC: StarkGenericConfig,
-    Val<SC>: PrimeField32,
-{
-    fn write_traces_to_file(
-        &self,
-        path: &str,
-        perm_challenges: [SC::Challenge; NUM_PERM_CHALLENGES],
-    ) -> Result<(), Box<dyn Error>>;
-}
-
-#[cfg(feature = "trace-writer")]
-impl<SC, C> MachineTraceDebugger<SC> for MachineTrace<SC, C>
-where
-    SC: StarkGenericConfig,
-    Val<SC>: PrimeField32,
-    C: MachineChip<SC>,
-{
     fn write_traces_to_file(
         &self,
         path: &str,

@@ -6,9 +6,9 @@ use proc_macro::TokenStream;
 #[cfg(feature = "trace-writer")]
 use quote::format_ident;
 use quote::quote;
+use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam};
 #[cfg(feature = "trace-writer")]
-use syn::Type;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam, Ident};
+use syn::{Ident, Type};
 
 // TODO: Check if serde_json is easier
 #[cfg(feature = "trace-writer")]
