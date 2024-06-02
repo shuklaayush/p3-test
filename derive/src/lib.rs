@@ -235,7 +235,13 @@ fn generate_trait_impls(
             }
         }
 
-        impl<AB: InteractionAirBuilder> Rap<AB> for #enum_name {}
+        impl<AB: InteractionAirBuilder> Rap<AB> for #enum_name {
+            fn preprocessed_width(&self) -> usize {
+                match self {
+                    #(#enum_name::#variant_names(chip) => <#variant_field_types as Rap<AB>>::preprocessed_width(chip),)*
+                }
+            }
+        }
 
         #[cfg(feature = "trace-writer")]
         impl<F: PrimeField32, EF: ExtensionField<F>> TraceWriter<F, EF> for #enum_name {
