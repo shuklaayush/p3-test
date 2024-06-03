@@ -3,7 +3,7 @@ use p3_derive::Columns;
 
 #[test]
 #[cfg(feature = "trace-writer")]
-fn test_generics() {
+fn test_simple() {
     #[derive(Columns)]
     struct A<T> {
         _a: T,
@@ -11,9 +11,10 @@ fn test_generics() {
 
     assert_eq!(A::<u32>::headers(), vec!["_a"]);
 }
+
 #[test]
 #[cfg(feature = "trace-writer")]
-fn test_generic_array() {
+fn test_simple_array() {
     #[derive(Columns)]
     struct A<T> {
         _a: [T; 1],
@@ -24,7 +25,18 @@ fn test_generic_array() {
 
 #[test]
 #[cfg(feature = "trace-writer")]
-fn test_generic_nested_array() {
+fn test_const_generic_array() {
+    #[derive(Columns)]
+    struct A<T, const N: usize> {
+        _a: [T; N],
+    }
+
+    assert_eq!(A::<u32, 1>::headers(), vec!["_a[0]"]);
+}
+
+#[test]
+#[cfg(feature = "trace-writer")]
+fn test_nested_array() {
     #[derive(Columns)]
     struct A<T> {
         _a: [[T; 1]; 1],

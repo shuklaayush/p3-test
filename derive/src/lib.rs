@@ -69,15 +69,13 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
         })
         .next()
         .expect("Expected at least one generic");
-    let non_first_generics = input
-        .generics
-        .params
+    let non_first_generics = input.generics.params.iter().skip(1).collect::<Vec<_>>();
+    let non_first_generics_idents = non_first_generics
         .iter()
-        .skip(1)
-        .filter_map(|param| match param {
-            GenericParam::Type(type_param) => Some(&type_param.ident),
-            GenericParam::Const(const_param) => Some(&const_param.ident),
-            _ => None,
+        .map(|param| match param {
+            GenericParam::Type(type_param) => &type_param.ident,
+            GenericParam::Const(const_param) => &const_param.ident,
+            _ => panic!("Expected type or const generic"),
         })
         .collect::<Vec<_>>();
     let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
@@ -119,14 +117,14 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
     let stream = quote! {
         impl #impl_generics #name #type_generics #where_clause {
             pub const fn num_cols() -> usize {
-                core::mem::size_of::<#name<u8 #(, #non_first_generics)*>>()
+                core::mem::size_of::<#name<u8 #(, #non_first_generics_idents)*>>()
             }
 
-            pub fn col_map() -> #name<usize #(, #non_first_generics)*> {
+            pub fn col_map() -> #name<usize #(, #non_first_generics_idents)*> {
                 let num_cols = Self::num_cols();
                 let indices_arr = (0..num_cols).collect::<Vec<usize>>();
 
-                let mut cols = std::mem::MaybeUninit::<#name<usize #(, #non_first_generics)*>>::uninit();
+                let mut cols = std::mem::MaybeUninit::<#name<usize #(, #non_first_generics_idents)*>>::uninit();
                 let ptr = cols.as_mut_ptr() as *mut usize;
                 unsafe {
                     ptr.copy_from_nonoverlapping(indices_arr.as_ptr(), num_cols);
@@ -137,7 +135,7 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
             #header_impl
         }
 
-        impl<#(#non_first_generics),*> #name<usize #(, #non_first_generics)*> #where_clause {
+        impl<#(#non_first_generics),*> #name<usize #(, #non_first_generics_idents)*> #where_clause {
             pub fn range(&self) -> std::ops::Range<usize> {
                 let num_cols = Self::num_cols();
                 let ptr = self as *const _ as *const usize;
@@ -148,7 +146,7 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
 
         impl #impl_generics core::borrow::Borrow<#name #type_generics> for [#type_generic] #where_clause {
             fn borrow(&self) -> &#name #type_generics {
-                debug_assert_eq!(self.len(), std::mem::size_of::<#name<u8 #(, #non_first_generics)*>>());
+                debug_assert_eq!(self.len(), std::mem::size_of::<#name<u8 #(, #non_first_generics_idents)*>>());
                 let (prefix, shorts, _suffix) = unsafe { self.align_to::<#name #type_generics>() };
                 debug_assert!(prefix.is_empty(), "Alignment should match");
                 debug_assert_eq!(shorts.len(), 1);
@@ -158,7 +156,7 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
 
         impl #impl_generics core::borrow::BorrowMut<#name #type_generics> for [#type_generic] #where_clause {
             fn borrow_mut(&mut self) -> &mut #name #type_generics {
-                debug_assert_eq!(self.len(), std::mem::size_of::<#name<u8 #(, #non_first_generics)*>>());
+                debug_assert_eq!(self.len(), std::mem::size_of::<#name<u8 #(, #non_first_generics_idents)*>>());
                 let (prefix, shorts, _suffix) = unsafe { self.align_to_mut::<#name #type_generics>() };
                 debug_assert!(prefix.is_empty(), "Alignment should match");
                 debug_assert_eq!(shorts.len(), 1);
