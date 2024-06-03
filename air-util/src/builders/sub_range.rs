@@ -67,14 +67,14 @@ where
 
 /// A builder used to eval a sub-air.  This will handle enforcing constraints for a subset of a
 /// trace matrix.  E.g. if a particular air needs to be enforced for a subset of the columns of
-/// the trace, then the SubRangeBuilder can be used.
-pub struct SubRangeBuilder<'a, AB: AirBuilder> {
+/// the trace, then the SubRangeAirBuilder can be used.
+pub struct SubRangeAirBuilder<'a, AB: AirBuilder> {
     inner: &'a mut AB,
     main_range: Range<usize>,
     preprocessed_range: Range<usize>,
 }
 
-impl<'a, AB: AirBuilder> SubRangeBuilder<'a, AB> {
+impl<'a, AB: AirBuilder> SubRangeAirBuilder<'a, AB> {
     pub fn new(
         inner: &'a mut AB,
         preprocessed_range: Range<usize>,
@@ -96,7 +96,7 @@ impl<'a, AB: AirBuilder> SubRangeBuilder<'a, AB> {
     }
 }
 
-impl<'a, AB: AirBuilder> AirBuilder for SubRangeBuilder<'a, AB> {
+impl<'a, AB: AirBuilder> AirBuilder for SubRangeAirBuilder<'a, AB> {
     type F = AB::F;
     type Expr = AB::Expr;
     type Var = AB::Var;
@@ -124,14 +124,14 @@ impl<'a, AB: AirBuilder> AirBuilder for SubRangeBuilder<'a, AB> {
     }
 }
 
-impl<'a, AB: PairBuilder> PairBuilder for SubRangeBuilder<'a, AB> {
+impl<'a, AB: PairBuilder> PairBuilder for SubRangeAirBuilder<'a, AB> {
     fn preprocessed(&self) -> Self::M {
         let matrix = self.inner.main();
         SubMatrixRange::new(matrix, self.preprocessed_range.clone())
     }
 }
 
-impl<'a, AB: AirBuilderWithPublicValues> AirBuilderWithPublicValues for SubRangeBuilder<'a, AB> {
+impl<'a, AB: AirBuilderWithPublicValues> AirBuilderWithPublicValues for SubRangeAirBuilder<'a, AB> {
     type PublicVar = AB::PublicVar;
 
     fn public_values(&self) -> &[Self::PublicVar] {
@@ -139,7 +139,7 @@ impl<'a, AB: AirBuilderWithPublicValues> AirBuilderWithPublicValues for SubRange
     }
 }
 
-impl<'a, AB: ExtensionBuilder> ExtensionBuilder for SubRangeBuilder<'a, AB> {
+impl<'a, AB: ExtensionBuilder> ExtensionBuilder for SubRangeAirBuilder<'a, AB> {
     type EF = AB::EF;
     type ExprEF = AB::ExprEF;
     type VarEF = AB::VarEF;
@@ -152,7 +152,7 @@ impl<'a, AB: ExtensionBuilder> ExtensionBuilder for SubRangeBuilder<'a, AB> {
     }
 }
 
-impl<'a, AB: PermutationAirBuilder> PermutationAirBuilder for SubRangeBuilder<'a, AB> {
+impl<'a, AB: PermutationAirBuilder> PermutationAirBuilder for SubRangeAirBuilder<'a, AB> {
     type MP = AB::MP;
 
     type RandomVar = AB::RandomVar;
