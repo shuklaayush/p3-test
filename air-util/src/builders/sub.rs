@@ -1,52 +1,79 @@
 use alloc::vec::Vec;
-use core::iter::{Skip, Take};
+use core::iter::Iterator;
 use core::marker::PhantomData;
-use core::ops::{Deref, Range};
+use core::ops::Deref;
+use core::slice::Iter;
 
 use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
 use p3_matrix::Matrix;
 
-/// A submatrix of a matrix. The matrix will contain a subset of the columns of `self.inner`.
-pub struct SubMatrixRowSlices<T, M>
+/// A subset of a matrix. The matrix will contain a subset of the elements of `self.inner`.
+pub struct SubMatrix<T, M>
 where
     T: Send + Sync,
     M: Matrix<T>,
 {
     inner: M,
-    column_range: Range<usize>,
+    indices: Vec<usize>,
     _phantom: PhantomData<T>,
 }
 
-impl<T, M> SubMatrixRowSlices<T, M>
+impl<T, M> SubMatrix<T, M>
 where
     T: Send + Sync,
     M: Matrix<T>,
 {
-    pub const fn new(inner: M, column_range: Range<usize>) -> Self {
+    pub const fn new(inner: M, indices: Vec<usize>) -> Self {
         Self {
             inner,
-            column_range,
+            indices,
             _phantom: PhantomData,
         }
     }
 }
 
-/// Implement `Matrix` for `SubMatrixRowSlices`.
-impl<T, M> Matrix<T> for SubMatrixRowSlices<T, M>
+/// An iterator that maps over matrix elements based on a set of indices.
+pub struct RowIterator<'a, T, M>
+where
+    T: Send + Sync + 'a,
+    M: Matrix<T> + 'a,
+{
+    inner: &'a M,
+    row: usize,
+    indices: Iter<'a, usize>,
+    _phantom: PhantomData<T>,
+}
+
+impl<'a, T, M> Iterator for RowIterator<'a, T, M>
 where
     T: Send + Sync,
     M: Matrix<T>,
 {
-    type Row<'a> = Skip<Take<M::Row<'a>>> where Self: 'a;
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.indices.next().map(|&i| self.inner.get(self.row, i))
+    }
+}
+
+/// Implement `Matrix` for `SubMatrix`.
+impl<T, M> Matrix<T> for SubMatrix<T, M>
+where
+    T: Send + Sync,
+    M: Matrix<T>,
+{
+    type Row<'a> = RowIterator<'a, T, M> where Self: 'a;
 
     #[inline]
     fn row(&self, r: usize) -> Self::Row<'_> {
-        self.inner
-            .row(r)
-            .take(self.column_range.end)
-            .skip(self.column_range.start)
+        RowIterator {
+            inner: &self.inner,
+            row: r,
+            indices: self.indices.iter(),
+            _phantom: PhantomData,
+        }
     }
 
     #[inline]
@@ -56,7 +83,7 @@ where
 
     #[inline]
     fn width(&self) -> usize {
-        self.column_range.len()
+        self.indices.len()
     }
 
     #[inline]
@@ -65,34 +92,42 @@ where
     }
 }
 
-/// A builder used to eval a sub-air.  This will handle enforcing constraints for a subset of a
-/// trace matrix.  E.g. if a particular air needs to be enforced for a subset of the columns of
-/// the trace, then the SubAirBuilder can be used.
+/// A builder used to eval a sub-air. This will handle enforcing constraints for a subset of elements
+/// of a trace matrix. E.g., if a particular air needs to be enforced for a subset of the elements
+/// of the trace, then the SubAirBuilder can be used.
 pub struct SubAirBuilder<'a, AB: AirBuilder> {
     inner: &'a mut AB,
-    main_range: Range<usize>,
-    preprocessed_range: Range<usize>,
+    preprocessed_indices: Vec<usize>,
+    main_indices: Vec<usize>,
 }
 
 impl<'a, AB: AirBuilder> SubAirBuilder<'a, AB> {
     pub fn new(
         inner: &'a mut AB,
-        preprocessed_range: Range<usize>,
-        main_range: Range<usize>,
+        preprocessed_indices: Vec<usize>,
+        main_indices: Vec<usize>,
     ) -> Self {
         Self {
             inner,
-            preprocessed_range,
-            main_range,
+            preprocessed_indices,
+            main_indices,
         }
     }
 
-    pub fn new_main(inner: &'a mut AB, main_range: Range<usize>) -> Self {
-        Self::new(inner, 0..0, main_range)
+    pub fn new_preprocessed(inner: &'a mut AB, preprocessed_indices: Vec<usize>) -> Self {
+        Self {
+            inner,
+            preprocessed_indices,
+            main_indices: vec![],
+        }
     }
 
-    pub fn new_preprocessed(inner: &'a mut AB, preprocessed_range: Range<usize>) -> Self {
-        Self::new(inner, preprocessed_range, 0..0)
+    pub fn new_main(inner: &'a mut AB, main_indices: Vec<usize>) -> Self {
+        Self {
+            inner,
+            preprocessed_indices: vec![],
+            main_indices,
+        }
     }
 }
 
@@ -100,11 +135,11 @@ impl<'a, AB: AirBuilder> AirBuilder for SubAirBuilder<'a, AB> {
     type F = AB::F;
     type Expr = AB::Expr;
     type Var = AB::Var;
-    type M = SubMatrixRowSlices<Self::Var, AB::M>;
+    type M = SubMatrix<Self::Var, AB::M>;
 
     fn main(&self) -> Self::M {
         let matrix = self.inner.main();
-        SubMatrixRowSlices::new(matrix, self.main_range.clone())
+        SubMatrix::new(matrix, self.main_indices.clone())
     }
 
     fn is_first_row(&self) -> Self::Expr {
@@ -127,7 +162,7 @@ impl<'a, AB: AirBuilder> AirBuilder for SubAirBuilder<'a, AB> {
 impl<'a, AB: PairBuilder> PairBuilder for SubAirBuilder<'a, AB> {
     fn preprocessed(&self) -> Self::M {
         let matrix = self.inner.main();
-        SubMatrixRowSlices::new(matrix, self.preprocessed_range.clone())
+        SubMatrix::new(matrix, self.preprocessed_indices.clone())
     }
 }
 
