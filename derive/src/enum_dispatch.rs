@@ -15,15 +15,6 @@ pub fn generate_trait_impls(
         .collect();
 
     quote! {
-        use p3_air::{Air, AirBuilder, BaseAir};
-        #[cfg(feature = "trace-writer")]
-        use p3_air_util::TraceWriter;
-        use p3_field::{ExtensionField, Field};
-        use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, Rap};
-        use p3_machine::chip::MachineChip;
-        use p3_matrix::dense::RowMajorMatrix;
-        use p3_uni_stark::{StarkGenericConfig, Val};
-
         impl std::fmt::Display for #name {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 match self {
@@ -32,65 +23,65 @@ pub fn generate_trait_impls(
             }
         }
 
-        impl<F: Field> BaseAir<F> for #name {
+        impl<F: p3_field::Field> p3_air::BaseAir<F> for #name {
             fn width(&self) -> usize {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as BaseAir<F>>::width(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air::BaseAir<F>>::width(chip),)*
                 }
             }
 
-            fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
+            fn preprocessed_trace(&self) -> Option<p3_matrix::dense::RowMajorMatrix<F>> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as BaseAir<F>>::preprocessed_trace(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air::BaseAir<F>>::preprocessed_trace(chip),)*
                 }
             }
         }
 
-        impl<AB: AirBuilder> Air<AB> for #name {
+        impl<AB: p3_air::AirBuilder> p3_air::Air<AB> for #name {
             fn eval(&self, builder: &mut AB) {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as Air<AB>>::eval(chip, builder),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air::Air<AB>>::eval(chip, builder),)*
                 }
             }
         }
 
-        impl<F: Field> InteractionAir<F> for #name {
-            fn receives(&self) -> Vec<Interaction<F>> {
+        impl<F: p3_field::Field> p3_interaction::InteractionAir<F> for #name {
+            fn receives(&self) -> Vec<p3_interaction::Interaction<F>> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as InteractionAir<F>>::receives(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_interaction::InteractionAir<F>>::receives(chip),)*
                 }
             }
 
-            fn sends(&self) -> Vec<Interaction<F>> {
+            fn sends(&self) -> Vec<p3_interaction::Interaction<F>> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as InteractionAir<F>>::sends(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_interaction::InteractionAir<F>>::sends(chip),)*
                 }
             }
         }
 
-        impl<AB: InteractionAirBuilder> Rap<AB> for #name {
+        impl<AB: p3_interaction::InteractionAirBuilder> p3_interaction::Rap<AB> for #name {
             fn preprocessed_width(&self) -> usize {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as Rap<AB>>::preprocessed_width(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_interaction::Rap<AB>>::preprocessed_width(chip),)*
                 }
             }
         }
 
         #[cfg(feature = "trace-writer")]
-        impl<F: Field, EF: ExtensionField<F>> TraceWriter<F, EF> for #name {
+        impl<F: p3_field::Field, EF: p3_field::ExtensionField<F>> p3_air_util::TraceWriter<F, EF> for #name {
             fn preprocessed_headers(&self) -> Vec<String> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::preprocessed_headers(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::TraceWriter<F, EF>>::preprocessed_headers(chip),)*
                 }
             }
 
             fn headers(&self) -> Vec<String> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::headers(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::TraceWriter<F, EF>>::headers(chip),)*
                 }
             }
         }
 
-        impl<SC: StarkGenericConfig> MachineChip<SC> for #name {}
+        impl<SC: p3_uni_stark::StarkGenericConfig> p3_machine::chip::Chip<SC> for #name {}
     }
 }

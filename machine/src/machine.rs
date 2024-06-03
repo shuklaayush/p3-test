@@ -4,7 +4,7 @@ use itertools::Itertools;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::PrimeField32;
-use p3_interaction::NUM_PERM_CHALLENGES;
+use p3_interaction::{Bus, NUM_PERM_CHALLENGES};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
@@ -16,7 +16,7 @@ use crate::trace::MachineTraceChecker;
 #[cfg(feature = "trace-writer")]
 use crate::trace::MachineTraceDebugger;
 use crate::{
-    chip::MachineChip,
+    chip::Chip,
     error::VerificationError,
     proof::{
         MachineProof, ProverPreprocessedData, ProvingKey, VerifierPreprocessedData, VerifyingKey,
@@ -28,12 +28,15 @@ use crate::{
     },
 };
 
-pub trait Machine<'a, SC, C>
+pub trait Machine<'a, SC>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
 {
-    fn chips(&self) -> Vec<C>;
+    type Chip: Chip<SC>;
+
+    type Bus: Bus;
+
+    fn chips(&self) -> Vec<Self::Chip>;
 
     fn setup(&self, config: &'a SC) -> (ProvingKey<SC>, VerifyingKey<SC>) {
         let pcs = config.pcs();
@@ -153,7 +156,7 @@ where
 
         // Verify constraints
         #[cfg(debug_assertions)]
-        trace.check_constraints(perm_challenges, &[]);
+        trace.check_constraints::<Self::Bus>(perm_challenges, &[]);
 
         // 6. Generate and commit to quotient traces
         tracing::info_span!("generate quotient trace").in_scope(|| {

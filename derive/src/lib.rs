@@ -2,6 +2,7 @@ extern crate proc_macro;
 extern crate quote;
 extern crate syn;
 
+#[cfg(feature = "trace-writer")]
 mod columnar;
 mod enum_dispatch;
 
@@ -15,8 +16,8 @@ use syn::{parse_macro_input, Data, DeriveInput, GenericParam};
 use self::columnar::generate_header_expr;
 use self::enum_dispatch::generate_trait_impls;
 
-#[proc_macro_derive(EnumTraits)]
-pub fn enum_traits_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Bus)]
+pub fn bus_derive(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -38,15 +39,15 @@ pub fn enum_traits_derive(input: TokenStream) -> TokenStream {
         .collect();
 
     let expanded = quote! {
-        impl #name {
-            pub fn from_usize(value: usize) -> Option<Self> {
+        impl p3_interaction::Bus for #name {
+            fn from_usize(value: usize) -> Option<Self> {
                 match value {
                     #(#variant_discriminants => Some(Self::#variant_names),)*
                     _ => None,
                 }
             }
 
-            pub fn name(&self) -> &'static str {
+            fn name(&self) -> &'static str {
                 match self {
                     #(#name::#variant_names => stringify!(#variant_names),)*
                 }

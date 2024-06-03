@@ -21,12 +21,12 @@ use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
 #[cfg(feature = "trace-writer")]
 use p3_field::PrimeField32;
 use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
-use p3_interaction::{generate_permutation_trace, NUM_PERM_CHALLENGES};
+use p3_interaction::{generate_permutation_trace, Bus, NUM_PERM_CHALLENGES};
 use p3_matrix::{dense::RowMajorMatrix, Matrix};
 use p3_uni_stark::{Domain, PackedChallenge, StarkGenericConfig, Val};
 
 use crate::{
-    chip::MachineChip, error::VerificationError, proof::Com, proof::PcsProverData,
+    chip::Chip, error::VerificationError, proof::Com, proof::PcsProverData,
     quotient::quotient_values, verify::verify_constraints,
 };
 
@@ -79,7 +79,7 @@ where
 pub struct ChipTrace<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     pub chip: C,
 
@@ -96,7 +96,7 @@ where
 impl<SC, C> ChipTrace<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     pub fn new(chip: C) -> Self {
         Self {
@@ -134,7 +134,7 @@ pub type MachineTrace<SC, C> = Vec<ChipTrace<SC, C>>;
 pub trait MachineTraceBuilder<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn new(chips: &[C]) -> Self;
 }
@@ -142,7 +142,7 @@ where
 impl<SC, C> MachineTraceBuilder<SC, C> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn new(chips: &[C]) -> Self {
         chips
@@ -187,7 +187,7 @@ where
 impl<'a, SC, C> MachineTraceLoader<'a, SC> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn generate_preprocessed(&mut self, pcs: &'a SC::Pcs) {
         let traces = self
@@ -371,7 +371,7 @@ where
 impl<'a, SC, C> MachineTraceCommiter<'a, SC> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn commit_preprocessed(
         &self,
@@ -429,15 +429,20 @@ pub trait MachineTraceChecker<SC>
 where
     SC: StarkGenericConfig,
 {
-    fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]);
+    fn check_constraints<B>(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>])
+    where
+        B: Bus;
 }
 
 impl<SC, C> MachineTraceChecker<SC> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
-    fn check_constraints(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>]) {
+    fn check_constraints<B>(&self, perm_challenges: [SC::Challenge; 2], public_values: &[Val<SC>])
+    where
+        B: Bus,
+    {
         for chip_trace in self.iter() {
             let preprocessed = chip_trace
                 .preprocessed
@@ -494,7 +499,7 @@ where
             .map(|chip_trace| chip_trace.chip.clone())
             .collect_vec();
 
-        check_cumulative_sums(
+        check_cumulative_sums::<_, _, _, B>(
             &airs,
             preprocessed_traces.as_slice(),
             main_traces.as_slice(),
@@ -530,7 +535,7 @@ impl<SC, C> MachineTraceDebugger<SC> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,
     Val<SC>: PrimeField32,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn track_failing_constraints(
         &self,
@@ -677,7 +682,7 @@ where
 impl<'a, SC, C> MachineTraceOpener<'a, SC> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn generate_rounds(
         &self,
@@ -962,7 +967,7 @@ where
 pub struct ChipTraceOpening<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     pub chip: C,
 
@@ -979,7 +984,7 @@ where
 impl<SC, C> ChipTraceOpening<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     pub fn new(chip: C) -> Self {
         Self {
@@ -1017,7 +1022,7 @@ pub type MachineTraceOpening<SC, C> = Vec<ChipTraceOpening<SC, C>>;
 pub trait MachineTraceOpeningBuilder<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn new(chips: &[C]) -> Self;
 }
@@ -1025,7 +1030,7 @@ where
 impl<SC, C> MachineTraceOpeningBuilder<SC, C> for MachineTraceOpening<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn new(chips: &[C]) -> Self {
         chips
@@ -1052,7 +1057,7 @@ where
 impl<'a, SC, C> MachineTraceOpeningLoader<'a, SC> for Vec<ChipTraceOpening<SC, C>>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn load_openings(
         &mut self,
@@ -1156,7 +1161,7 @@ where
 impl<SC, C> MachineTraceOpeningVerifier<SC> for MachineTraceOpening<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn generate_rounds(
         &self,
@@ -1277,7 +1282,7 @@ where
 impl<SC, C> MachineTraceConstraintVerifier<SC> for MachineTraceOpening<SC, C>
 where
     SC: StarkGenericConfig,
-    C: MachineChip<SC>,
+    C: Chip<SC>,
 {
     fn verify_constraints(
         &self,

@@ -1,11 +1,8 @@
-#[cfg(feature = "trace-writer")]
 use quote::format_ident;
 use quote::quote;
-#[cfg(feature = "trace-writer")]
 use syn::{Ident, Type};
 
 // TODO: Check if serde_json is easier
-#[cfg(feature = "trace-writer")]
 pub fn generate_header_expr(
     base_generic: &Ident,
     field_type: &Type,

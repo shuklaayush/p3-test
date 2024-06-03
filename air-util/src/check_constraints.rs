@@ -5,7 +5,7 @@ use core::borrow::Borrow;
 
 use hashbrown::HashMap;
 use p3_field::{ExtensionField, Field};
-use p3_interaction::{InteractionType, Rap};
+use p3_interaction::{Bus, InteractionType, Rap};
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use p3_matrix::Matrix;
@@ -97,7 +97,7 @@ pub fn check_constraints<F, EF, A>(
     });
 }
 
-pub fn check_cumulative_sums<F, EF, A>(
+pub fn check_cumulative_sums<F, EF, A, B>(
     airs: &[A],
     preprocessed: &[Option<RowMajorMatrixView<F>>],
     main: &[Option<RowMajorMatrixView<F>>],
@@ -106,6 +106,7 @@ pub fn check_cumulative_sums<F, EF, A>(
     F: Field,
     EF: ExtensionField<F>,
     A: for<'a> Rap<DebugConstraintBuilder<'a, F, EF>>,
+    B: Bus,
 {
     let mut sums = BTreeMap::new();
     for (i, air) in airs.iter().enumerate() {
@@ -144,7 +145,8 @@ pub fn check_cumulative_sums<F, EF, A>(
         }
     }
     for (i, sum) in sums {
-        assert_eq!(sum, EF::zero(), "Non zero sum at bus {i}");
+        let bus = B::from_usize(i).expect("Unknown bus").name();
+        assert_eq!(sum, EF::zero(), "Non zero sum at bus {bus}");
     }
 
     // Check cumulative sums

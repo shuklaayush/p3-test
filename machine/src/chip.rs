@@ -13,7 +13,7 @@ use p3_interaction::Rap;
 
 // TODO: Remove clone
 #[cfg(not(feature = "trace-writer"))]
-pub trait MachineChip<SC: StarkGenericConfig>:
+pub trait Chip<SC: StarkGenericConfig>:
     Clone
     + Debug
     + Display
@@ -25,7 +25,7 @@ pub trait MachineChip<SC: StarkGenericConfig>:
 }
 
 #[cfg(feature = "trace-writer")]
-pub trait MachineChip<SC: StarkGenericConfig>:
+pub trait Chip<SC: StarkGenericConfig>:
     Clone
     + Debug
     + Display
