@@ -50,11 +50,18 @@ where
 
     fn add(self, rhs: Self) -> Self {
         let mut origin = BTreeSet::new();
-        if !self.value.is_zero() {
-            origin = origin.union(&self.origin).cloned().collect();
-        }
-        if !rhs.value.is_zero() {
-            origin = origin.union(&rhs.origin).cloned().collect();
+        match (self.value.is_zero(), rhs.value.is_zero()) {
+            (false, true) => {
+                origin = origin.union(&self.origin).cloned().collect();
+            }
+            (true, false) => {
+                origin = origin.union(&rhs.origin).cloned().collect();
+            }
+            (_, _) => {
+                // Both or either
+                origin = origin.union(&self.origin).cloned().collect();
+                origin = origin.union(&rhs.origin).cloned().collect();
+            }
         }
         Self {
             value: self.value + rhs.value,
@@ -124,11 +131,18 @@ where
 
     fn sub(self, rhs: Self) -> Self {
         let mut origin = BTreeSet::new();
-        if !self.value.is_zero() {
-            origin = origin.union(&self.origin).cloned().collect();
-        }
-        if !rhs.value.is_zero() {
-            origin = origin.union(&rhs.origin).cloned().collect();
+        match (self.value.is_zero(), rhs.value.is_zero()) {
+            (false, true) => {
+                origin = origin.union(&self.origin).cloned().collect();
+            }
+            (true, false) => {
+                origin = origin.union(&rhs.origin).cloned().collect();
+            }
+            (_, _) => {
+                // Both or either
+                origin = origin.union(&self.origin).cloned().collect();
+                origin = origin.union(&rhs.origin).cloned().collect();
+            }
         }
         Self {
             value: self.value - rhs.value,
@@ -200,13 +214,8 @@ where
             (false, true) => {
                 origin = origin.union(&rhs.origin).cloned().collect();
             }
-            (false, false) => {
-                // Both
-                origin = origin.union(&self.origin).cloned().collect();
-                origin = origin.union(&rhs.origin).cloned().collect();
-            }
-            (true, true) => {
-                // Either?
+            (_, _) => {
+                // Both or either
                 origin = origin.union(&self.origin).cloned().collect();
                 origin = origin.union(&rhs.origin).cloned().collect();
             }
