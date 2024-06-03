@@ -15,6 +15,7 @@ use crate::util::{ColumnEntry, TraceEntry};
 
 pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
     fn preprocessed_headers(&self) -> Vec<String> {
+        // TODO: Assert preprocessed trace is None here
         vec![]
     }
 

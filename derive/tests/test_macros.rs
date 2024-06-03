@@ -1,10 +1,10 @@
 #[cfg(feature = "trace-writer")]
-use p3_derive::Columns;
+use p3_derive::Columnar;
 
 #[test]
 #[cfg(feature = "trace-writer")]
 fn test_simple() {
-    #[derive(Columns)]
+    #[derive(Columnar)]
     struct A<T> {
         _a: T,
     }
@@ -15,7 +15,7 @@ fn test_simple() {
 #[test]
 #[cfg(feature = "trace-writer")]
 fn test_simple_array() {
-    #[derive(Columns)]
+    #[derive(Columnar)]
     struct A<T> {
         _a: [T; 1],
     }
@@ -26,7 +26,7 @@ fn test_simple_array() {
 #[test]
 #[cfg(feature = "trace-writer")]
 fn test_const_generic_array() {
-    #[derive(Columns)]
+    #[derive(Columnar)]
     struct A<T, const N: usize> {
         _a: [T; N],
     }
@@ -37,7 +37,7 @@ fn test_const_generic_array() {
 #[test]
 #[cfg(feature = "trace-writer")]
 fn test_nested_array() {
-    #[derive(Columns)]
+    #[derive(Columnar)]
     struct A<T> {
         _a: [[T; 1]; 1],
     }
@@ -50,7 +50,7 @@ fn test_nested_array() {
 fn test_array_variable_length() {
     const N: usize = 1;
 
-    #[derive(Columns)]
+    #[derive(Columnar)]
     struct A<T> {
         _a: [T; N],
     }
@@ -63,7 +63,7 @@ fn test_array_variable_length() {
 fn test_nested_array_variable_length() {
     const N: usize = 1;
 
-    #[derive(Columns)]
+    #[derive(Columnar)]
     struct A<T> {
         _a: [[T; N]; N],
     }

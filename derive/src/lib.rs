@@ -2,60 +2,78 @@ extern crate proc_macro;
 extern crate quote;
 extern crate syn;
 
+mod columnar;
+mod enum_dispatch;
+
 use proc_macro::TokenStream;
-#[cfg(feature = "trace-writer")]
-use quote::format_ident;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam};
 #[cfg(feature = "trace-writer")]
-use syn::{Ident, Type};
+use syn::Fields;
+use syn::{parse_macro_input, Data, DeriveInput, GenericParam};
 
-// TODO: Check if serde_json is easier
 #[cfg(feature = "trace-writer")]
-fn generate_header_expr(
-    base_generic: &Ident,
-    field_type: &Type,
-    prefix: &str,
-    depth: u32,
-) -> proc_macro2::TokenStream {
-    match field_type {
-        Type::Array(array) => {
-            let elem_type = &array.elem;
-            let len_expr = &array.len;
+use self::columnar::generate_header_expr;
+use self::enum_dispatch::generate_trait_impls;
 
-            let inner_expr = generate_header_expr(base_generic, elem_type, prefix, depth + 1);
-            let idepth = format_ident!("i{}", depth);
-            quote! {
-                for #idepth in 0..#len_expr {
-                    #inner_expr
-                }
-            }
-        }
-        Type::Path(type_path) => {
-            let last_segment = type_path.path.segments.last().unwrap();
-            if last_segment.ident == *base_generic {
-                let expr = (0..depth).fold(prefix.to_string(), |acc, _| format!("{}[{{}}]", acc));
-                let is = (0..depth).map(|i| format_ident!("i{}", i));
-                quote! {
-                    headers.push(format!(#expr, #(#is),*));
-                }
+#[proc_macro_derive(EnumTraits)]
+pub fn enum_traits_derive(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let name = input.ident;
+    let variants = match input.data {
+        Data::Enum(data_enum) => data_enum.variants,
+        _ => panic!("Bus can only be derived for enums"),
+    };
+    let variant_names: Vec<_> = variants.iter().map(|variant| &variant.ident).collect();
+    let variant_discriminants: Vec<_> = variants
+        .iter()
+        .map(|variant| {
+            if let Some((_, expr)) = &variant.discriminant {
+                expr
             } else {
-                // Assuming it's a struct with a headers() method
-                let name = &last_segment.ident;
-                let generic_args = &last_segment.arguments;
-                quote! {
-                    for header in #name::#generic_args::headers() {
-                        headers.push(format!("{}.{}", #prefix, header));
-                    }
+                panic!("All enum variants must have an explicit discriminant");
+            }
+        })
+        .collect();
+
+    let expanded = quote! {
+        impl #name {
+            pub fn from_usize(value: usize) -> Option<Self> {
+                match value {
+                    #(#variant_discriminants => Some(Self::#variant_names),)*
+                    _ => None,
+                }
+            }
+
+            pub fn name(&self) -> &'static str {
+                match self {
+                    #(#name::#variant_names => stringify!(#variant_names),)*
                 }
             }
         }
-        _ => unreachable!(),
-    }
+    };
+
+    TokenStream::from(expanded)
 }
 
-#[proc_macro_derive(Columns)]
-pub fn columns_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(EnumDispatch)]
+pub fn enum_dispatch_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = input.ident;
+
+    let variants = match input.data {
+        Data::Enum(data_enum) => data_enum.variants,
+        _ => panic!("EnumDispatch can only be derived for enums"),
+    };
+
+    let trait_impls = generate_trait_impls(&name, &variants);
+
+    TokenStream::from(trait_impls)
+}
+
+#[proc_macro_derive(Columnar)]
+pub fn columnar_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = input.ident;
 
@@ -114,7 +132,7 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
     #[cfg(not(feature = "trace-writer"))]
     let header_impl = quote! {};
 
-    let stream = quote! {
+    let expanded = quote! {
         impl #impl_generics #name #type_generics #where_clause {
             pub const fn num_cols() -> usize {
                 core::mem::size_of::<#name<u8 #(, #non_first_generics_idents)*>>()
@@ -165,116 +183,5 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
         }
     };
 
-    TokenStream::from(stream)
-}
-
-#[proc_macro_derive(EnumDispatch)]
-pub fn enum_dispatch_derive(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let enum_name = input.ident;
-
-    let variants = match input.data {
-        Data::Enum(data_enum) => data_enum.variants,
-        _ => panic!("EnumDispatch can only be derived for enums"),
-    };
-
-    let trait_impls = generate_trait_impls(&enum_name, &variants);
-
-    TokenStream::from(quote! {
-        #trait_impls
-    })
-}
-
-fn generate_trait_impls(
-    enum_name: &syn::Ident,
-    variants: &syn::punctuated::Punctuated<syn::Variant, syn::token::Comma>,
-) -> proc_macro2::TokenStream {
-    let variant_names: Vec<_> = variants.iter().map(|variant| &variant.ident).collect();
-    let variant_field_types: Vec<_> = variants
-        .iter()
-        .map(|variant| match &variant.fields {
-            Fields::Unnamed(fields) => &fields.unnamed.first().unwrap().ty,
-            _ => panic!("EnumDispatch only supports enum variants with a single unnamed field"),
-        })
-        .collect();
-
-    quote! {
-        use p3_air::{Air, AirBuilder, BaseAir};
-        #[cfg(feature = "trace-writer")]
-        use p3_air_util::TraceWriter;
-        use p3_field::{ExtensionField, Field, PrimeField32};
-        use p3_interaction::{Interaction, InteractionAir, InteractionAirBuilder, Rap};
-        use p3_machine::chip::MachineChip;
-        use p3_matrix::dense::RowMajorMatrix;
-        use p3_uni_stark::{StarkGenericConfig, Val};
-
-        impl std::fmt::Display for #enum_name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                match self {
-                    #(#enum_name::#variant_names(_) => write!(f, stringify!(#variant_names)),)*
-                }
-            }
-        }
-
-        impl<F: Field> BaseAir<F> for #enum_name {
-            fn width(&self) -> usize {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as BaseAir<F>>::width(chip),)*
-                }
-            }
-
-            fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as BaseAir<F>>::preprocessed_trace(chip),)*
-                }
-            }
-        }
-
-        impl<AB: AirBuilder> Air<AB> for #enum_name {
-            fn eval(&self, builder: &mut AB) {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as Air<AB>>::eval(chip, builder),)*
-                }
-            }
-        }
-
-        impl<F: Field> InteractionAir<F> for #enum_name {
-            fn receives(&self) -> Vec<Interaction<F>> {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionAir<F>>::receives(chip),)*
-                }
-            }
-
-            fn sends(&self) -> Vec<Interaction<F>> {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as InteractionAir<F>>::sends(chip),)*
-                }
-            }
-        }
-
-        impl<AB: InteractionAirBuilder> Rap<AB> for #enum_name {
-            fn preprocessed_width(&self) -> usize {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as Rap<AB>>::preprocessed_width(chip),)*
-                }
-            }
-        }
-
-        #[cfg(feature = "trace-writer")]
-        impl<F: PrimeField32, EF: ExtensionField<F>> TraceWriter<F, EF> for #enum_name {
-            fn preprocessed_headers(&self) -> Vec<String> {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::preprocessed_headers(chip),)*
-                }
-            }
-
-            fn headers(&self) -> Vec<String> {
-                match self {
-                    #(#enum_name::#variant_names(chip) => <#variant_field_types as TraceWriter<F, EF>>::headers(chip),)*
-                }
-            }
-        }
-
-        impl<SC: StarkGenericConfig> MachineChip<SC> for #enum_name where Val<SC>: PrimeField32 {}
-    }
+    TokenStream::from(expanded)
 }
