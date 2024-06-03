@@ -146,7 +146,7 @@ pub fn check_cumulative_sums<F, EF, A, B>(
     }
     for (i, sum) in sums {
         let bus = B::from_usize(i).expect("Unknown bus").name();
-        assert_eq!(sum, EF::zero(), "Non zero sum at bus {bus}");
+        assert_eq!(sum, EF::zero(), "{bus} cumulative sum is not zero");
     }
 
     // Check cumulative sums
