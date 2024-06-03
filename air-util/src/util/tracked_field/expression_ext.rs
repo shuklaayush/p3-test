@@ -3,7 +3,7 @@ use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use p3_field::{AbstractExtensionField, AbstractField};
+use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
 
 use super::TrackedFieldExpression;
 
@@ -15,14 +15,14 @@ pub struct TrackedExtensionFieldExpression<F, EF, E>(
     pub PhantomData<F>,
 )
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord;
 
 impl<F, EF, E> Default for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn default() -> Self {
@@ -32,8 +32,8 @@ where
 
 impl<F, EF, E> From<F> for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn from(value: F) -> Self {
@@ -43,8 +43,8 @@ where
 
 impl<F, EF, E> From<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn from(value: TrackedFieldExpression<F, E>) -> Self {
@@ -54,8 +54,8 @@ where
 
 impl<F, EF, E> Add for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -67,8 +67,8 @@ where
 
 impl<F, EF, E> Add<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -80,8 +80,8 @@ where
 
 impl<F, EF, E> AddAssign for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn add_assign(&mut self, rhs: Self) {
@@ -91,8 +91,8 @@ where
 
 impl<F, EF, E> AddAssign<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn add_assign(&mut self, rhs: TrackedFieldExpression<F, E>) {
@@ -102,8 +102,8 @@ where
 
 impl<F, EF, E> Sum for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
@@ -113,8 +113,8 @@ where
 
 impl<F, EF, E> Sub for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -126,8 +126,8 @@ where
 
 impl<F, EF, E> Sub<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -139,8 +139,8 @@ where
 
 impl<F, EF, E> SubAssign for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn sub_assign(&mut self, rhs: Self) {
@@ -150,8 +150,8 @@ where
 
 impl<F, EF, E> SubAssign<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn sub_assign(&mut self, rhs: TrackedFieldExpression<F, E>) {
@@ -161,8 +161,8 @@ where
 
 impl<F, EF, E> Neg for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -174,8 +174,8 @@ where
 
 impl<F, EF, E> Mul for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -187,8 +187,8 @@ where
 
 impl<F, EF, E> Mul<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -200,8 +200,8 @@ where
 
 impl<F, EF, E> MulAssign for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn mul_assign(&mut self, rhs: Self) {
@@ -211,8 +211,8 @@ where
 
 impl<F, EF, E> MulAssign<TrackedFieldExpression<F, E>> for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn mul_assign(&mut self, rhs: TrackedFieldExpression<F, E>) {
@@ -222,8 +222,8 @@ where
 
 impl<F, EF, E> Product for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
@@ -232,8 +232,8 @@ where
 }
 impl<F, EF, E> AbstractField for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     type F = EF::F;
@@ -298,8 +298,8 @@ where
 impl<F, EF, E> AbstractExtensionField<TrackedFieldExpression<F, E>>
     for TrackedExtensionFieldExpression<F, EF, E>
 where
-    F: AbstractField,
-    EF: AbstractExtensionField<F>,
+    F: Field,
+    EF: ExtensionField<F>,
     E: Default + Clone + Debug + Ord,
 {
     const D: usize = EF::D;

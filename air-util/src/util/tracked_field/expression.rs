@@ -3,12 +3,12 @@ use core::iter::{Product, Sum};
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use std::collections::BTreeSet;
 
-use p3_field::AbstractField;
+use p3_field::{AbstractField, Field};
 
 #[derive(Clone, Debug)]
 pub struct TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     pub value: F,
@@ -17,7 +17,7 @@ where
 
 impl<F, E> Default for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn default() -> Self {
@@ -30,7 +30,7 @@ where
 
 impl<F, E> From<F> for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn from(value: F) -> Self {
@@ -43,22 +43,29 @@ where
 
 impl<F, E> Add for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
+        let mut origin = BTreeSet::new();
+        if !self.value.is_zero() {
+            origin = origin.union(&self.origin).cloned().collect();
+        }
+        if !rhs.value.is_zero() {
+            origin = origin.union(&rhs.origin).cloned().collect();
+        }
         Self {
             value: self.value + rhs.value,
-            origin: &self.origin | &rhs.origin,
+            origin,
         }
     }
 }
 
 impl<F, E> Add<F> for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -70,7 +77,7 @@ where
 
 impl<F, E> AddAssign for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn add_assign(&mut self, rhs: Self) {
@@ -80,7 +87,7 @@ where
 
 impl<F, E> AddAssign<F> for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn add_assign(&mut self, rhs: F) {
@@ -90,7 +97,7 @@ where
 
 impl<F, E> Sum for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
@@ -100,7 +107,7 @@ where
 
 impl<F, E> Sum<F> for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn sum<I: Iterator<Item = F>>(iter: I) -> Self {
@@ -110,22 +117,29 @@ where
 
 impl<F, E> Sub for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self {
+        let mut origin = BTreeSet::new();
+        if !self.value.is_zero() {
+            origin = origin.union(&self.origin).cloned().collect();
+        }
+        if !rhs.value.is_zero() {
+            origin = origin.union(&rhs.origin).cloned().collect();
+        }
         Self {
             value: self.value - rhs.value,
-            origin: &self.origin | &rhs.origin,
+            origin,
         }
     }
 }
 
 impl<F, E> Sub<F> for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -137,7 +151,7 @@ where
 
 impl<F, E> SubAssign for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn sub_assign(&mut self, rhs: Self) {
@@ -147,7 +161,7 @@ where
 
 impl<F, E> SubAssign<F> for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn sub_assign(&mut self, rhs: F) {
@@ -157,7 +171,7 @@ where
 
 impl<F, E> Neg for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -172,22 +186,41 @@ where
 
 impl<F, E> Mul for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self {
+        let mut origin = BTreeSet::new();
+        match (self.value.is_zero(), rhs.value.is_zero()) {
+            (true, false) => {
+                origin = origin.union(&self.origin).cloned().collect();
+            }
+            (false, true) => {
+                origin = origin.union(&rhs.origin).cloned().collect();
+            }
+            (false, false) => {
+                // Both
+                origin = origin.union(&self.origin).cloned().collect();
+                origin = origin.union(&rhs.origin).cloned().collect();
+            }
+            (true, true) => {
+                // Either?
+                origin = origin.union(&self.origin).cloned().collect();
+                origin = origin.union(&rhs.origin).cloned().collect();
+            }
+        }
         Self {
             value: self.value * rhs.value,
-            origin: &self.origin | &rhs.origin,
+            origin,
         }
     }
 }
 
 impl<F, E> Mul<F> for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     type Output = Self;
@@ -199,7 +232,7 @@ where
 
 impl<F, E> MulAssign for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn mul_assign(&mut self, rhs: Self) {
@@ -209,7 +242,7 @@ where
 
 impl<F, E> MulAssign<F> for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn mul_assign(&mut self, rhs: F) {
@@ -219,7 +252,7 @@ where
 
 impl<F, E> Product for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
@@ -229,7 +262,7 @@ where
 
 impl<F, E> Product<F> for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     fn product<I: Iterator<Item = F>>(iter: I) -> Self {
@@ -239,7 +272,7 @@ where
 
 impl<F, E> AbstractField for TrackedFieldExpression<F, E>
 where
-    F: AbstractField,
+    F: Field,
     E: Default + Clone + Debug + Ord,
 {
     type F = F::F;
