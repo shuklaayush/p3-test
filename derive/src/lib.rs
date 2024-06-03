@@ -137,6 +137,15 @@ pub fn columns_derive(input: TokenStream) -> TokenStream {
             #header_impl
         }
 
+        impl<#(#non_first_generics),*> #name<usize #(, #non_first_generics)*> #where_clause {
+            pub fn range(&self) -> std::ops::Range<usize> {
+                let num_cols = Self::num_cols();
+                let ptr = self as *const _ as *const usize;
+                let start = unsafe { *ptr };
+                start..start + num_cols
+            }
+        }
+
         impl #impl_generics core::borrow::Borrow<#name #type_generics> for [#type_generic] #where_clause {
             fn borrow(&self) -> &#name #type_generics {
                 debug_assert_eq!(self.len(), std::mem::size_of::<#name<u8 #(, #non_first_generics)*>>());
