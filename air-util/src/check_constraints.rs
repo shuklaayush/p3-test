@@ -110,34 +110,36 @@ pub fn check_cumulative_sums<F, EF, A>(
     let mut sums = BTreeMap::new();
     for (i, air) in airs.iter().enumerate() {
         for (j, (interaction, interaction_type)) in air.all_interactions().iter().enumerate() {
-            for (n, perm_row) in permutation[i].unwrap().rows().enumerate() {
-                let preprocessed_row = preprocessed[i]
-                    .as_ref()
-                    .map(|preprocessed| {
-                        let row = preprocessed.row_slice(n);
-                        let row: &[_] = (*row).borrow();
-                        row.to_vec()
-                    })
-                    .unwrap_or_default();
-                let main_row = main[i]
-                    .as_ref()
-                    .map(|main| {
-                        let row = main.row_slice(n);
-                        let row: &[_] = (*row).borrow();
-                        row.to_vec()
-                    })
-                    .unwrap_or_default();
-                let perm_row: Vec<_> = perm_row.collect();
-                let mult = interaction
-                    .count
-                    .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
-                let val = match interaction_type {
-                    InteractionType::Send => perm_row[j] * mult,
-                    InteractionType::Receive => -perm_row[j] * mult,
-                };
-                sums.entry(interaction.argument_index)
-                    .and_modify(|c| *c += val)
-                    .or_insert(val);
+            if let Some(permutation) = permutation[i].as_ref() {
+                for (n, perm_row) in permutation.rows().enumerate() {
+                    let preprocessed_row = preprocessed[i]
+                        .as_ref()
+                        .map(|preprocessed| {
+                            let row = preprocessed.row_slice(n);
+                            let row: &[_] = (*row).borrow();
+                            row.to_vec()
+                        })
+                        .unwrap_or_default();
+                    let main_row = main[i]
+                        .as_ref()
+                        .map(|main| {
+                            let row = main.row_slice(n);
+                            let row: &[_] = (*row).borrow();
+                            row.to_vec()
+                        })
+                        .unwrap_or_default();
+                    let perm_row: Vec<_> = perm_row.collect();
+                    let mult = interaction
+                        .count
+                        .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
+                    let val = match interaction_type {
+                        InteractionType::Send => perm_row[j] * mult,
+                        InteractionType::Receive => -perm_row[j] * mult,
+                    };
+                    sums.entry(interaction.argument_index)
+                        .and_modify(|c| *c += val)
+                        .or_insert(val);
+                }
             }
         }
     }
