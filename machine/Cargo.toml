@@ -27,4 +27,4 @@ cfg-if = "1.0.0"
 
 [features]
 default = []
-trace-writer = ["dep:rust_xlsxwriter", "p3-air-util/trace-writer"]
+air-logger = ["dep:rust_xlsxwriter", "p3-air-util/air-logger"]

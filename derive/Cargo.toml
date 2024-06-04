@@ -21,4 +21,4 @@ p3-interaction = { path = "../interaction" }
 
 [features]
 default = []
-trace-writer = []
+air-logger = []

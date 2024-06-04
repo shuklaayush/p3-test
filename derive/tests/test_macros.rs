@@ -1,8 +1,8 @@
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 use p3_derive::Columnar;
 
 #[test]
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 fn test_simple() {
     #[derive(Columnar)]
     struct A<T> {
@@ -13,7 +13,7 @@ fn test_simple() {
 }
 
 #[test]
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 fn test_simple_array() {
     #[derive(Columnar)]
     struct A<T> {
@@ -24,7 +24,7 @@ fn test_simple_array() {
 }
 
 #[test]
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 fn test_const_generic_array() {
     #[derive(Columnar)]
     struct A<T, const N: usize> {
@@ -35,7 +35,7 @@ fn test_const_generic_array() {
 }
 
 #[test]
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 fn test_nested_array() {
     #[derive(Columnar)]
     struct A<T> {
@@ -46,7 +46,7 @@ fn test_nested_array() {
 }
 
 #[test]
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 fn test_array_variable_length() {
     const N: usize = 1;
 
@@ -59,7 +59,7 @@ fn test_array_variable_length() {
 }
 
 #[test]
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 fn test_nested_array_variable_length() {
     const N: usize = 1;
 

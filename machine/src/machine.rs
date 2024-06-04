@@ -4,16 +4,18 @@ use itertools::Itertools;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::PrimeField32;
-use p3_interaction::{Bus, NUM_PERM_CHALLENGES};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
 
 use p3_air_util::proof::Commitments;
+#[cfg(feature = "air-logger")]
+use p3_air_util::AirLogger;
+use p3_interaction::{Bus, NUM_PERM_CHALLENGES};
 
 #[cfg(debug_assertions)]
 use crate::trace::MachineTraceChecker;
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 use crate::trace::MachineTraceDebugger;
 use crate::{
     chip::Chip,
@@ -104,7 +106,7 @@ where
         public_values: &'a [Val<SC>],
     ) -> MachineProof<SC>
     where
-        // TODO: Put behind trace-writer feature
+        // TODO: Put behind air-logger feature
         Val<SC>: PrimeField32,
     {
         // TODO: Use fixed size array instead of Vecs
@@ -151,7 +153,7 @@ where
         }
         let alpha: SC::Challenge = challenger.sample_ext_element();
 
-        #[cfg(feature = "trace-writer")]
+        #[cfg(feature = "air-logger")]
         let _ = trace.write_traces_to_file("trace.xlsx", perm_challenges);
 
         // Verify constraints
@@ -287,5 +289,19 @@ where
         trace.verify_cumulative_sums()?;
 
         Ok(())
+    }
+
+    #[cfg(feature = "air-logger")]
+    fn write_schema_to_file(&self, path: &str) {
+        let chips = self.chips();
+        for chip in chips.iter() {
+            let headers_and_types = chip.headers_and_types();
+            let body = headers_and_types
+                .iter()
+                .map(|(header, ty)| format!("\t{} {}", header, ty))
+                .join("\n");
+            let table = format!("Table {} {{{}}}\n\n", chip, body);
+            dbg!(table);
+        }
     }
 }

@@ -1,12 +1,12 @@
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 use alloc::boxed::Box;
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 use alloc::collections::BTreeSet;
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 use core::error::Error;
 
 use itertools::Itertools;
@@ -15,10 +15,10 @@ use p3_air_util::{
     check_constraints, check_cumulative_sums, get_quotient_degree,
     proof::{AdjacentOpenedValues, InteractionAirProof, OpenedValues},
 };
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 use p3_air_util::{track_failing_constraints, track_failing_interactions, util::TraceEntry};
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 use p3_field::PrimeField32;
 use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
 use p3_interaction::{generate_permutation_trace, Bus, NUM_PERM_CHALLENGES};
@@ -508,7 +508,7 @@ where
     }
 }
 
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 pub trait MachineTraceDebugger<SC>
 where
     SC: StarkGenericConfig,
@@ -530,7 +530,7 @@ where
     ) -> Result<(), Box<dyn Error>>;
 }
 
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 impl<SC, C> MachineTraceDebugger<SC> for MachineTrace<SC, C>
 where
     SC: StarkGenericConfig,

@@ -2,18 +2,18 @@ extern crate proc_macro;
 extern crate quote;
 extern crate syn;
 
-#[cfg(feature = "trace-writer")]
+#[cfg(feature = "air-logger")]
 mod columnar;
 mod enum_dispatch;
 
 use proc_macro::TokenStream;
 use quote::quote;
-#[cfg(feature = "trace-writer")]
-use syn::Fields;
 use syn::{parse_macro_input, Data, DeriveInput, GenericParam};
 
-#[cfg(feature = "trace-writer")]
-use self::columnar::generate_header_expr;
+#[cfg(feature = "air-logger")]
+use self::columnar::generate_headers;
+#[cfg(feature = "air-logger")]
+use self::columnar::generate_headers_and_types;
 use self::enum_dispatch::generate_trait_impls;
 
 #[proc_macro_derive(Bus)]
@@ -103,39 +103,15 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
         .collect::<Vec<_>>();
     let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
 
-    #[cfg(feature = "trace-writer")]
-    let fields = match input.data {
-        Data::Struct(ref data) => match data.fields {
-            Fields::Named(ref fields) => fields.named.iter(),
-            _ => panic!("Unsupported struct fields"),
-        },
-        _ => panic!("Unsupported data type"),
-    };
-    #[cfg(feature = "trace-writer")]
-    let mut header_exprs = Vec::new();
-    #[cfg(feature = "trace-writer")]
-    for field in fields {
-        let field_name = field.ident.as_ref().unwrap();
-        let field_type = &field.ty;
-        header_exprs.push(generate_header_expr(
-            type_generic,
-            field_type,
-            &field_name.to_string(),
-            0,
-        ));
-    }
-
-    #[cfg(feature = "trace-writer")]
-    let header_impl = quote! {
-        #[cfg(feature = "trace-writer")]
-        pub fn headers() -> Vec<String> {
-            let mut headers = Vec::new();
-            #(#header_exprs)*
-            headers
-        }
-    };
-    #[cfg(not(feature = "trace-writer"))]
+    #[cfg(feature = "air-logger")]
+    let header_impl = generate_headers(&input.data, type_generic);
+    #[cfg(not(feature = "air-logger"))]
     let header_impl = quote! {};
+
+    #[cfg(feature = "air-logger")]
+    let header_type_impl = generate_headers_and_types(&input.data, type_generic);
+    #[cfg(not(feature = "air-logger"))]
+    let header_type_impl = quote! {};
 
     let expanded = quote! {
         impl #impl_generics #name #type_generics #where_clause {
@@ -156,6 +132,8 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
             }
 
             #header_impl
+
+            #header_type_impl
         }
 
         impl<#(#non_first_generics),*> #name<usize #(, #non_first_generics_idents)*> #where_clause {

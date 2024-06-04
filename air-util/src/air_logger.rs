@@ -13,13 +13,15 @@ use rust_xlsxwriter::{Color, Format, Worksheet};
 
 use crate::util::{ColumnEntry, TraceEntry};
 
-pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
+pub trait AirLogger<F: Field, EF: ExtensionField<F>> {
     fn preprocessed_headers(&self) -> Vec<String> {
         // TODO: Assert preprocessed trace is None here
         vec![]
     }
 
     fn main_headers(&self) -> Vec<String>;
+
+    fn headers_and_types(&self) -> Vec<(String, String)>;
 
     fn write_traces_to_worksheet(
         &self,
