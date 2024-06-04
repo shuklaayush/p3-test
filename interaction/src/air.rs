@@ -17,44 +17,39 @@ pub trait BaseInteractionAir<F>
 where
     F: Field,
 {
-    fn receives_from_preprocessed_col_map<C>(
+    fn receives_from_preprocessed_indices(
         &self,
-        _preprocessed_col_map: C,
+        preprocessed_indices: Vec<usize>,
     ) -> Vec<Interaction<F>> {
-        vec![]
+        self.receives_from_indices(preprocessed_indices, vec![])
     }
 
-    fn receives_from_main_col_map<C>(&self, _main_col_map: C) -> Vec<Interaction<F>> {
-        vec![]
+    fn receives_from_main_indices(&self, main_indices: Vec<usize>) -> Vec<Interaction<F>> {
+        self.receives_from_indices(vec![], main_indices)
     }
 
-    fn receives_from_col_maps<C1, C2>(
+    fn receives_from_indices(
         &self,
-        preprocessed_col_map: C1,
-        main_col_map: C2,
-    ) -> Vec<Interaction<F>> {
-        let mut interactions = self.receives_from_preprocessed_col_map(preprocessed_col_map);
-        interactions.extend(self.receives_from_main_col_map(main_col_map));
-        interactions
-    }
+        preprocessed_indices: Vec<usize>,
+        main_indices: Vec<usize>,
+    ) -> Vec<Interaction<F>>;
 
-    fn sends_from_preprocessed_col_map<C>(&self, _preprocessed_col_map: C) -> Vec<Interaction<F>> {
-        vec![]
-    }
-
-    fn sends_from_main_col_map<C>(&self, _main_col_map: C) -> Vec<Interaction<F>> {
-        vec![]
-    }
-
-    fn sends_from_col_maps<C1, C2>(
+    fn sends_from_preprocessed_indices(
         &self,
-        preprocessed_col_map: C1,
-        main_col_map: C2,
+        preprocessed_indices: Vec<usize>,
     ) -> Vec<Interaction<F>> {
-        let mut interactions = self.sends_from_preprocessed_col_map(preprocessed_col_map);
-        interactions.extend(self.sends_from_main_col_map(main_col_map));
-        interactions
+        self.sends_from_indices(preprocessed_indices, vec![])
     }
+
+    fn sends_from_main_indices(&self, main_indices: Vec<usize>) -> Vec<Interaction<F>> {
+        self.sends_from_indices(vec![], main_indices)
+    }
+
+    fn sends_from_indices(
+        &self,
+        preprocessed_indices: Vec<usize>,
+        main_indices: Vec<usize>,
+    ) -> Vec<Interaction<F>>;
 }
 
 pub trait InteractionAir<F>: BaseInteractionAir<F>

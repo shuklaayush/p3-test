@@ -155,8 +155,28 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
         }
 
         impl<#(#non_first_generics),*> #name<usize #(, #non_first_generics_idents)*> #where_clause {
-            pub fn range(&self) -> std::ops::Range<usize> {
+            pub fn as_vec(&self) -> Vec<usize> {
                 let num_cols = Self::num_cols();
+                let ptr = self as *const _ as *const usize;
+                unsafe {
+                    std::slice::from_raw_parts(ptr, num_cols).to_vec()
+                }
+            }
+
+            pub fn from_vec(indices: Vec<usize>) -> Self {
+                let num_cols = Self::num_cols();
+                assert_eq!(indices.len(), num_cols, "Expected {} indices, got {}", num_cols, indices.len());
+                let mut cols = std::mem::MaybeUninit::<#name<usize #(, #non_first_generics_idents)*>>::uninit();
+                let ptr = cols.as_mut_ptr() as *mut usize;
+                unsafe {
+                    ptr.copy_from_nonoverlapping(indices.as_ptr(), num_cols);
+                    cols.assume_init()
+                }
+            }
+
+            pub fn as_range(&self) -> std::ops::Range<usize> {
+                let num_cols = Self::num_cols();
+                // TODO: Check if actually a range
                 let ptr = self as *const _ as *const usize;
                 let start = unsafe { *ptr };
                 start..start + num_cols
