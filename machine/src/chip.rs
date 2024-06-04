@@ -13,7 +13,7 @@ use p3_interaction::Rap;
 
 // TODO: Remove clone
 #[cfg(not(feature = "trace-writer"))]
-pub trait Chip<SC: StarkGenericConfig>:
+pub trait Chip<SC>:
     Clone
     + Debug
     + Display
@@ -21,11 +21,13 @@ pub trait Chip<SC: StarkGenericConfig>:
     + for<'a> Rap<VerifierConstraintFolder<'a, SC>>
     + for<'a> Rap<SymbolicAirBuilder<Val<SC>>>
     + for<'a> Rap<DebugConstraintBuilder<'a, Val<SC>, SC::Challenge>>
+where
+    SC: StarkGenericConfig,
 {
 }
 
 #[cfg(feature = "trace-writer")]
-pub trait Chip<SC: StarkGenericConfig>:
+pub trait Chip<SC>:
     Clone
     + Debug
     + Display
@@ -35,5 +37,7 @@ pub trait Chip<SC: StarkGenericConfig>:
     + for<'a> Rap<DebugConstraintBuilder<'a, Val<SC>, SC::Challenge>>
     + TraceWriter<Val<SC>, SC::Challenge>
     + for<'a> Rap<TrackingConstraintBuilder<'a, Val<SC>, SC::Challenge>>
+where
+    SC: StarkGenericConfig,
 {
 }

@@ -13,7 +13,23 @@ pub trait InteractionAirBuilder: PermutationAirBuilder + PairBuilder {
     fn cumulative_sum(&self) -> Self::VarEF;
 }
 
-pub trait InteractionAir<F: Field> {
+pub trait BaseInteractionAir<F>
+where
+    F: Field,
+{
+    fn receives_from_col_map<C>(&self, _col_map: C) -> Vec<Interaction<F>> {
+        vec![]
+    }
+
+    fn sends_from_col_map<C>(&self, _col_map: C) -> Vec<Interaction<F>> {
+        vec![]
+    }
+}
+
+pub trait InteractionAir<F>: BaseInteractionAir<F>
+where
+    F: Field,
+{
     fn receives(&self) -> Vec<Interaction<F>> {
         vec![]
     }
@@ -31,7 +47,10 @@ pub trait InteractionAir<F: Field> {
     }
 }
 
-pub trait Rap<AB: InteractionAirBuilder>: Air<AB> + InteractionAir<AB::F> {
+pub trait Rap<AB>: Air<AB> + InteractionAir<AB::F>
+where
+    AB: InteractionAirBuilder,
+{
     fn preprocessed_width(&self) -> usize {
         debug_assert!(self.preprocessed_trace().is_none());
         0
