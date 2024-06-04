@@ -166,16 +166,16 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn as_vec(&self) -> Vec<usize> {
+            pub fn as_slice(&self) -> &[usize] {
                 let num_cols = Self::num_cols();
                 let ptr = self as *const _ as *const usize;
                 unsafe {
-                    std::slice::from_raw_parts(ptr, num_cols).to_vec()
+                    std::slice::from_raw_parts(ptr, num_cols)
                 }
             }
 
             pub fn as_range(&self) -> std::ops::Range<usize> {
-                debug_assert!(self.as_vec().windows(2).all(|w| w[1] == w[0] + 1), "Expected contiguous indices");
+                debug_assert!(self.as_slice().windows(2).all(|w| w[1] == w[0] + 1), "Expected contiguous indices");
                 let ptr = self as *const _ as *const usize;
                 let start = unsafe { *ptr };
                 start..start + Self::num_cols()
