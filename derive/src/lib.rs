@@ -39,20 +39,24 @@ pub fn bus_derive(input: TokenStream) -> TokenStream {
         .collect();
 
     let expanded = quote! {
-        impl p3_interaction::Bus for #name {
-            fn from_usize(value: usize) -> Option<Self> {
-                match value {
-                    #(#variant_discriminants => Some(Self::#variant_names),)*
-                    _ => None,
-                }
-            }
-
-            fn name(&self) -> &'static str {
+        impl std::fmt::Display for #name {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 match self {
-                    #(#name::#variant_names => stringify!(#variant_names),)*
+                    #(#name::#variant_names => write!(f, stringify!(#variant_names)),)*
                 }
             }
         }
+
+        impl From<usize> for #name {
+            fn from(value: usize) -> Self {
+                match value {
+                    #(#variant_discriminants => Self::#variant_names,)*
+                    _ => panic!("Invalid value for enum #name"),
+                }
+            }
+        }
+
+        impl p3_interaction::Bus for #name {}
     };
 
     TokenStream::from(expanded)
@@ -155,7 +159,7 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
         }
 
         impl<#(#non_first_generics),*> #name<usize #(, #non_first_generics_idents)*> #where_clause {
-            pub fn from_usize_slice(indices: &[usize]) -> Self {
+            pub fn from_slice(indices: &[usize]) -> Self {
                 let num_cols = Self::num_cols();
                 debug_assert_eq!(indices.len(), num_cols, "Expected {} indices, got {}", num_cols, indices.len());
                 let mut cols = std::mem::MaybeUninit::<#name<usize #(, #non_first_generics_idents)*>>::uninit();
@@ -166,7 +170,7 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn as_usize_slice(&self) -> &[usize] {
+            pub fn as_slice(&self) -> &[usize] {
                 let num_cols = Self::num_cols();
                 let ptr = self as *const _ as *const usize;
                 unsafe {
@@ -174,8 +178,8 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn as_usize_range(&self) -> std::ops::Range<usize> {
-                debug_assert!(self.as_usize_slice().windows(2).all(|w| w[1] == w[0] + 1), "Expected contiguous indices");
+            pub fn as_range(&self) -> std::ops::Range<usize> {
+                debug_assert!(self.as_slice().windows(2).all(|w| w[1] == w[0] + 1), "Expected contiguous indices");
                 let ptr = self as *const _ as *const usize;
                 let start = unsafe { *ptr };
                 start..start + Self::num_cols()

@@ -1,5 +1,3 @@
-pub trait Bus: Sized {
-    fn from_usize(value: usize) -> Option<Self>;
+use core::fmt::Display;
 
-    fn name(&self) -> &'static str;
-}
+pub trait Bus: Sized + From<usize> + Display {}

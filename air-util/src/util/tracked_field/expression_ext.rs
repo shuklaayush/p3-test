@@ -309,13 +309,13 @@ where
     }
 
     fn from_base_slice(bs: &[TrackedFieldExpression<F, E>]) -> Self {
-        let bs = bs.iter().map(|b| b.value.clone()).collect::<Vec<_>>();
+        let bs = bs.iter().map(|b| b.value).collect::<Vec<_>>();
         let value = EF::from_base_slice(&bs);
         Self(TrackedFieldExpression::from(value), PhantomData)
     }
 
     fn from_base_fn<FN: FnMut(usize) -> TrackedFieldExpression<F, E>>(mut f: FN) -> Self {
-        let value = EF::from_base_fn(|i| f(i).value.clone());
+        let value = EF::from_base_fn(|i| f(i).value);
         Self(TrackedFieldExpression::from(value), PhantomData)
     }
 
