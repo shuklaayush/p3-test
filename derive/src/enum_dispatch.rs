@@ -45,6 +45,20 @@ pub fn generate_trait_impls(
             }
         }
 
+        impl<F: p3_field::Field> p3_interaction::BaseInteractionAir<F> for #name {
+            fn receives_from_indices(&self, preprocessed_indices: &[usize], main_indices: &[usize]) -> Vec<p3_interaction::Interaction<F>> {
+                match self {
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_interaction::BaseInteractionAir<F>>::receives_from_indices(chip, preprocessed_indices, main_indices),)*
+                }
+            }
+
+            fn sends_from_indices(&self, preprocessed_indices: &[usize], main_indices: &[usize]) -> Vec<p3_interaction::Interaction<F>> {
+                match self {
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_interaction::BaseInteractionAir<F>>::sends_from_indices(chip, preprocessed_indices, main_indices),)*
+                }
+            }
+        }
+
         impl<F: p3_field::Field> p3_interaction::InteractionAir<F> for #name {
             fn receives(&self) -> Vec<p3_interaction::Interaction<F>> {
                 match self {
@@ -75,9 +89,9 @@ pub fn generate_trait_impls(
                 }
             }
 
-            fn headers(&self) -> Vec<String> {
+            fn main_headers(&self) -> Vec<String> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::TraceWriter<F, EF>>::headers(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::TraceWriter<F, EF>>::main_headers(chip),)*
                 }
             }
         }

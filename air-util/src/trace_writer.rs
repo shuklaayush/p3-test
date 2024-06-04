@@ -19,7 +19,7 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
         vec![]
     }
 
-    fn headers(&self) -> Vec<String>;
+    fn main_headers(&self) -> Vec<String>;
 
     fn write_traces_to_worksheet(
         &self,
@@ -67,9 +67,9 @@ pub trait TraceWriter<F: Field, EF: ExtensionField<F>> {
             offset += 1;
         }
 
-        let main_headers = self.headers();
+        let main_headers = self.main_headers();
         if !main_headers.is_empty() {
-            for (j, header) in self.headers().iter().enumerate() {
+            for (j, header) in main_headers.iter().enumerate() {
                 let format = {
                     if column_entries.contains(&ColumnEntry::Main { col: j }) {
                         Format::new().set_background_color(Color::Red)

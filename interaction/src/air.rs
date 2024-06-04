@@ -30,9 +30,11 @@ where
 
     fn receives_from_indices(
         &self,
-        preprocessed_indices: &[usize],
-        main_indices: &[usize],
-    ) -> Vec<Interaction<F>>;
+        _preprocessed_indices: &[usize],
+        _main_indices: &[usize],
+    ) -> Vec<Interaction<F>> {
+        vec![]
+    }
 
     fn sends_from_preprocessed_indices(
         &self,
@@ -47,9 +49,11 @@ where
 
     fn sends_from_indices(
         &self,
-        preprocessed_indices: &[usize],
-        main_indices: &[usize],
-    ) -> Vec<Interaction<F>>;
+        _preprocessed_indices: &[usize],
+        _main_indices: &[usize],
+    ) -> Vec<Interaction<F>> {
+        vec![]
+    }
 }
 
 pub trait InteractionAir<F>: BaseInteractionAir<F>
