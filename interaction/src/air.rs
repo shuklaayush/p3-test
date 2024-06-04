@@ -17,12 +17,43 @@ pub trait BaseInteractionAir<F>
 where
     F: Field,
 {
-    fn receives_from_col_map<C>(&self, _col_map: C) -> Vec<Interaction<F>> {
+    fn receives_from_preprocessed_col_map<C>(
+        &self,
+        _preprocessed_col_map: C,
+    ) -> Vec<Interaction<F>> {
         vec![]
     }
 
-    fn sends_from_col_map<C>(&self, _col_map: C) -> Vec<Interaction<F>> {
+    fn receives_from_main_col_map<C>(&self, _main_col_map: C) -> Vec<Interaction<F>> {
         vec![]
+    }
+
+    fn receives_from_col_maps<C1, C2>(
+        &self,
+        preprocessed_col_map: C1,
+        main_col_map: C2,
+    ) -> Vec<Interaction<F>> {
+        let mut interactions = self.receives_from_preprocessed_col_map(preprocessed_col_map);
+        interactions.extend(self.receives_from_main_col_map(main_col_map));
+        interactions
+    }
+
+    fn sends_from_preprocessed_col_map<C>(&self, _preprocessed_col_map: C) -> Vec<Interaction<F>> {
+        vec![]
+    }
+
+    fn sends_from_main_col_map<C>(&self, _main_col_map: C) -> Vec<Interaction<F>> {
+        vec![]
+    }
+
+    fn sends_from_col_maps<C1, C2>(
+        &self,
+        preprocessed_col_map: C1,
+        main_col_map: C2,
+    ) -> Vec<Interaction<F>> {
+        let mut interactions = self.sends_from_preprocessed_col_map(preprocessed_col_map);
+        interactions.extend(self.sends_from_main_col_map(main_col_map));
+        interactions
     }
 }
 
