@@ -8,10 +8,14 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
 
+use p3_air_util::folders::{
+    DebugConstraintBuilder, ProverConstraintFolder, SymbolicAirBuilder, TrackingConstraintBuilder,
+    VerifierConstraintFolder,
+};
 use p3_air_util::proof::Commitments;
 #[cfg(feature = "air-logger")]
 use p3_air_util::AirLogger;
-use p3_interaction::{Bus, NUM_PERM_CHALLENGES};
+use p3_interaction::{Bus, Rap, NUM_PERM_CHALLENGES};
 
 #[cfg(debug_assertions)]
 use crate::trace::MachineTraceChecker;
@@ -30,17 +34,21 @@ use crate::{
     },
 };
 
-pub trait Machine<'a, SC>
-where
-    SC: StarkGenericConfig,
-{
-    type Chip: Chip<SC>;
+pub trait Machine {
+    type Chip: Chip;
 
     type Bus: Bus;
 
     fn chips(&self) -> Vec<Self::Chip>;
 
-    fn setup(&self, config: &'a SC) -> (ProvingKey<SC>, VerifyingKey<SC>) {
+    fn setup<'a, SC>(&self, config: &'a SC) -> (ProvingKey<SC>, VerifyingKey<SC>)
+    where
+        SC: StarkGenericConfig,
+        Self::Chip: for<'b> Rap<ProverConstraintFolder<'b, SC>>
+            + for<'b> Rap<VerifierConstraintFolder<'b, SC>>
+            + for<'b> Rap<SymbolicAirBuilder<Val<SC>>>
+            + for<'b> Rap<DebugConstraintBuilder<'b, Val<SC>, SC::Challenge>>,
+    {
         let pcs = config.pcs();
         let chips = self.chips();
         let mut trace: MachineTrace<SC, _> = MachineTraceBuilder::new(chips.as_slice());
@@ -96,7 +104,7 @@ where
         (pk, vk)
     }
 
-    fn prove(
+    fn prove<'a, SC>(
         &self,
         config: &'a SC,
         challenger: &mut SC::Challenger,
@@ -106,7 +114,13 @@ where
         public_values: &'a [Val<SC>],
     ) -> MachineProof<SC>
     where
-        // TODO: Put behind air-logger feature
+        SC: StarkGenericConfig,
+        Self::Chip: for<'b> Rap<ProverConstraintFolder<'b, SC>>
+            + for<'b> Rap<VerifierConstraintFolder<'b, SC>>
+            + for<'b> Rap<SymbolicAirBuilder<Val<SC>>>
+            + for<'b> Rap<DebugConstraintBuilder<'b, Val<SC>, SC::Challenge>>
+            // TODO: Put behind air-logger feature
+            + for<'b> Rap<TrackingConstraintBuilder<'b, Val<SC>, SC::Challenge>>,
         Val<SC>: PrimeField32,
     {
         // TODO: Use fixed size array instead of Vecs
@@ -215,14 +229,20 @@ where
     }
 
     #[instrument(skip_all)]
-    fn verify(
+    fn verify<'a, SC>(
         &self,
         config: &'a SC,
         challenger: &'a mut SC::Challenger,
         vk: &'a VerifyingKey<SC>,
         proof: &MachineProof<SC>,
         public_values: &'a [Val<SC>],
-    ) -> Result<(), VerificationError> {
+    ) -> Result<(), VerificationError>
+    where
+        SC: StarkGenericConfig,
+        Val<SC>: PrimeField32,
+        Self::Chip: for<'b> Rap<VerifierConstraintFolder<'b, SC>>
+            + for<'b> Rap<SymbolicAirBuilder<Val<SC>>>,
+    {
         let chips = self.chips();
         let pcs = config.pcs();
 

@@ -6,14 +6,14 @@ use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::error::Error;
 
-use p3_field::{ExtensionField, Field, PrimeField32};
+use p3_field::{ExtensionField, PrimeField32};
 use p3_interaction::{Interaction, InteractionType};
 use p3_matrix::{dense::RowMajorMatrixView, Matrix};
 use rust_xlsxwriter::{Color, Format, Worksheet};
 
 use crate::util::{ColumnEntry, TraceEntry};
 
-pub trait AirLogger<F: Field, EF: ExtensionField<F>> {
+pub trait AirLogger {
     fn preprocessed_headers(&self) -> Vec<String> {
         // TODO: Assert preprocessed trace is None here
         vec![]
@@ -23,7 +23,7 @@ pub trait AirLogger<F: Field, EF: ExtensionField<F>> {
 
     fn headers_and_types(&self) -> Vec<(String, String)>;
 
-    fn write_traces_to_worksheet(
+    fn write_traces_to_worksheet<F, EF>(
         &self,
         ws: &mut Worksheet,
         preprocessed_trace: &Option<RowMajorMatrixView<F>>,
@@ -33,6 +33,7 @@ pub trait AirLogger<F: Field, EF: ExtensionField<F>> {
     ) -> Result<(), Box<dyn Error>>
     where
         F: PrimeField32,
+        EF: ExtensionField<F>,
     {
         let column_entries = BTreeSet::from_iter(entries.iter().map(|entry| match entry {
             TraceEntry::None => ColumnEntry::None,

@@ -82,26 +82,26 @@ pub fn generate_trait_impls(
         }
 
         #[cfg(feature = "air-logger")]
-        impl<F: p3_field::Field, EF: p3_field::ExtensionField<F>> p3_air_util::AirLogger<F, EF> for #name {
+        impl p3_air_util::AirLogger for #name {
             fn preprocessed_headers(&self) -> Vec<String> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger<F, EF>>::preprocessed_headers(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger>::preprocessed_headers(chip),)*
                 }
             }
 
             fn main_headers(&self) -> Vec<String> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger<F, EF>>::main_headers(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger>::main_headers(chip),)*
                 }
             }
 
             fn headers_and_types(&self) -> Vec<(String, String)> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger<F, EF>>::headers_and_types(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger>::headers_and_types(chip),)*
                 }
             }
         }
 
-        impl<SC: p3_uni_stark::StarkGenericConfig> p3_machine::chip::Chip<SC> for #name {}
+        impl p3_machine::chip::Chip for #name {}
     }
 }
