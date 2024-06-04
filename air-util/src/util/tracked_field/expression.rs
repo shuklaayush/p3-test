@@ -1,7 +1,7 @@
+use alloc::collections::BTreeSet;
 use core::fmt::Debug;
 use core::iter::{Product, Sum};
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use std::collections::BTreeSet;
 
 use p3_field::{AbstractField, Field};
 

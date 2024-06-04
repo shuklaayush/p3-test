@@ -1,7 +1,8 @@
+use alloc::vec::Vec;
+use core::fmt::Debug;
 use core::iter::{Product, Sum};
+use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use std::fmt::Debug;
-use std::marker::PhantomData;
 
 use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, Field};
 

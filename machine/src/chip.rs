@@ -1,5 +1,4 @@
-use core::fmt::Display;
-use std::fmt::Debug;
+use core::fmt::{Debug, Display};
 
 #[cfg(feature = "air-logger")]
 use p3_air_util::AirLogger;

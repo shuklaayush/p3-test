@@ -1,7 +1,8 @@
+use alloc::collections::BTreeSet;
+use alloc::vec;
 use core::fmt::Debug;
+use core::marker::PhantomData;
 use core::ops::{Add, Mul, Sub};
-use std::collections::BTreeSet;
-use std::marker::PhantomData;
 
 use p3_field::{ExtensionField, Field};
 

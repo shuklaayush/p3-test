@@ -1,3 +1,5 @@
+#[cfg(feature = "air-logger")]
+use alloc::format;
 use alloc::vec::Vec;
 
 use itertools::Itertools;
