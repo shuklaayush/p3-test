@@ -112,11 +112,11 @@ pub fn generate_primitive_header_expr(
                 }
                 Type::Path(type_path) => {
                     let last_segment = type_path.path.segments.last().unwrap();
-                    // Assuming it's a struct with a header_types() method
+                    // Assuming it's a struct with a headers_and_types() method
                     let name = &last_segment.ident;
                     let generic_args = &last_segment.arguments;
                     quote! {
-                        for (header, ty) in #name::#generic_args::header_types() {
+                        for (header, ty) in #name::#generic_args::headers_and_types() {
                             out.push((format!("{}.{}", #prefix, header), ty));
                         }
                     }
@@ -179,7 +179,7 @@ pub fn generate_headers_and_types(data: &Data, type_generic: &Ident) -> proc_mac
 
     quote! {
         #[cfg(feature = "air-logger")]
-        pub fn header_types() -> Vec<(String, String)> {
+        pub fn headers_and_types() -> Vec<(String, String)> {
             let mut out = Vec::new();
             #(#header_exprs)*
             out
