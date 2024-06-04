@@ -1,3 +1,5 @@
+extern crate alloc;
+
 #[cfg(feature = "air-logger")]
 use p3_derive::Columnar;
 

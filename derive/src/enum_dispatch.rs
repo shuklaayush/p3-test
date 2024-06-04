@@ -15,8 +15,8 @@ pub fn generate_trait_impls(
         .collect();
 
     quote! {
-        impl std::fmt::Display for #name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        impl core::fmt::Display for #name {
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
                 match self {
                     #(#name::#variant_names(_) => write!(f, stringify!(#variant_names)),)*
                 }
@@ -46,13 +46,13 @@ pub fn generate_trait_impls(
         }
 
         impl<F: p3_field::Field> p3_interaction::BaseInteractionAir<F> for #name {
-            fn receives_from_indices(&self, preprocessed_indices: &[usize], main_indices: &[usize]) -> Vec<p3_interaction::Interaction<F>> {
+            fn receives_from_indices(&self, preprocessed_indices: &[usize], main_indices: &[usize]) -> alloc::vec::Vec<p3_interaction::Interaction<F>> {
                 match self {
                     #(#name::#variant_names(chip) => <#variant_field_types as p3_interaction::BaseInteractionAir<F>>::receives_from_indices(chip, preprocessed_indices, main_indices),)*
                 }
             }
 
-            fn sends_from_indices(&self, preprocessed_indices: &[usize], main_indices: &[usize]) -> Vec<p3_interaction::Interaction<F>> {
+            fn sends_from_indices(&self, preprocessed_indices: &[usize], main_indices: &[usize]) -> alloc::vec::Vec<p3_interaction::Interaction<F>> {
                 match self {
                     #(#name::#variant_names(chip) => <#variant_field_types as p3_interaction::BaseInteractionAir<F>>::sends_from_indices(chip, preprocessed_indices, main_indices),)*
                 }
@@ -60,13 +60,13 @@ pub fn generate_trait_impls(
         }
 
         impl<F: p3_field::Field> p3_interaction::InteractionAir<F> for #name {
-            fn receives(&self) -> Vec<p3_interaction::Interaction<F>> {
+            fn receives(&self) -> alloc::vec::Vec<p3_interaction::Interaction<F>> {
                 match self {
                     #(#name::#variant_names(chip) => <#variant_field_types as p3_interaction::InteractionAir<F>>::receives(chip),)*
                 }
             }
 
-            fn sends(&self) -> Vec<p3_interaction::Interaction<F>> {
+            fn sends(&self) -> alloc::vec::Vec<p3_interaction::Interaction<F>> {
                 match self {
                     #(#name::#variant_names(chip) => <#variant_field_types as p3_interaction::InteractionAir<F>>::sends(chip),)*
                 }
@@ -83,19 +83,19 @@ pub fn generate_trait_impls(
 
         #[cfg(feature = "air-logger")]
         impl p3_air_util::AirLogger for #name {
-            fn preprocessed_headers(&self) -> Vec<String> {
+            fn preprocessed_headers(&self) -> alloc::vec::Vec<String> {
                 match self {
                     #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger>::preprocessed_headers(chip),)*
                 }
             }
 
-            fn main_headers(&self) -> Vec<String> {
+            fn main_headers(&self) -> alloc::vec::Vec<String> {
                 match self {
                     #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger>::main_headers(chip),)*
                 }
             }
 
-            fn headers_and_types(&self) -> Vec<(String, String)> {
+            fn headers_and_types(&self) -> alloc::vec::Vec<(String, String)> {
                 match self {
                     #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger>::headers_and_types(chip),)*
                 }

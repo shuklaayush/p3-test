@@ -149,8 +149,8 @@ pub fn generate_headers(data: &Data, type_generic: &Ident) -> proc_macro2::Token
 
     quote! {
         #[cfg(feature = "air-logger")]
-        pub fn headers() -> Vec<String> {
-            let mut out = Vec::new();
+        pub fn headers() -> alloc::vec::Vec<String> {
+            let mut out = alloc::vec::Vec::new();
             #(#header_exprs)*
             out
         }
@@ -179,8 +179,8 @@ pub fn generate_headers_and_types(data: &Data, type_generic: &Ident) -> proc_mac
 
     quote! {
         #[cfg(feature = "air-logger")]
-        pub fn headers_and_types() -> Vec<(String, String)> {
-            let mut out = Vec::new();
+        pub fn headers_and_types() -> alloc::vec::Vec<(String, String)> {
+            let mut out = alloc::vec::Vec::new();
             #(#header_exprs)*
             out
         }

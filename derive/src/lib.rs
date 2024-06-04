@@ -39,8 +39,8 @@ pub fn bus_derive(input: TokenStream) -> TokenStream {
         .collect();
 
     let expanded = quote! {
-        impl std::fmt::Display for #name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        impl core::fmt::Display for #name {
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
                 match self {
                     #(#name::#variant_names => write!(f, stringify!(#variant_names)),)*
                 }
@@ -121,9 +121,9 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
 
             pub fn col_map() -> #name<usize #(, #non_first_generics_idents)*> {
                 let num_cols = Self::num_cols();
-                let indices_arr = (0..num_cols).collect::<Vec<usize>>();
+                let indices_arr = (0..num_cols).collect::<alloc::vec::Vec<usize>>();
 
-                let mut cols = std::mem::MaybeUninit::<#name<usize #(, #non_first_generics_idents)*>>::uninit();
+                let mut cols = core::mem::MaybeUninit::<#name<usize #(, #non_first_generics_idents)*>>::uninit();
                 let ptr = cols.as_mut_ptr() as *mut usize;
                 unsafe {
                     ptr.copy_from_nonoverlapping(indices_arr.as_ptr(), num_cols);
@@ -140,7 +140,7 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
             pub fn from_slice(indices: &[usize]) -> Self {
                 let num_cols = Self::num_cols();
                 debug_assert_eq!(indices.len(), num_cols, "Expected {} indices, got {}", num_cols, indices.len());
-                let mut cols = std::mem::MaybeUninit::<#name<usize #(, #non_first_generics_idents)*>>::uninit();
+                let mut cols = core::mem::MaybeUninit::<#name<usize #(, #non_first_generics_idents)*>>::uninit();
                 let ptr = cols.as_mut_ptr() as *mut usize;
                 unsafe {
                     ptr.copy_from_nonoverlapping(indices.as_ptr(), num_cols);
@@ -152,11 +152,11 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
                 let num_cols = Self::num_cols();
                 let ptr = self as *const _ as *const usize;
                 unsafe {
-                    std::slice::from_raw_parts(ptr, num_cols)
+                    core::slice::from_raw_parts(ptr, num_cols)
                 }
             }
 
-            pub fn as_range(&self) -> std::ops::Range<usize> {
+            pub fn as_range(&self) -> core::ops::Range<usize> {
                 debug_assert!(self.as_slice().windows(2).all(|w| w[1] == w[0] + 1), "Expected contiguous indices");
                 let ptr = self as *const _ as *const usize;
                 let start = unsafe { *ptr };
@@ -166,7 +166,7 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
 
         impl #impl_generics core::borrow::Borrow<#name #type_generics> for [#type_generic] #where_clause {
             fn borrow(&self) -> &#name #type_generics {
-                debug_assert_eq!(self.len(), std::mem::size_of::<#name<u8 #(, #non_first_generics_idents)*>>());
+                debug_assert_eq!(self.len(), core::mem::size_of::<#name<u8 #(, #non_first_generics_idents)*>>());
                 let (prefix, shorts, _suffix) = unsafe { self.align_to::<#name #type_generics>() };
                 debug_assert!(prefix.is_empty(), "Alignment should match");
                 debug_assert_eq!(shorts.len(), 1);
@@ -176,7 +176,7 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
 
         impl #impl_generics core::borrow::BorrowMut<#name #type_generics> for [#type_generic] #where_clause {
             fn borrow_mut(&mut self) -> &mut #name #type_generics {
-                debug_assert_eq!(self.len(), std::mem::size_of::<#name<u8 #(, #non_first_generics_idents)*>>());
+                debug_assert_eq!(self.len(), core::mem::size_of::<#name<u8 #(, #non_first_generics_idents)*>>());
                 let (prefix, shorts, _suffix) = unsafe { self.align_to_mut::<#name #type_generics>() };
                 debug_assert!(prefix.is_empty(), "Alignment should match");
                 debug_assert_eq!(shorts.len(), 1);
