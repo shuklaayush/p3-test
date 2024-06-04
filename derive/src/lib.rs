@@ -155,17 +155,9 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
         }
 
         impl<#(#non_first_generics),*> #name<usize #(, #non_first_generics_idents)*> #where_clause {
-            pub fn as_vec(&self) -> Vec<usize> {
+            pub fn from_slice(indices: &[usize]) -> Self {
                 let num_cols = Self::num_cols();
-                let ptr = self as *const _ as *const usize;
-                unsafe {
-                    std::slice::from_raw_parts(ptr, num_cols).to_vec()
-                }
-            }
-
-            pub fn from_vec(indices: Vec<usize>) -> Self {
-                let num_cols = Self::num_cols();
-                assert_eq!(indices.len(), num_cols, "Expected {} indices, got {}", num_cols, indices.len());
+                debug_assert_eq!(indices.len(), num_cols, "Expected {} indices, got {}", num_cols, indices.len());
                 let mut cols = std::mem::MaybeUninit::<#name<usize #(, #non_first_generics_idents)*>>::uninit();
                 let ptr = cols.as_mut_ptr() as *mut usize;
                 unsafe {
@@ -174,12 +166,19 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn as_range(&self) -> std::ops::Range<usize> {
+            pub fn as_vec(&self) -> Vec<usize> {
                 let num_cols = Self::num_cols();
-                // TODO: Check if actually a range
+                let ptr = self as *const _ as *const usize;
+                unsafe {
+                    std::slice::from_raw_parts(ptr, num_cols).to_vec()
+                }
+            }
+
+            pub fn as_range(&self) -> std::ops::Range<usize> {
+                debug_assert!(self.as_vec().windows(2).all(|w| w[1] == w[0] + 1), "Expected contiguous indices");
                 let ptr = self as *const _ as *const usize;
                 let start = unsafe { *ptr };
-                start..start + num_cols
+                start..start + Self::num_cols()
             }
         }
 

@@ -19,36 +19,36 @@ where
 {
     fn receives_from_preprocessed_indices(
         &self,
-        preprocessed_indices: Vec<usize>,
+        preprocessed_indices: &[usize],
     ) -> Vec<Interaction<F>> {
-        self.receives_from_indices(preprocessed_indices, vec![])
+        self.receives_from_indices(preprocessed_indices, &[])
     }
 
-    fn receives_from_main_indices(&self, main_indices: Vec<usize>) -> Vec<Interaction<F>> {
-        self.receives_from_indices(vec![], main_indices)
+    fn receives_from_main_indices(&self, main_indices: &[usize]) -> Vec<Interaction<F>> {
+        self.receives_from_indices(&[], main_indices)
     }
 
     fn receives_from_indices(
         &self,
-        preprocessed_indices: Vec<usize>,
-        main_indices: Vec<usize>,
+        preprocessed_indices: &[usize],
+        main_indices: &[usize],
     ) -> Vec<Interaction<F>>;
 
     fn sends_from_preprocessed_indices(
         &self,
-        preprocessed_indices: Vec<usize>,
+        preprocessed_indices: &[usize],
     ) -> Vec<Interaction<F>> {
-        self.sends_from_indices(preprocessed_indices, vec![])
+        self.sends_from_indices(preprocessed_indices, &[])
     }
 
-    fn sends_from_main_indices(&self, main_indices: Vec<usize>) -> Vec<Interaction<F>> {
-        self.sends_from_indices(vec![], main_indices)
+    fn sends_from_main_indices(&self, main_indices: &[usize]) -> Vec<Interaction<F>> {
+        self.sends_from_indices(&[], main_indices)
     }
 
     fn sends_from_indices(
         &self,
-        preprocessed_indices: Vec<usize>,
-        main_indices: Vec<usize>,
+        preprocessed_indices: &[usize],
+        main_indices: &[usize],
     ) -> Vec<Interaction<F>>;
 }
 
