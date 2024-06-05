@@ -12,7 +12,7 @@ use core::error::Error;
 use itertools::Itertools;
 use p3_air::BaseAir;
 #[cfg(feature = "air-logger")]
-use p3_air_util::folders::TrackingConstraintBuilder;
+use p3_air_util::folders::{EntriesLog, TrackingConstraintBuilder};
 use p3_air_util::{
     check_constraints, check_cumulative_sums,
     folders::{
@@ -528,9 +528,9 @@ where
         &self,
         perm_challenges: [SC::Challenge; 2],
         public_values: &[Val<SC>],
-    ) -> Vec<BTreeSet<TraceEntry>>;
+    ) -> Vec<EntriesLog<TraceEntry>>;
 
-    fn track_failing_interactions(&self) -> Vec<BTreeSet<TraceEntry>>;
+    fn track_failing_interactions(&self) -> Vec<EntriesLog<TraceEntry>>;
 
     fn write_traces_to_file(
         &self,
@@ -552,7 +552,7 @@ where
         &self,
         perm_challenges: [SC::Challenge; 2],
         public_values: &[Val<SC>],
-    ) -> Vec<BTreeSet<TraceEntry>> {
+    ) -> Vec<EntriesLog<TraceEntry>> {
         let mut chip_indices = Vec::new();
         for chip_trace in self.iter() {
             let preprocessed = chip_trace
@@ -581,7 +581,7 @@ where
         chip_indices
     }
 
-    fn track_failing_interactions(&self) -> Vec<BTreeSet<TraceEntry>> {
+    fn track_failing_interactions(&self) -> Vec<EntriesLog<TraceEntry>> {
         let preprocessed_traces = self
             .iter()
             .map(|chip_trace| {
@@ -622,7 +622,7 @@ where
         let mut workbook = Workbook::new();
 
         // TODO: Account for public values
-        let mut entries = vec![BTreeSet::new(); self.len()];
+        let mut entries = vec![EntriesLog::default(); self.len()];
         self.track_failing_constraints(perm_challenges, &[])
             .iter()
             .zip(&mut entries)

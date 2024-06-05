@@ -28,5 +28,5 @@ cfg-if = "1.0.0"
 [features]
 default = []
 std = []
-schema = ["air-logger"]
 air-logger = ["std", "dep:rust_xlsxwriter", "p3-air-util/air-logger"]
+schema = ["air-logger"]

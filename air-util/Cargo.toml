@@ -24,3 +24,4 @@ num-bigint = { version = "0.4.5" }
 default = []
 std = []
 air-logger = ["dep:rust_xlsxwriter"]
+schema = ["air-logger"]

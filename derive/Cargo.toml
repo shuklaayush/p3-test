@@ -22,3 +22,4 @@ p3-interaction = { path = "../interaction" }
 [features]
 default = []
 air-logger = []
+schema = ["air-logger"]

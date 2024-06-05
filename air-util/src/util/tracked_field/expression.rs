@@ -12,7 +12,8 @@ where
     E: Default + Clone + Debug + Ord,
 {
     pub value: F,
-    pub origin: BTreeSet<E>,
+    pub value_origin: BTreeSet<E>,
+    pub constraint_origin: BTreeSet<E>,
 }
 
 impl<F, E> Default for TrackedFieldExpression<F, E>
@@ -23,7 +24,8 @@ where
     fn default() -> Self {
         Self {
             value: F::zero(),
-            origin: BTreeSet::new(),
+            value_origin: BTreeSet::new(),
+            constraint_origin: BTreeSet::new(),
         }
     }
 }
@@ -36,7 +38,8 @@ where
     fn from(value: F) -> Self {
         Self {
             value,
-            origin: BTreeSet::new(),
+            value_origin: BTreeSet::new(),
+            constraint_origin: BTreeSet::new(),
         }
     }
 }
@@ -49,23 +52,24 @@ where
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
-        let mut origin = BTreeSet::new();
+        let mut value_origin = BTreeSet::new();
         match (self.value.is_zero(), rhs.value.is_zero()) {
             (false, true) => {
-                origin = origin.union(&self.origin).cloned().collect();
+                value_origin = value_origin.union(&self.value_origin).cloned().collect();
             }
             (true, false) => {
-                origin = origin.union(&rhs.origin).cloned().collect();
+                value_origin = value_origin.union(&rhs.value_origin).cloned().collect();
             }
             (_, _) => {
                 // Both or either
-                origin = origin.union(&self.origin).cloned().collect();
-                origin = origin.union(&rhs.origin).cloned().collect();
+                value_origin = value_origin.union(&self.value_origin).cloned().collect();
+                value_origin = value_origin.union(&rhs.value_origin).cloned().collect();
             }
         }
         Self {
             value: self.value + rhs.value,
-            origin,
+            value_origin,
+            constraint_origin: &self.constraint_origin | &rhs.constraint_origin,
         }
     }
 }
@@ -130,23 +134,24 @@ where
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self {
-        let mut origin = BTreeSet::new();
+        let mut value_origin = BTreeSet::new();
         match (self.value.is_zero(), rhs.value.is_zero()) {
             (false, true) => {
-                origin = origin.union(&self.origin).cloned().collect();
+                value_origin = value_origin.union(&self.value_origin).cloned().collect();
             }
             (true, false) => {
-                origin = origin.union(&rhs.origin).cloned().collect();
+                value_origin = value_origin.union(&rhs.value_origin).cloned().collect();
             }
             (_, _) => {
                 // Both or either
-                origin = origin.union(&self.origin).cloned().collect();
-                origin = origin.union(&rhs.origin).cloned().collect();
+                value_origin = value_origin.union(&self.value_origin).cloned().collect();
+                value_origin = value_origin.union(&rhs.value_origin).cloned().collect();
             }
         }
         Self {
             value: self.value - rhs.value,
-            origin,
+            value_origin,
+            constraint_origin: &self.constraint_origin | &rhs.constraint_origin,
         }
     }
 }
@@ -193,7 +198,8 @@ where
     fn neg(self) -> Self {
         Self {
             value: -self.value,
-            origin: self.origin,
+            value_origin: self.value_origin,
+            constraint_origin: self.constraint_origin,
         }
     }
 }
@@ -206,23 +212,37 @@ where
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self {
-        let mut origin = BTreeSet::new();
+        let mut value_origin = BTreeSet::new();
+        let mut constraint_origin = BTreeSet::new();
         match (self.value.is_zero(), rhs.value.is_zero()) {
             (true, false) => {
-                origin = origin.union(&self.origin).cloned().collect();
+                value_origin = value_origin.union(&self.value_origin).cloned().collect();
+                constraint_origin = constraint_origin
+                    .union(&self.constraint_origin)
+                    .cloned()
+                    .collect();
             }
             (false, true) => {
-                origin = origin.union(&rhs.origin).cloned().collect();
+                value_origin = value_origin.union(&rhs.value_origin).cloned().collect();
+                constraint_origin = constraint_origin
+                    .union(&rhs.constraint_origin)
+                    .cloned()
+                    .collect();
             }
-            (_, _) => {
-                // Both or either
-                origin = origin.union(&self.origin).cloned().collect();
-                origin = origin.union(&rhs.origin).cloned().collect();
+            (true, true) => {
+                // Either
+                value_origin = &self.value_origin | &rhs.value_origin;
+            }
+            (false, false) => {
+                // Both
+                value_origin = &self.value_origin | &rhs.value_origin;
+                constraint_origin = &self.constraint_origin | &rhs.constraint_origin;
             }
         }
         Self {
             value: self.value * rhs.value,
-            origin,
+            value_origin,
+            constraint_origin,
         }
     }
 }
@@ -303,7 +323,8 @@ where
     fn from_f(f: Self::F) -> Self {
         Self {
             value: F::from_f(f),
-            origin: BTreeSet::new(),
+            value_origin: BTreeSet::new(),
+            constraint_origin: BTreeSet::new(),
         }
     }
 

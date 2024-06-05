@@ -42,9 +42,11 @@ where
     E: Default + Clone + Debug + Ord,
 {
     fn from(value: TrackedFieldVariable<F, E>) -> Self {
+        let entries = vec![value.entry];
         TrackedFieldExpression {
             value: value.value,
-            origin: BTreeSet::from_iter(vec![value.entry]),
+            value_origin: BTreeSet::from_iter(entries.clone()),
+            constraint_origin: BTreeSet::from_iter(entries),
         }
     }
 }

@@ -13,7 +13,7 @@ use p3_maybe_rayon::prelude::IntoParallelIterator;
 
 use crate::util::{MultiTraceEntry, TrackedFieldExpression};
 use crate::{
-    folders::{DebugConstraintBuilder, TrackingConstraintBuilder},
+    folders::{DebugConstraintBuilder, EntriesLog, TrackingConstraintBuilder},
     util::{TraceEntry, TrackedFieldVariable},
 };
 
@@ -165,7 +165,7 @@ pub fn track_failing_constraints<F, EF, A>(
     perm_challenges: [EF; 2],
     cumulative_sum: Option<EF>,
     public_values: &[F],
-) -> BTreeSet<TraceEntry>
+) -> EntriesLog<TraceEntry>
 where
     F: Field,
     EF: ExtensionField<F>,
@@ -181,7 +181,7 @@ where
         assert_eq!(perm.height(), height);
     }
 
-    let mut entries = BTreeSet::new();
+    let mut entries = EntriesLog::<TraceEntry>::default();
     (0..height).into_par_iter().for_each(|i| {
         let i_next = (i + 1) % height;
 
@@ -194,10 +194,8 @@ where
                         .iter()
                         .enumerate()
                         .map(|(j, x)| {
-                            TrackedFieldVariable::new(
-                                *x,
-                                TraceEntry::Preprocessed { row: i, col: j },
-                            )
+                            let entry = TraceEntry::Preprocessed { row: i, col: j };
+                            TrackedFieldVariable::new(*x, entry)
                         })
                         .collect::<Vec<_>>(),
                     preprocessed
@@ -205,10 +203,8 @@ where
                         .iter()
                         .enumerate()
                         .map(|(j, x)| {
-                            TrackedFieldVariable::new(
-                                *x,
-                                TraceEntry::Preprocessed { row: i, col: j },
-                            )
+                            let entry = TraceEntry::Preprocessed { row: i, col: j };
+                            TrackedFieldVariable::new(*x, entry)
                         })
                         .collect::<Vec<_>>(),
                 )
@@ -222,14 +218,16 @@ where
                         .iter()
                         .enumerate()
                         .map(|(j, x)| {
-                            TrackedFieldVariable::new(*x, TraceEntry::Main { row: i, col: j })
+                            let entry = TraceEntry::Main { row: i, col: j };
+                            TrackedFieldVariable::new(*x, entry)
                         })
                         .collect::<Vec<_>>(),
                     main.row_slice(i_next)
                         .iter()
                         .enumerate()
                         .map(|(j, x)| {
-                            TrackedFieldVariable::new(*x, TraceEntry::Main { row: i, col: j })
+                            let entry = TraceEntry::Main { row: i, col: j };
+                            TrackedFieldVariable::new(*x, entry)
                         })
                         .collect::<Vec<_>>(),
                 )
@@ -244,10 +242,8 @@ where
                         .iter()
                         .enumerate()
                         .map(|(j, x)| {
-                            TrackedFieldVariable::new(
-                                *x,
-                                TraceEntry::Permutation { row: i, col: j },
-                            )
+                            let entry = TraceEntry::Permutation { row: i, col: j };
+                            TrackedFieldVariable::new(*x, entry)
                         })
                         .collect::<Vec<_>>(),
                     permutation
@@ -255,10 +251,8 @@ where
                         .iter()
                         .enumerate()
                         .map(|(j, x)| {
-                            TrackedFieldVariable::new(
-                                *x,
-                                TraceEntry::Permutation { row: i, col: j },
-                            )
+                            let entry = TraceEntry::Permutation { row: i, col: j };
+                            TrackedFieldVariable::new(*x, entry)
                         })
                         .collect::<Vec<_>>(),
                 )
@@ -274,7 +268,7 @@ where
         let cumulative_sum = cumulative_sum.map(|x| TrackedFieldVariable::new_untracked(x));
 
         let mut builder = TrackingConstraintBuilder {
-            entries: BTreeSet::new(),
+            entries: EntriesLog::default(),
             preprocessed: VerticalPair::new(
                 RowMajorMatrixView::new_row(preprocessed_local.as_slice()),
                 RowMajorMatrixView::new_row(preprocessed_next.as_slice()),
@@ -303,7 +297,7 @@ where
         }
 
         air.eval_all(&mut builder);
-        entries.extend(builder.entries);
+        entries.extend(&builder.entries);
     });
 
     entries
@@ -313,14 +307,14 @@ pub fn track_failing_interactions<F, EF, A>(
     airs: &[A],
     preprocessed: &[Option<RowMajorMatrixView<F>>],
     main: &[Option<RowMajorMatrixView<F>>],
-) -> Vec<BTreeSet<TraceEntry>>
+) -> Vec<EntriesLog<TraceEntry>>
 where
     F: Field,
     EF: ExtensionField<F>,
     A: for<'a> Rap<DebugConstraintBuilder<'a, F, EF>>,
 {
     let mut bus_counts = BTreeMap::new();
-    let mut entries = vec![BTreeSet::new(); airs.len()];
+    let mut entries = vec![EntriesLog::default(); airs.len()];
     for (i, air) in airs.iter().enumerate() {
         let preprocessed_i = preprocessed[i].as_ref();
         let main_i = main[i].as_ref();
@@ -337,14 +331,12 @@ where
                         row.iter()
                             .enumerate()
                             .map(|(k, x)| {
-                                TrackedFieldVariable::new(
-                                    *x,
-                                    MultiTraceEntry::Preprocessed {
-                                        trace: i,
-                                        row: n,
-                                        col: k,
-                                    },
-                                )
+                                let entry = MultiTraceEntry::Preprocessed {
+                                    trace: i,
+                                    row: n,
+                                    col: k,
+                                };
+                                TrackedFieldVariable::new(*x, entry)
                             })
                             .collect::<Vec<_>>()
                     })
@@ -356,18 +348,31 @@ where
                         row.iter()
                             .enumerate()
                             .map(|(k, x)| {
-                                TrackedFieldVariable::new(
-                                    *x,
-                                    MultiTraceEntry::Main {
-                                        trace: i,
-                                        row: n,
-                                        col: k,
-                                    },
-                                )
+                                let entry = MultiTraceEntry::Main {
+                                    trace: i,
+                                    row: n,
+                                    col: k,
+                                };
+                                TrackedFieldVariable::new(*x, entry)
                             })
                             .collect::<Vec<_>>()
                     })
                     .unwrap_or_default();
+
+                let mut mult = interaction
+                    .count
+                    .apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
+                        preprocessed_row.as_slice(),
+                        main_row.as_slice(),
+                    );
+                // Add virtual column field
+                let entry = MultiTraceEntry::VirtualColumnCount {
+                    trace: i,
+                    row: n,
+                    interaction: j,
+                };
+                entries[i].constrained.insert(TraceEntry::from(entry));
+                mult.value_origin.insert(entry);
 
                 let fields = interaction
                     .fields
@@ -378,26 +383,18 @@ where
                             preprocessed_row.as_slice(),
                             main_row.as_slice(),
                         );
-                        expr.origin.insert(MultiTraceEntry::VirtualColumnField {
+                        // Add virtual column field
+                        let entry = MultiTraceEntry::VirtualColumnField {
                             trace: i,
                             row: n,
                             interaction: j,
                             field: k,
-                        });
+                        };
+                        entries[i].constrained.insert(TraceEntry::from(entry));
+                        expr.value_origin.insert(entry);
                         expr
                     })
                     .collect::<Vec<_>>();
-                let mut mult = interaction
-                    .count
-                    .apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
-                        preprocessed_row.as_slice(),
-                        main_row.as_slice(),
-                    );
-                mult.origin.insert(MultiTraceEntry::VirtualColumnCount {
-                    trace: i,
-                    row: n,
-                    interaction: j,
-                });
                 let val = match interaction_type {
                     InteractionType::Send => mult,
                     InteractionType::Receive => -mult,
@@ -416,21 +413,23 @@ where
     for counts in bus_counts.into_values() {
         for sum in counts.into_values() {
             if !sum.value.is_zero() {
-                for entry in sum.origin.into_iter() {
+                for entry in sum.value_origin.into_iter() {
                     match entry {
                         MultiTraceEntry::Preprocessed { trace, row, col } => {
-                            entries[trace].insert(TraceEntry::Preprocessed { row, col });
+                            let entry = TraceEntry::Preprocessed { row, col };
+                            entries[trace].failing.insert(entry);
                         }
                         MultiTraceEntry::Main { trace, row, col } => {
-                            entries[trace].insert(TraceEntry::Main { row, col });
+                            let entry = TraceEntry::Main { row, col };
+                            entries[trace].failing.insert(entry);
                         }
                         MultiTraceEntry::VirtualColumnCount {
                             trace,
                             row,
                             interaction,
                         } => {
-                            entries[trace]
-                                .insert(TraceEntry::VirtualColumnCount { row, interaction });
+                            let entry = TraceEntry::VirtualColumnCount { row, interaction };
+                            entries[trace].failing.insert(entry);
                         }
                         MultiTraceEntry::VirtualColumnField {
                             trace,
@@ -438,11 +437,12 @@ where
                             interaction,
                             field,
                         } => {
-                            entries[trace].insert(TraceEntry::VirtualColumnField {
+                            let entry = TraceEntry::VirtualColumnField {
                                 row,
                                 interaction,
                                 field,
-                            });
+                            };
+                            entries[trace].failing.insert(entry);
                         }
                         _ => {}
                     }

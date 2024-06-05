@@ -12,7 +12,7 @@ use syn::{parse_macro_input, Data, DeriveInput, GenericParam};
 
 #[cfg(feature = "air-logger")]
 use self::columnar::generate_headers;
-#[cfg(feature = "air-logger")]
+#[cfg(feature = "schema")]
 use self::columnar::generate_headers_and_types;
 use self::enum_dispatch::generate_trait_impls;
 
@@ -108,9 +108,9 @@ pub fn columnar_derive(input: TokenStream) -> TokenStream {
     #[cfg(not(feature = "air-logger"))]
     let header_impl = quote! {};
 
-    #[cfg(feature = "air-logger")]
+    #[cfg(feature = "schema")]
     let header_type_impl = generate_headers_and_types(&input.data, type_generic);
-    #[cfg(not(feature = "air-logger"))]
+    #[cfg(not(feature = "schema"))]
     let header_type_impl = quote! {};
 
     let expanded = quote! {

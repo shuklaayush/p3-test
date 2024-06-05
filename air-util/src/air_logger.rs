@@ -4,15 +4,26 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::borrow::Borrow;
 use core::error::Error;
-use core::{borrow::Borrow, ops::Range};
 
 use p3_field::{ExtensionField, PrimeField32};
 use p3_interaction::{Interaction, InteractionType};
 use p3_matrix::{dense::RowMajorMatrixView, Matrix};
 use rust_xlsxwriter::{Color, Format, Worksheet};
 
+use crate::folders::EntriesLog;
 use crate::util::{ColumnEntry, TraceEntry};
+
+fn generate_format<T: Copy + Ord>(entries: &EntriesLog<T>, entry: T) -> Format {
+    let failing = entries.failing.contains(&entry);
+    let constrained = entries.constrained.contains(&entry);
+    match (failing, constrained) {
+        (true, _) => Format::new().set_background_color(Color::Red),
+        (false, true) => Format::new(),
+        (_, _) => Format::new().set_background_color(Color::Yellow),
+    }
+}
 
 pub trait AirLogger {
     fn preprocessed_headers(&self) -> Vec<String> {
@@ -22,12 +33,14 @@ pub trait AirLogger {
 
     fn main_headers(&self) -> Vec<String>;
 
-    fn preprocessed_headers_and_types(&self) -> Vec<(String, String, Range<usize>)> {
+    #[cfg(feature = "schema")]
+    fn preprocessed_headers_and_types(&self) -> Vec<(String, String, ops::Range<usize>)> {
         // TODO: Assert preprocessed trace is None here
         vec![]
     }
 
-    fn main_headers_and_types(&self) -> Vec<(String, String, Range<usize>)>;
+    #[cfg(feature = "schema")]
+    fn main_headers_and_types(&self) -> Vec<(String, String, ops::Range<usize>)>;
 
     fn write_traces_to_worksheet<F, EF>(
         &self,
@@ -35,40 +48,32 @@ pub trait AirLogger {
         preprocessed_trace: &Option<RowMajorMatrixView<F>>,
         main_trace: &Option<RowMajorMatrixView<F>>,
         interactions: Vec<(Interaction<F>, InteractionType)>,
-        entries: BTreeSet<TraceEntry>,
+        entries: EntriesLog<TraceEntry>,
     ) -> Result<(), Box<dyn Error>>
     where
         F: PrimeField32,
         EF: ExtensionField<F>,
     {
-        let column_entries = BTreeSet::from_iter(entries.iter().map(|entry| match entry {
-            TraceEntry::None => ColumnEntry::None,
-            TraceEntry::Preprocessed { col, .. } => ColumnEntry::Preprocessed { col: *col },
-            TraceEntry::Main { col, .. } => ColumnEntry::Main { col: *col },
-            TraceEntry::Permutation { col, .. } => ColumnEntry::Permutation { col: *col },
-            TraceEntry::VirtualColumnCount { interaction, .. } => ColumnEntry::VirtualColumnCount {
-                interaction: *interaction,
-            },
-            TraceEntry::VirtualColumnField {
-                interaction, field, ..
-            } => ColumnEntry::VirtualColumnField {
-                interaction: *interaction,
-                field: *field,
-            },
-            TraceEntry::Public { index } => ColumnEntry::Public { index: *index },
-        }));
+        let column_entries = EntriesLog {
+            failing: BTreeSet::from_iter(
+                entries
+                    .failing
+                    .iter()
+                    .map(|entry| ColumnEntry::from(*entry)),
+            ),
+            constrained: BTreeSet::from_iter(
+                entries
+                    .constrained
+                    .iter()
+                    .map(|entry| ColumnEntry::from(*entry)),
+            ),
+        };
 
         let mut offset = 0;
         let preprocessed_headers = self.preprocessed_headers();
         if !preprocessed_headers.is_empty() {
             for (j, header) in preprocessed_headers.iter().enumerate() {
-                let format = {
-                    if column_entries.contains(&ColumnEntry::Preprocessed { col: j }) {
-                        Format::new().set_background_color(Color::Red)
-                    } else {
-                        Format::new()
-                    }
-                };
+                let format = generate_format(&column_entries, ColumnEntry::Preprocessed { col: j });
                 ws.write_with_format(0, offset, header, &format)?;
                 offset += 1;
             }
@@ -79,13 +84,7 @@ pub trait AirLogger {
         let main_headers = self.main_headers();
         if !main_headers.is_empty() {
             for (j, header) in main_headers.iter().enumerate() {
-                let format = {
-                    if column_entries.contains(&ColumnEntry::Main { col: j }) {
-                        Format::new().set_background_color(Color::Red)
-                    } else {
-                        Format::new()
-                    }
-                };
+                let format = generate_format(&column_entries, ColumnEntry::Main { col: j });
                 ws.write_with_format(0, offset, header, &format)?;
                 offset += 1;
             }
@@ -96,13 +95,10 @@ pub trait AirLogger {
         let mut num_receives = 0;
         let mut num_sends = 0;
         for (j, interaction) in interactions.iter().enumerate() {
-            let format = {
-                if column_entries.contains(&ColumnEntry::VirtualColumnCount { interaction: j }) {
-                    Format::new().set_background_color(Color::Red)
-                } else {
-                    Format::new()
-                }
-            };
+            let format = generate_format(
+                &column_entries,
+                ColumnEntry::VirtualColumnCount { interaction: j },
+            );
             let (ty, ty_offset) = match interaction.1 {
                 InteractionType::Receive => {
                     let out = ("receive", num_receives);
@@ -121,16 +117,13 @@ pub trait AirLogger {
             offset += 1;
 
             for k in 0..interaction.0.fields.len() {
-                let format = {
-                    if column_entries.contains(&ColumnEntry::VirtualColumnField {
+                let format = generate_format(
+                    &column_entries,
+                    ColumnEntry::VirtualColumnField {
                         interaction: j,
                         field: k,
-                    }) {
-                        Format::new().set_background_color(Color::Red)
-                    } else {
-                        Format::new()
-                    }
-                };
+                    },
+                );
                 ws.write_with_format(0, offset, format!("{prefix}[{k}]"), &format)?;
                 offset += 1;
             }
@@ -145,13 +138,8 @@ pub trait AirLogger {
             let mut offset = 0;
             if let Some(preprocessed_trace) = preprocessed_trace {
                 for j in 0..preprocessed_trace.width() {
-                    let format = {
-                        if entries.contains(&TraceEntry::Preprocessed { row: i, col: j }) {
-                            Format::new().set_background_color(Color::Red)
-                        } else {
-                            Format::new()
-                        }
-                    };
+                    let format =
+                        generate_format(&entries, TraceEntry::Preprocessed { row: i, col: j });
                     ws.write_number_with_format(
                         i as u32 + 1,
                         offset,
@@ -166,13 +154,7 @@ pub trait AirLogger {
 
             if let Some(main_trace) = main_trace {
                 for j in 0..main_trace.width() {
-                    let format = {
-                        if entries.contains(&TraceEntry::Main { row: i, col: j }) {
-                            Format::new().set_background_color(Color::Red)
-                        } else {
-                            Format::new()
-                        }
-                    };
+                    let format = generate_format(&entries, TraceEntry::Main { row: i, col: j });
                     ws.write_number_with_format(
                         i as u32 + 1,
                         offset,
@@ -206,16 +188,13 @@ pub trait AirLogger {
                 let count = interaction
                     .count
                     .apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
-                let format = {
-                    if entries.contains(&TraceEntry::VirtualColumnCount {
+                let format = generate_format(
+                    &entries,
+                    TraceEntry::VirtualColumnCount {
                         row: i,
                         interaction: j,
-                    }) {
-                        Format::new().set_background_color(Color::Red)
-                    } else {
-                        Format::new()
-                    }
-                };
+                    },
+                );
                 ws.write_number_with_format(
                     i as u32 + 1,
                     offset,
@@ -225,17 +204,14 @@ pub trait AirLogger {
                 offset += 1;
                 for (k, field) in interaction.fields.iter().enumerate() {
                     let val = field.apply::<F, F>(preprocessed_row.as_slice(), main_row.as_slice());
-                    let format = {
-                        if entries.contains(&TraceEntry::VirtualColumnField {
+                    let format = generate_format(
+                        &entries,
+                        TraceEntry::VirtualColumnField {
                             row: i,
                             interaction: j,
                             field: k,
-                        }) {
-                            Format::new().set_background_color(Color::Red)
-                        } else {
-                            Format::new()
-                        }
-                    };
+                        },
+                    );
 
                     ws.write_number_with_format(
                         i as u32 + 1,

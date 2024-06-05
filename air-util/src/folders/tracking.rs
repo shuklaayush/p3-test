@@ -11,13 +11,26 @@ use crate::util::{
     TraceEntry, TrackedExtensionFieldExpression, TrackedFieldExpression, TrackedFieldVariable,
 };
 
+#[derive(Default, Clone)]
+pub struct EntriesLog<T: Copy + Ord> {
+    pub failing: BTreeSet<T>,
+    pub constrained: BTreeSet<T>,
+}
+
+impl<T: Copy + Ord> EntriesLog<T> {
+    pub fn extend(&mut self, other: &Self) {
+        self.failing.extend(&other.failing);
+        self.constrained.extend(&other.constrained);
+    }
+}
+
 // TODO: Remove permutations?
 pub struct TrackingConstraintBuilder<'a, F, EF>
 where
     F: Field,
     EF: ExtensionField<F>,
 {
-    pub entries: BTreeSet<TraceEntry>,
+    pub entries: EntriesLog<TraceEntry>,
     pub preprocessed: ViewPair<'a, TrackedFieldVariable<F, TraceEntry>>,
     pub main: ViewPair<'a, TrackedFieldVariable<F, TraceEntry>>,
     pub permutation: ViewPair<'a, TrackedFieldVariable<EF, TraceEntry>>,
@@ -61,8 +74,9 @@ where
 
     fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) {
         let x = x.into();
+        self.entries.constrained.extend(x.constraint_origin);
         if !x.value.is_zero() {
-            self.entries.extend(x.origin);
+            self.entries.failing.extend(x.value_origin);
         }
     }
 }
@@ -103,8 +117,9 @@ where
         I: Into<Self::ExprEF>,
     {
         let x = x.into();
+        self.entries.constrained.extend(x.0.constraint_origin);
         if !x.0.value.is_zero() {
-            self.entries.extend(x.0.origin);
+            self.entries.failing.extend(x.0.value_origin);
         }
     }
 }

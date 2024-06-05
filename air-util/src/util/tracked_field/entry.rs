@@ -85,3 +85,46 @@ impl Default for MultiTraceEntry {
         Self::None
     }
 }
+
+impl From<MultiTraceEntry> for TraceEntry {
+    fn from(entry: MultiTraceEntry) -> Self {
+        match entry {
+            MultiTraceEntry::None => TraceEntry::None,
+            MultiTraceEntry::Preprocessed { row, col, .. } => TraceEntry::Preprocessed { row, col },
+            MultiTraceEntry::Main { row, col, .. } => TraceEntry::Main { row, col },
+            MultiTraceEntry::Permutation { row, col, .. } => TraceEntry::Permutation { row, col },
+            MultiTraceEntry::VirtualColumnCount {
+                row, interaction, ..
+            } => TraceEntry::VirtualColumnCount { row, interaction },
+            MultiTraceEntry::VirtualColumnField {
+                row,
+                interaction,
+                field,
+                ..
+            } => TraceEntry::VirtualColumnField {
+                row,
+                interaction,
+                field,
+            },
+            MultiTraceEntry::Public { index } => TraceEntry::Public { index },
+        }
+    }
+}
+
+impl From<TraceEntry> for ColumnEntry {
+    fn from(entry: TraceEntry) -> Self {
+        match entry {
+            TraceEntry::None => ColumnEntry::None,
+            TraceEntry::Preprocessed { col, .. } => ColumnEntry::Preprocessed { col },
+            TraceEntry::Main { col, .. } => ColumnEntry::Main { col },
+            TraceEntry::Permutation { col, .. } => ColumnEntry::Permutation { col },
+            TraceEntry::VirtualColumnCount { interaction, .. } => {
+                ColumnEntry::VirtualColumnCount { interaction }
+            }
+            TraceEntry::VirtualColumnField {
+                interaction, field, ..
+            } => ColumnEntry::VirtualColumnField { interaction, field },
+            TraceEntry::Public { index } => ColumnEntry::Public { index },
+        }
+    }
+}
