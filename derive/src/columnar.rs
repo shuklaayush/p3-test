@@ -82,16 +82,17 @@ pub fn generate_primitive_header_expr(
     match maybe_lengths {
         Some(lengths) => {
             if lengths.is_empty() {
-                let ty = type_generic.to_string();
                 quote! {
-                    out.push((#prefix.to_string(), #ty.to_string()));
+                    out.push((#prefix.to_string(), "Field".to_string(), offset..offset+1));
+                    offset += 1;
                 }
             } else {
                 let ty = lengths
                     .iter()
-                    .fold(type_generic.to_string(), |acc, _| format!("{}[{{}}]", acc));
+                    .fold("Field".to_string(), |acc, _| format!("{}[{{}}]", acc));
                 quote! {
-                    out.push((#prefix.to_string(), format!(#ty, #(#lengths),*)));
+                    let total_len = [#(#lengths,)*].iter().fold(1, |acc, len| acc * len);
+                    out.push((#prefix.to_string(), format!(#ty, #(#lengths),*), offset..offset+total_len));
                 }
             }
         }
@@ -116,9 +117,10 @@ pub fn generate_primitive_header_expr(
                     let name = &last_segment.ident;
                     let generic_args = &last_segment.arguments;
                     quote! {
-                        for (header, ty) in #name::#generic_args::headers_and_types() {
-                            out.push((format!("{}.{}", #prefix, header), ty));
+                        for (header, ty, range) in #name::#generic_args::headers_and_types() {
+                            out.push((format!("{}.{}", #prefix, header), ty, range.start + offset..range.end + offset));
                         }
+                        offset += #name::#generic_args::num_cols();
                     }
                 }
                 _ => unreachable!(),
@@ -179,8 +181,9 @@ pub fn generate_headers_and_types(data: &Data, type_generic: &Ident) -> proc_mac
 
     quote! {
         #[cfg(feature = "air-logger")]
-        pub fn headers_and_types() -> alloc::vec::Vec<(String, String)> {
+        pub fn headers_and_types() -> alloc::vec::Vec<(String, String, core::ops::Range<usize>)> {
             let mut out = alloc::vec::Vec::new();
+            let mut offset = 0;
             #(#header_exprs)*
             out
         }

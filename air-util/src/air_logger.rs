@@ -4,8 +4,8 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::borrow::Borrow;
 use core::error::Error;
+use core::{borrow::Borrow, ops::Range};
 
 use p3_field::{ExtensionField, PrimeField32};
 use p3_interaction::{Interaction, InteractionType};
@@ -22,7 +22,12 @@ pub trait AirLogger {
 
     fn main_headers(&self) -> Vec<String>;
 
-    fn headers_and_types(&self) -> Vec<(String, String)>;
+    fn preprocessed_headers_and_types(&self) -> Vec<(String, String, Range<usize>)> {
+        // TODO: Assert preprocessed trace is None here
+        vec![]
+    }
+
+    fn main_headers_and_types(&self) -> Vec<(String, String, Range<usize>)>;
 
     fn write_traces_to_worksheet<F, EF>(
         &self,

@@ -95,9 +95,15 @@ pub fn generate_trait_impls(
                 }
             }
 
-            fn headers_and_types(&self) -> alloc::vec::Vec<(String, String)> {
+            fn preprocessed_headers_and_types(&self) -> alloc::vec::Vec<(String, String, core::ops::Range<usize>)> {
                 match self {
-                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger>::headers_and_types(chip),)*
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger>::preprocessed_headers_and_types(chip),)*
+                }
+            }
+
+            fn main_headers_and_types(&self) -> alloc::vec::Vec<(String, String, core::ops::Range<usize>)> {
+                match self {
+                    #(#name::#variant_names(chip) => <#variant_field_types as p3_air_util::AirLogger>::main_headers_and_types(chip),)*
                 }
             }
         }

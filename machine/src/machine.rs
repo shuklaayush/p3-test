@@ -1,10 +1,10 @@
-#[cfg(feature = "air-logger")]
-use alloc::format;
 use alloc::vec::Vec;
 
 use itertools::Itertools;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_commit::{Pcs, PolynomialSpace};
+#[cfg(feature = "schema")]
+use p3_field::Field;
 use p3_field::PrimeField32;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{StarkGenericConfig, Val};
@@ -15,8 +15,8 @@ use p3_air_util::folders::{
     VerifierConstraintFolder,
 };
 use p3_air_util::proof::Commitments;
-#[cfg(feature = "air-logger")]
-use p3_air_util::AirLogger;
+#[cfg(feature = "schema")]
+use p3_interaction::InteractionAir;
 use p3_interaction::{Bus, Rap, NUM_PERM_CHALLENGES};
 
 #[cfg(debug_assertions)]
@@ -172,6 +172,7 @@ pub trait Machine {
         #[cfg(feature = "air-logger")]
         let _ = trace.write_traces_to_file("trace.xlsx", perm_challenges);
 
+        // TODO: Check number of virtual columns in bus are same
         // Verify constraints
         #[cfg(debug_assertions)]
         trace.check_constraints::<Self::Bus>(perm_challenges, &[]);
@@ -313,17 +314,114 @@ pub trait Machine {
         Ok(())
     }
 
-    #[cfg(feature = "air-logger")]
-    fn write_schema_to_file(&self, path: &str) {
+    #[cfg(feature = "schema")]
+    fn write_schema_to_file<F>(&self, path: &str)
+    where
+        F: Field,
+        Self::Chip: InteractionAir<F>,
+    {
+        use alloc::collections::BTreeMap;
+        use alloc::format;
+        use alloc::vec;
+        use alloc::vec::Vec;
+        use core::iter::once;
+        use p3_air::PairCol;
+        use p3_air_util::AirLogger;
+        use p3_interaction::InteractionType;
+        use std::fs::File;
+        use std::io::{BufWriter, Write};
+
         let chips = self.chips();
+        let f = File::create(path).expect("Unable to create file");
+        let mut f = BufWriter::new(f);
+        let mut bus_lengths = BTreeMap::new();
+        let mut interaction_rows = vec![];
         for chip in chips.iter() {
-            let headers_and_types = chip.headers_and_types();
+            let mut chip_rows = BTreeMap::new();
+            let headers_and_types = chip
+                .preprocessed_headers_and_types()
+                .into_iter()
+                .chain(chip.main_headers_and_types().into_iter())
+                .collect::<Vec<_>>();
+            let preprocessed_headers = chip
+                .preprocessed_headers_and_types()
+                .into_iter()
+                .flat_map(|(header, _, header_range)| header_range.map(move |_| header.clone()))
+                .collect::<Vec<_>>();
+            let main_headers = chip
+                .main_headers_and_types()
+                .into_iter()
+                .flat_map(|(header, _, header_range)| header_range.map(move |_| header.clone()))
+                .collect::<Vec<_>>();
             let body = headers_and_types
                 .iter()
-                .map(|(header, ty)| format!("\t{} {}", header, ty))
+                .map(|(header, ty, _)| format!("    \"{}\" {}", header, ty))
                 .join("\n");
-            let table = format!("Table {} {{{}}}\n\n", chip, body);
-            dbg!(table);
+            let table = format!("Table {} {{\n{}\n}}\n\n", chip, body);
+            f.write_all(table.as_bytes()).expect("Unable to write data");
+
+            for (interaction, ty) in chip.all_interactions().iter() {
+                let bus = Self::Bus::from(interaction.argument_index);
+                bus_lengths
+                    .entry(bus as usize)
+                    .and_modify(|existing_length| {
+                        *existing_length =
+                            core::cmp::max(*existing_length, interaction.fields.len());
+                    })
+                    .or_insert(interaction.fields.len());
+
+                let direction = match ty {
+                    InteractionType::Receive => '<',
+                    InteractionType::Send => '>',
+                };
+                for (col, _) in interaction.count.column_weights.iter() {
+                    let header = match col {
+                        PairCol::Preprocessed(k) => &preprocessed_headers[*k],
+                        PairCol::Main(k) => &main_headers[*k],
+                    };
+                    let row = (
+                        format!("Ref: \"{}\".\"{}\"", chip, header),
+                        format!("\"{}\".\"count\"\n", bus),
+                    );
+                    if chip_rows.contains_key(&row) && chip_rows[&row] != direction {
+                        chip_rows.insert(row, '-');
+                    } else {
+                        chip_rows.insert(row, direction);
+                    }
+                }
+                for (j, field) in interaction.fields.iter().enumerate() {
+                    for (col, _) in field.column_weights.iter() {
+                        let header = match col {
+                            PairCol::Preprocessed(k) => &preprocessed_headers[*k],
+                            PairCol::Main(k) => &main_headers[*k],
+                        };
+                        let row = (
+                            format!("Ref: \"{}\".\"{}\"", chip, header),
+                            format!("\"{}\".\"vc[{}]\"\n", bus, j),
+                        );
+                        if chip_rows.contains_key(&row) && chip_rows[&row] != direction {
+                            chip_rows.insert(row, '-');
+                        } else {
+                            chip_rows.insert(row, direction);
+                        }
+                    }
+                }
+            }
+            interaction_rows.push(chip_rows);
+        }
+        for (i, &length) in bus_lengths.iter() {
+            let body = once("    \"count\" Field".to_string())
+                .chain((0..length).map(|i| format!("    \"vc[{}]\" Field", i)))
+                .join("\n");
+            let table = format!("Table {} {{\n{}\n}}\n\n", Bus::from(i), body);
+            f.write_all(table.as_bytes()).expect("Unable to write data");
+        }
+        for chip_rows in interaction_rows.into_iter() {
+            for ((prefix, suffix), direction) in chip_rows.into_iter() {
+                let row = format!("{} {} {}", prefix, direction, suffix);
+                f.write_all(row.as_bytes()).expect("Unable to write data");
+            }
+            f.write_all("\n".as_bytes()).expect("Unable to write data");
         }
     }
 }
