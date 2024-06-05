@@ -1,8 +1,6 @@
 #[cfg(feature = "air-logger")]
 use alloc::boxed::Box;
 #[cfg(feature = "air-logger")]
-use alloc::collections::BTreeSet;
-#[cfg(feature = "air-logger")]
 use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;

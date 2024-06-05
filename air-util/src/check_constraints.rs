@@ -1,4 +1,4 @@
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeMap;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
@@ -318,71 +318,70 @@ where
     for (i, air) in airs.iter().enumerate() {
         let preprocessed_i = preprocessed[i].as_ref();
         let main_i = main[i].as_ref();
-        for (j, (interaction, interaction_type)) in air.all_interactions().iter().enumerate() {
-            let preprocessed_height = preprocessed_i.map_or(0, |t| t.height());
-            let main_height = main_i.map_or(0, |t| t.height());
-            let height = preprocessed_height.max(main_height);
+        let preprocessed_height = preprocessed_i.map_or(0, |t| t.height());
+        let main_height = main_i.map_or(0, |t| t.height());
+        let height = preprocessed_height.max(main_height);
+        for n in 0..height {
+            let preprocessed_row = preprocessed_i
+                .map(|preprocessed| {
+                    let row = preprocessed.row_slice(n);
+                    let row: &[_] = (*row).borrow();
+                    row.iter()
+                        .enumerate()
+                        .map(|(k, x)| {
+                            let entry = MultiTraceEntry::Preprocessed {
+                                trace: i,
+                                row: n,
+                                col: k,
+                            };
+                            TrackedFieldVariable::new(*x, entry)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let main_row = main_i
+                .map(|main| {
+                    let row = main.row_slice(n);
+                    let row: &[_] = (*row).borrow();
+                    row.iter()
+                        .enumerate()
+                        .map(|(k, x)| {
+                            let entry = MultiTraceEntry::Main {
+                                trace: i,
+                                row: n,
+                                col: k,
+                            };
+                            TrackedFieldVariable::new(*x, entry)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
 
-            for n in 0..height {
-                let preprocessed_row = preprocessed_i
-                    .map(|preprocessed| {
-                        let row = preprocessed.row_slice(n);
-                        let row: &[_] = (*row).borrow();
-                        row.iter()
-                            .enumerate()
-                            .map(|(k, x)| {
-                                let entry = MultiTraceEntry::Preprocessed {
-                                    trace: i,
-                                    row: n,
-                                    col: k,
-                                };
-                                TrackedFieldVariable::new(*x, entry)
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
-                let main_row = main_i
-                    .map(|main| {
-                        let row = main.row_slice(n);
-                        let row: &[_] = (*row).borrow();
-                        row.iter()
-                            .enumerate()
-                            .map(|(k, x)| {
-                                let entry = MultiTraceEntry::Main {
-                                    trace: i,
-                                    row: n,
-                                    col: k,
-                                };
-                                TrackedFieldVariable::new(*x, entry)
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
-
-                let mut mult = interaction
-                    .count
-                    .apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
-                        preprocessed_row.as_slice(),
-                        main_row.as_slice(),
-                    );
-                // Add virtual column field
+            for (j, (interaction, interaction_type)) in air.all_interactions().iter().enumerate() {
                 let entry = MultiTraceEntry::VirtualColumnCount {
                     trace: i,
                     row: n,
                     interaction: j,
                 };
                 entries[i].constrained.insert(TraceEntry::from(entry));
+                let mut mult = interaction
+                    .count
+                    .apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
+                        preprocessed_row.as_slice(),
+                        main_row.as_slice(),
+                    );
                 mult.value_origin.insert(entry);
+                entries[i].constrained.extend(
+                    mult.constraint_origin
+                        .iter()
+                        .map(|entry| TraceEntry::from(*entry)),
+                );
 
                 let fields = interaction
                     .fields
                     .iter()
                     .enumerate()
                     .map(|(k, f)| {
-                        let mut expr = f.apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
-                            preprocessed_row.as_slice(),
-                            main_row.as_slice(),
-                        );
                         // Add virtual column field
                         let entry = MultiTraceEntry::VirtualColumnField {
                             trace: i,
@@ -391,7 +390,18 @@ where
                             field: k,
                         };
                         entries[i].constrained.insert(TraceEntry::from(entry));
+                        // Add origin fields
+                        let mut expr = f.apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
+                            preprocessed_row.as_slice(),
+                            main_row.as_slice(),
+                        );
                         expr.value_origin.insert(entry);
+                        entries[i].constrained.extend(
+                            expr.constraint_origin
+                                .iter()
+                                .map(|entry| TraceEntry::from(*entry)),
+                        );
+
                         expr
                     })
                     .collect::<Vec<_>>();
