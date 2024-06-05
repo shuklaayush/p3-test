@@ -377,7 +377,7 @@ where
                         .map(|entry| TraceEntry::from(*entry)),
                 );
 
-                let fields = interaction
+                let values = interaction
                     .fields
                     .iter()
                     .enumerate()
@@ -401,15 +401,16 @@ where
                                 .iter()
                                 .map(|entry| TraceEntry::from(*entry)),
                         );
+                        // Add field origin value to multipicity origin set
+                        mult.value_origin.extend(expr.value_origin);
 
-                        expr
+                        expr.value
                     })
                     .collect::<Vec<_>>();
                 let val = match interaction_type {
                     InteractionType::Send => mult,
                     InteractionType::Receive => -mult,
                 };
-                let values = fields.iter().map(|f| f.value).collect::<Vec<_>>();
                 bus_counts
                     .entry(interaction.argument_index)
                     .or_insert_with(HashMap::new)
