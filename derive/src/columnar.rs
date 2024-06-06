@@ -1,13 +1,13 @@
 use quote::format_ident;
 use quote::quote;
-use syn::Expr;
 use syn::{Data, Fields, Ident, Type};
 
+#[cfg(feature = "schema")]
 pub fn get_type_array_lengths<'a>(
     type_generic: &Ident,
     field_type: &'a Type,
-    mut lengths: Vec<&'a Expr>,
-) -> Option<Vec<&'a Expr>> {
+    mut lengths: Vec<&'a syn::Expr>,
+) -> Option<Vec<&'a syn::Expr>> {
     match field_type {
         Type::Array(array) => {
             let elem_type = &array.elem;
@@ -71,6 +71,7 @@ pub fn generate_header_expr(
     }
 }
 
+#[cfg(feature = "schema")]
 pub fn generate_primitive_header_expr(
     type_generic: &Ident,
     field_type: &Type,
@@ -159,6 +160,7 @@ pub fn generate_headers(data: &Data, type_generic: &Ident) -> proc_macro2::Token
     }
 }
 
+#[cfg(feature = "schema")]
 pub fn generate_headers_and_types(data: &Data, type_generic: &Ident) -> proc_macro2::TokenStream {
     let fields = match data {
         Data::Struct(ref data) => match data.fields {

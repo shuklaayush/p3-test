@@ -208,7 +208,10 @@ where
                         .iter()
                         .enumerate()
                         .map(|(j, x)| {
-                            let entry = TraceEntry::Preprocessed { row: i, col: j };
+                            let entry = TraceEntry::Preprocessed {
+                                row: i_next,
+                                col: j,
+                            };
                             TrackedFieldVariable::new(*x, entry)
                         })
                         .collect::<Vec<_>>(),
@@ -231,7 +234,10 @@ where
                         .iter()
                         .enumerate()
                         .map(|(j, x)| {
-                            let entry = TraceEntry::Main { row: i, col: j };
+                            let entry = TraceEntry::Main {
+                                row: i_next,
+                                col: j,
+                            };
                             TrackedFieldVariable::new(*x, entry)
                         })
                         .collect::<Vec<_>>(),
@@ -256,7 +262,10 @@ where
                         .iter()
                         .enumerate()
                         .map(|(j, x)| {
-                            let entry = TraceEntry::Permutation { row: i, col: j };
+                            let entry = TraceEntry::Permutation {
+                                row: i_next,
+                                col: j,
+                            };
                             TrackedFieldVariable::new(*x, entry)
                         })
                         .collect::<Vec<_>>(),

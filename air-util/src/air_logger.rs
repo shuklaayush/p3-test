@@ -83,6 +83,7 @@ pub trait AirLogger {
 
         let main_headers = self.main_headers();
         if !main_headers.is_empty() {
+            // TODO: Yellow if not all rows are constrained
             for (j, header) in main_headers.iter().enumerate() {
                 let format = generate_format(&column_entries, ColumnEntry::Main { col: j });
                 ws.write_with_format(0, offset, header, &format)?;
