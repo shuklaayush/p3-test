@@ -384,53 +384,46 @@ where
                         preprocessed_row.as_slice(),
                         main_row.as_slice(),
                     );
+                mult = match interaction_type {
+                    InteractionType::Send => mult,
+                    InteractionType::Receive => -mult,
+                };
                 mult.value_origin.insert(entry);
                 entries[i].constrained.extend(
                     mult.constraint_origin
                         .iter()
                         .map(|entry| TraceEntry::from(*entry)),
                 );
+                for (k, field) in interaction.fields.iter().enumerate() {
+                    // Add virtual column field
+                    let entry = MultiTraceEntry::VirtualColumnField {
+                        trace: i,
+                        row: n,
+                        interaction: j,
+                        field: k,
+                    };
+                    entries[i].constrained.insert(TraceEntry::from(entry));
+                    // Add origin fields
+                    let mut expr = field.apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
+                        preprocessed_row.as_slice(),
+                        main_row.as_slice(),
+                    );
+                    expr.value_origin.insert(entry);
+                    entries[i].constrained.extend(
+                        expr.constraint_origin
+                            .iter()
+                            .map(|entry| TraceEntry::from(*entry)),
+                    );
 
-                let values = interaction
-                    .fields
-                    .iter()
-                    .enumerate()
-                    .map(|(k, f)| {
-                        // Add virtual column field
-                        let entry = MultiTraceEntry::VirtualColumnField {
-                            trace: i,
-                            row: n,
-                            interaction: j,
-                            field: k,
-                        };
-                        entries[i].constrained.insert(TraceEntry::from(entry));
-                        // Add origin fields
-                        let mut expr = f.apply::<TrackedFieldExpression<F, MultiTraceEntry>, _>(
-                            preprocessed_row.as_slice(),
-                            main_row.as_slice(),
-                        );
-                        expr.value_origin.insert(entry);
-                        entries[i].constrained.extend(
-                            expr.constraint_origin
-                                .iter()
-                                .map(|entry| TraceEntry::from(*entry)),
-                        );
-                        // Add field origin value to multipicity origin set
-                        mult.value_origin.extend(expr.value_origin);
-
-                        expr.value
-                    })
-                    .collect::<Vec<_>>();
-                let val = match interaction_type {
-                    InteractionType::Send => mult,
-                    InteractionType::Receive => -mult,
-                };
-                bus_counts
-                    .entry(interaction.argument_index)
-                    .or_insert_with(HashMap::new)
-                    .entry(values)
-                    .and_modify(|c| *c += val.clone())
-                    .or_insert(val);
+                    let field_val = expr.value;
+                    let val = mult.clone() * expr;
+                    bus_counts
+                        .entry(interaction.argument_index)
+                        .or_insert_with(HashMap::new)
+                        .entry((k, field_val))
+                        .and_modify(|c| *c += val.clone())
+                        .or_insert(val);
+                }
             }
         }
     }
