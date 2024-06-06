@@ -145,7 +145,12 @@ pub fn check_cumulative_sums<F, EF, A, B>(
         }
     }
     for (i, sum) in sums {
-        assert_eq!(sum, EF::zero(), "{} cumulative sum is not zero", B::from(i));
+        assert_eq!(
+            sum,
+            EF::zero(),
+            "{} bus cumulative sum is not zero",
+            B::from(i)
+        );
     }
 
     // Check cumulative sums
