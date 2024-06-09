@@ -10,7 +10,7 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{StarkGenericConfig, Val};
 use tracing::instrument;
 
-use p3_air_util::folders::{
+use p3_air_util::folders::rap::{
     DebugConstraintBuilder, ProverConstraintFolder, SymbolicAirBuilder, TrackingConstraintBuilder,
     VerifierConstraintFolder,
 };

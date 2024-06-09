@@ -10,10 +10,10 @@ use core::error::Error;
 use itertools::Itertools;
 use p3_air::BaseAir;
 #[cfg(feature = "air-logger")]
-use p3_air_util::folders::{EntriesLog, TrackingConstraintBuilder};
+use p3_air_util::folders::{rap::TrackingConstraintBuilder, EntriesLog};
 use p3_air_util::{
-    check_constraints, check_cumulative_sums,
-    folders::{
+    debug::rap::{check_constraints, check_cumulative_sums},
+    folders::rap::{
         DebugConstraintBuilder, ProverConstraintFolder, SymbolicAirBuilder,
         VerifierConstraintFolder,
     },
@@ -21,7 +21,10 @@ use p3_air_util::{
     proof::{AdjacentOpenedValues, InteractionAirProof, OpenedValues},
 };
 #[cfg(feature = "air-logger")]
-use p3_air_util::{track_failing_constraints, track_failing_interactions, util::TraceEntry};
+use p3_air_util::{
+    debug::rap::{track_constraints, track_interactions},
+    util::TraceEntry,
+};
 use p3_commit::{OpenedValuesForRound, Pcs, PolynomialSpace};
 #[cfg(feature = "air-logger")]
 use p3_field::PrimeField32;
@@ -522,13 +525,13 @@ where
     Val<SC>: PrimeField32,
 {
     // TODO: Move to separate trait
-    fn track_failing_constraints(
+    fn track_constraints(
         &self,
         perm_challenges: [SC::Challenge; 2],
         public_values: &[Val<SC>],
     ) -> Vec<EntriesLog<TraceEntry>>;
 
-    fn track_failing_interactions(&self) -> Vec<EntriesLog<TraceEntry>>;
+    fn track_interactions(&self) -> Vec<EntriesLog<TraceEntry>>;
 
     fn write_traces_to_file(
         &self,
@@ -546,7 +549,7 @@ where
         + for<'b> Rap<DebugConstraintBuilder<'b, Val<SC>, SC::Challenge>>
         + for<'b> Rap<TrackingConstraintBuilder<'b, Val<SC>, SC::Challenge>>,
 {
-    fn track_failing_constraints(
+    fn track_constraints(
         &self,
         perm_challenges: [SC::Challenge; 2],
         public_values: &[Val<SC>],
@@ -565,7 +568,7 @@ where
                 .permutation
                 .as_ref()
                 .map(|permutation| permutation.trace.value.as_view());
-            let indices = track_failing_constraints(
+            let indices = track_constraints(
                 &chip_trace.chip,
                 &preprocessed,
                 &main,
@@ -579,7 +582,7 @@ where
         chip_indices
     }
 
-    fn track_failing_interactions(&self) -> Vec<EntriesLog<TraceEntry>> {
+    fn track_interactions(&self) -> Vec<EntriesLog<TraceEntry>> {
         let preprocessed_traces = self
             .iter()
             .map(|chip_trace| {
@@ -604,7 +607,7 @@ where
             .map(|chip_trace| chip_trace.chip.clone())
             .collect_vec();
 
-        track_failing_interactions(&airs, &preprocessed_traces, &main_traces)
+        track_interactions(&airs, &preprocessed_traces, &main_traces)
     }
 
     fn write_traces_to_file(
@@ -621,11 +624,11 @@ where
 
         // TODO: Account for public values
         let mut entries = vec![EntriesLog::default(); self.len()];
-        self.track_failing_constraints(perm_challenges, &[])
+        self.track_constraints(perm_challenges, &[])
             .iter()
             .zip(&mut entries)
             .for_each(|(entry, set)| set.extend(entry));
-        self.track_failing_interactions()
+        self.track_interactions()
             .iter()
             .zip(&mut entries)
             .for_each(|(entry, set)| set.extend(entry));

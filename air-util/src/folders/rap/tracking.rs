@@ -1,28 +1,13 @@
-use alloc::collections::BTreeSet;
-
 use p3_air::{
     AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PairBuilder, PermutationAirBuilder,
 };
 use p3_field::{ExtensionField, Field};
 use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
 
-use super::ViewPair;
+use crate::folders::{EntriesLog, ViewPair};
 use crate::util::{
     TraceEntry, TrackedExtensionFieldExpression, TrackedFieldExpression, TrackedFieldVariable,
 };
-
-#[derive(Default, Clone)]
-pub struct EntriesLog<T: Copy + Ord> {
-    pub failing: BTreeSet<T>,
-    pub constrained: BTreeSet<T>,
-}
-
-impl<T: Copy + Ord> EntriesLog<T> {
-    pub fn extend(&mut self, other: &Self) {
-        self.failing.extend(&other.failing);
-        self.constrained.extend(&other.constrained);
-    }
-}
 
 // TODO: Remove permutations?
 pub struct TrackingConstraintBuilder<'a, F, EF>

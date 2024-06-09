@@ -2,7 +2,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use itertools::Itertools;
-use p3_air_util::folders::VerifierConstraintFolder;
+use p3_air_util::folders::rap::VerifierConstraintFolder;
 use p3_air_util::proof::OpenedValues;
 use p3_commit::PolynomialSpace;
 use p3_field::{AbstractExtensionField, AbstractField, Field};

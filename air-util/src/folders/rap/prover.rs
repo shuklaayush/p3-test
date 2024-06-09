@@ -4,7 +4,7 @@ use p3_air::{
 use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
 use p3_uni_stark::{PackedChallenge, PackedVal, StarkGenericConfig, Val};
 
-use super::ViewPair;
+use crate::folders::ViewPair;
 
 /// A folder for prover constraints.
 pub struct ProverConstraintFolder<'a, SC: StarkGenericConfig> {

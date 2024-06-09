@@ -6,7 +6,7 @@ use p3_uni_stark::SymbolicExpression;
 use p3_util::log2_ceil_usize;
 use tracing::instrument;
 
-use crate::folders::SymbolicAirBuilder;
+use crate::folders::rap::SymbolicAirBuilder;
 
 #[instrument(name = "infer log of constraint degree", skip_all)]
 pub fn get_quotient_degree<F, A>(air: &A, num_public_values: usize) -> usize

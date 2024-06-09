@@ -4,7 +4,7 @@ use p3_air::{
 use p3_field::{ExtensionField, Field};
 use p3_interaction::{InteractionAirBuilder, NUM_PERM_CHALLENGES};
 
-use super::ViewPair;
+use crate::folders::ViewPair;
 
 /// An `AirBuilder` which asserts that each constraint is zero, allowing any failed constraints to
 /// be detected early.
