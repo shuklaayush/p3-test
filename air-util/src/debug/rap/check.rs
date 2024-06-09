@@ -92,6 +92,7 @@ pub fn check_constraints<F, EF, A>(
     });
 }
 
+// TODO: Check number of virtual columns in bus are same
 pub fn check_cumulative_sums<F, EF, A, B>(
     airs: &[A],
     preprocessed: &[Option<RowMajorMatrixView<F>>],

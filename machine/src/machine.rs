@@ -170,12 +170,13 @@ pub trait Machine {
         let alpha: SC::Challenge = challenger.sample_ext_element();
 
         #[cfg(feature = "air-logger")]
-        let _ = trace.write_traces_to_file("trace.xlsx", perm_challenges);
+        let _ = tracing::info_span!("writing traces to file")
+            .in_scope(|| trace.write_traces_to_file("trace.xlsx", perm_challenges));
 
-        // TODO: Check number of virtual columns in bus are same
         // Verify constraints
         #[cfg(debug_assertions)]
-        trace.check_constraints::<Self::Bus>(perm_challenges, &[]);
+        tracing::info_span!("checking constraints")
+            .in_scope(|| trace.check_constraints::<Self::Bus>(perm_challenges, &[]));
 
         // 6. Generate and commit to quotient traces
         tracing::info_span!("generate quotient trace").in_scope(|| {

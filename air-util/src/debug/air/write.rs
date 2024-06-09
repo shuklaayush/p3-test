@@ -23,9 +23,27 @@ pub fn write_traces_to_worksheet<F>(
 where
     F: PrimeField32,
 {
-    let preprocessed_width = preprocessed_trace.as_ref().map_or(0, |t| t.width() + 1);
-    let main_width = main_trace.as_ref().map_or(0, |t| t.width() + 1);
-    let total_width = preprocessed_width + main_width;
+    let preprocessed_width = preprocessed_trace.as_ref().map_or(0, |t| t.width());
+    let main_width = main_trace.as_ref().map_or(0, |t| t.width());
+    debug_assert!(
+        preprocessed_headers.len() == preprocessed_width,
+        "preprocessed_headers.len() = {}, preprocessed_trace.width() = {}",
+        preprocessed_headers.len(),
+        preprocessed_width,
+    );
+    debug_assert!(
+        main_headers.len() == main_width,
+        "main_headers.len() = {}, main_trace.width() = {}",
+        main_headers.len(),
+        main_width,
+    );
+    let preprocessed_width_buffered = if preprocessed_width == 0 {
+        0
+    } else {
+        preprocessed_width + 1
+    };
+    let main_width_buffered = if main_width == 0 { 0 } else { main_width + 1 };
+    let total_width = preprocessed_width_buffered + main_width_buffered;
     let mut headers = vec![String::new(); total_width];
 
     let mut offset = 0;
